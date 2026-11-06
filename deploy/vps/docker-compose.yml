@@ -1,0 +1,35 @@
+# CloudCLI Remote - Controller on a Linux VPS.
+# Run from the claudecodeui folder:
+#   cp deploy/vps/vps.env.example deploy/vps/.env   # then edit it (chmod 600)
+#   docker compose -f deploy/vps/docker-compose.yml up -d --build
+services:
+  cloudcli:
+    build:
+      context: ../..                       # = the claudecodeui folder
+      dockerfile: deploy/vps/Dockerfile
+    image: cloudcli-remote:latest
+    container_name: cloudcli-remote
+    init: true                             # reaps zombie PTY/shell children, forwards signals
+    restart: unless-stopped
+    env_file:
+      - .env                               # deploy/vps/.env (secrets live here, never in git)
+    environment:
+      HOST: "0.0.0.0"                      # inside the container only
+      SERVER_PORT: "3001"
+    ports:
+      # Published on the VPS loopback only. The HTTPS reverse proxy (nginx/Caddy/cloudflared)
+      # on the VPS is the only thing that reaches it. Do NOT change this to "3001:3001":
+      # Docker publishes such ports straight through the firewall, bypassing firewalld.
+      - "127.0.0.1:3001:3001"
+    volumes:
+      # Named volume (not a bind mount): no uid/SELinux label problems on CentOS.
+      - cloudcli-data:/home/node/.cloudcli
+    # Small log footprint on the VPS disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  cloudcli-data:

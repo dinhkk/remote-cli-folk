@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!--
+      Remote tab shim. A Remote tab is a sandboxed iframe without allow-same-origin,
+      where merely READING localStorage, sessionStorage, document.cookie or
+      navigator.serviceWorker throws. This must run before every other script on the
+      page (including the service-worker script below) and does nothing outside a tab.
+      The real in-memory storage, synced to the Controller page, replaces these
+      stand-ins in src/shared/transport/storage-shim.ts once the app boots.
+    -->
+    <script data-cloudcli-target-shim>
+      (function () {
+        try {
+          // Same rule as initTargetContext (src/shared/transport/target-context.ts):
+          // a tab is a FRAME with a valid id from the query (the first ?target= wins,
+          // an invalid one is not retried from window.name) or else from window.name.
+          // A top-level page that merely carries ?target= or a tab-like name is a normal page.
+          var idPattern = /^[A-Za-z0-9_-]{1,64}$/;
+          var inTab = false;
+          if (window.parent && window.parent !== window) {
+            var queryTarget = null;
+            var pairs = String(window.location.search).replace(/^\?/, '').split('&');
+            for (var i = 0; i < pairs.length; i++) {
+              var eq = pairs[i].indexOf('=');
+              if ((eq === -1 ? pairs[i] : pairs[i].slice(0, eq)) === 'target') {
+                var raw = eq === -1 ? '' : pairs[i].slice(eq + 1).replace(/\+/g, ' ');
+                try { queryTarget = decodeURIComponent(raw); } catch (e) { queryTarget = ''; }
+                break;
+              }
+            }
+            var tabName = String(window.name);
+            inTab = queryTarget !== null
+              ? idPattern.test(queryTarget)
+              : tabName.indexOf('cloudcli-target:') === 0 && idPattern.test(tabName.slice('cloudcli-target:'.length));
+          }
+          if (!inTab) return;
+          window.__CLOUDCLI_TARGET__ = true;
+
+          var memoryStorage = function () {
+            var data = {};
+            return {
+              get length() { return Object.keys(data).length; },
+              key: function (index) { var k = Object.keys(data)[index]; return k === undefined ? null : k; },
+              getItem: function (key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+              setItem: function (key, value) { data[String(key)] = String(value); },
+              removeItem: function (key) { delete data[key]; },
+              clear: function () { data = {}; }
+            };
+          };
+          var local = memoryStorage();
+          var session = memoryStorage();
+          Object.defineProperty(window, 'localStorage', { configurable: true, get: function () { return local; } });
+          Object.defineProperty(window, 'sessionStorage', { configurable: true, get: function () { return session; } });
+          Object.defineProperty(window.document, 'cookie', { configurable: true, get: function () { return ''; }, set: function () {} });
+
+          var serviceWorker = {
+            controller: null,
+            ready: new Promise(function () {}),
+            register: function () { return Promise.reject(new Error('Service workers are not available in a Remote tab')); },
+            getRegistration: function () { return Promise.resolve(undefined); },
+            getRegistrations: function () { return Promise.resolve([]); },
+            addEventListener: function () {},
+            removeEventListener: function () {}
+          };
+          Object.defineProperty(navigator, 'serviceWorker', { configurable: true, get: function () { return serviceWorker; } });
+        } catch (e) { /* a normal document has nothing to shim */ }
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>RemoteCLI UI</title>
+
+    <!-- Fonts (Encode Sans for the UI, Merriweather for chat) are self-hosted: see src/fonts.css. No third-party request. -->
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials"  />
+    
+    <!-- iOS Safari PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RemoteCLI" />
+    
+    <!-- iOS Safari Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    
+    <!-- Prevent zoom on iOS -->
+    <meta name="format-detection" content="telephone=no" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator && !window.__CLOUDCLI_TARGET__) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>

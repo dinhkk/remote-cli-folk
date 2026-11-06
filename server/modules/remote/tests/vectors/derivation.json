@@ -1,0 +1,27 @@
+{
+  "link": {
+    "kHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "roomId": "89ebf947fd57d521d2760b3fdfe59a1e",
+    "hostToken": "PBWABbVSs_ZCtn9b5Ql0PRXNHJ0u0Iz6defwmPucUHY",
+    "controllerToken": "nenCJ-vpWClz62GgXOknt_84qCaUkPwRIsztpbpP9Rk",
+    "macKeyHex": "4ea046146c16ef1ae7d2f9c1fcb7ea45c2809dcd7cf0ad7a149abe005a8b8f96"
+  },
+  "gate": {
+    "relaySecret": "test-relay-secret",
+    "link": "39cb8b6a4ff0324cc0a35c84ed450a542f655744173658c36a924c56644b89b0",
+    "pair": "493198a7f1045faa4de88451acd79ace2da06d8eacead4dc77b962a8b1fcb014"
+  },
+  "pair": {
+    "normalizedCode": "ABCDEFGH",
+    "pairRoomId": "ef07d253f666a1bc1c94802cd592950a",
+    "pairToken": "Hf6A8TB1IRaC-XijQtmEfHTlyrWPrTeFSu7_X_HMVOE"
+  },
+  "session": {
+    "ecdhHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "nonceCHex": "404142434445464748494a4b4c4d4e4f",
+    "nonceHHex": "505152535455565758595a5b5c5d5e5f",
+    "keyC2HHex": "a8d2b4c91b452041a6d228182a0efbe8938ee65f277f8d78fde0c1b740acb514",
+    "keyH2CHex": "c121cd2b5bc8bf6339f51f4b8f5d3cc68f75a45d9c8a383f80778325f2a40b92",
+    "pairingKeyHex": "3ee39fb222ac48113b9ddf008f481562ca882eaa3ac337de7f060f5402a4661f"
+  }
+}

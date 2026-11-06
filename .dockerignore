@@ -1,0 +1,13 @@
+**/node_modules
+dist
+dist-server
+dist-server.next
+dist-server.old
+.git
+.out
+.claude
+.agents
+relay
+deploy/vps/.env
+**/.env
+**/.env.local

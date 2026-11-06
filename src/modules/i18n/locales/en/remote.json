@@ -1,0 +1,236 @@
+{
+  "tabs": {
+    "label": "Hosts",
+    "local": "Local",
+    "state": {
+      "revoked": "This pairing was revoked on the Host. Remove it and pair again to reconnect.",
+      "replaced": "This Host is now controlled from another browser. Reconnect to take over again.",
+      "locked": "The Host is locked. Unlock it on the Host to continue.",
+      "expired": "This pairing has expired. Pair the Host again to continue."
+    }
+  },
+  "target": {
+    "dismiss": "Dismiss",
+    "linkError": {
+      "REMOTE_LINK_DOWN": "The connection to the Host is down. This tab will keep retrying.",
+      "REMOTE_UPSTREAM_AUTH": "The Host did not accept this request. Check the pairing on the Host.",
+      "REMOTE_QUOTA": "This tab is sending too many requests to the Host. Wait a moment.",
+      "REMOTE_TOO_LARGE": "That request is too large to send to the Host.",
+      "REMOTE_PROTOCOL": "The Host runs an incompatible version. Update it to continue.",
+      "REMOTE_UNSUPPORTED_MODE": "Remote work is not supported in this server mode.",
+      "generic": "There was a problem reaching the Host."
+    },
+    "sessionExpiredTitle": "Session expired",
+    "sessionExpiredBody": "This tab lost its session with the Host. It will resume by itself once the Controller page renews it; if it does not, reload the tab.",
+    "sessionExpiredReload": "Reload tab"
+  },
+  "settings": {
+    "title": "Remote work",
+    "description": "Control this machine from another browser, or control other machines from here, through an end-to-end encrypted relay. The relay only forwards encrypted data.",
+    "loading": "Loading…",
+    "unavailable": "Remote work is not available on this server.",
+    "loadFailed": "Could not load the Remote work settings. Retrying automatically."
+  },
+  "relay": {
+    "title": "Relay",
+    "description": "Both machines connect out to the same relay. Enter its address and the shared secret once; the secret is stored encrypted and never shown again.",
+    "urlLabel": "Relay URL",
+    "urlPlaceholder": "wss://relay.example.workers.dev",
+    "secretLabel": "Relay secret",
+    "secretPlaceholder": "Enter the relay secret",
+    "secretStored": "A secret is stored. Enter it again to save a change.",
+    "secretRequired": "Enter the relay secret.",
+    "secretTooShort": "The relay secret must be at least 32 characters. Paste the full secret that was set on the relay.",
+    "invalidUrl": "Enter a valid relay address starting with wss:// (or https://).",
+    "changeWarning": "Changing the relay revokes every pairing. All Controllers and Hosts must pair again.",
+    "save": "Save relay",
+    "saving": "Saving…",
+    "saved": "Relay saved.",
+    "failed": "The relay settings could not be saved.",
+    "reauthTitle": "Confirm relay change",
+    "reauthDescription": "Enter your account password to save the relay settings."
+  },
+  "accept": {
+    "title": "Accept Controllers",
+    "description": "While this is on, paired Controllers can connect to this machine and run Claude Code on it. Turn it off when you do not need it.",
+    "switchLabel": "Accept Controllers",
+    "autoOffLabel": "Turn off automatically after (hours, 0 = never)",
+    "autoOffAt": "Turns off automatically at {{time}}.",
+    "relayRequired": "Save the relay settings first.",
+    "turnOnTitle": "Turn on Accept",
+    "turnOffTitle": "Turn off Accept",
+    "reauthDescription": "Enter your account password to change this setting.",
+    "failed": "The setting could not be changed.",
+    "unsupported": "Remote work cannot be turned on in this server mode."
+  },
+  "warnings": {
+    "masterKeyFile": "The master key was generated into a file on this machine. Set CLOUDCLI_REMOTE_MASTER_KEY so pairing secrets are encrypted with a key kept outside the data directory.",
+    "masterKeyMismatch": "The master key changed or is missing. Remote work is turned off and existing pairings cannot be read. Restore the original key; a new one is never generated while pairings exist.",
+    "approvalTimeout": "Tool approvals on this Host time out after {{duration}}. If you answer from a Controller, set CLAUDE_TOOL_APPROVAL_TIMEOUT_MS=300000 (5 minutes) so requests do not expire first. This also applies to Local use of this Host.",
+    "unsupportedMode": "Remote work is not supported in this server mode (platform mode, or API_KEY set on a Controller).",
+    "duration": {
+      "seconds_one": "{{count}} second",
+      "seconds_other": "{{count}} seconds",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes"
+    }
+  },
+  "device": {
+    "unverified": "Unverified",
+    "unverifiedHint": "The Controller chose this name itself. It is not verified."
+  },
+  "indicator": {
+    "connected_one": "{{count}} Controller connected",
+    "connected_other": "{{count}} Controllers connected"
+  },
+  "controllers": {
+    "title": "Paired Controllers",
+    "description": "Controllers paired with this Host. Disconnect closes a connection now; Revoke deletes the pairing for good.",
+    "empty": "No Controllers are paired with this Host.",
+    "connectedAt": "Connected at {{time}}",
+    "notConnected": "Not connected",
+    "suspendedUntil": "Suspended until {{time}}",
+    "suspendedReason": "This Controller sent too many refused requests. It can reconnect when the time is up; Revoke ends the pairing for good.",
+    "streams_one": "{{count}} open stream",
+    "streams_other": "{{count}} open streams",
+    "disconnect": "Disconnect",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke pairing",
+    "revokeDescription": "Enter your account password to revoke the pairing with {{name}}. It cannot be undone.",
+    "revokedConfirmed": "Pairing with {{name}} was revoked.",
+    "revokedUnconfirmed": "Pairing with {{name}} was revoked on this machine, but the relay has not confirmed it yet. The relay keeps being asked until it does.",
+    "actionFailed": "That action failed.",
+    "dismiss": "Dismiss"
+  },
+  "audit": {
+    "title": "Audit log",
+    "description": "A best-effort record of what Controllers did on this Host, newest first. A Controller owns a terminal on this machine and could alter the audit database, so treat this as evidence, not proof. Names are chosen by the Controller and are not verified.",
+    "loading": "Loading…",
+    "empty": "No audit entries yet.",
+    "loadFailed": "The audit log could not be loaded.",
+    "refresh": "Refresh",
+    "pageSizeLabel": "Rows per page",
+    "pagination": "Audit log pages",
+    "previous": "Previous",
+    "next": "Next",
+    "pageLabel": "Page {{page}}",
+    "filterLabel": "Controller",
+    "filterAll": "All Controllers",
+    "filterOption": "{{label}} (unverified)",
+    "event": {
+      "pair": "Pair",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "revoke": "Revoke",
+      "expire": "Expire",
+      "tool-decision": "Tool decision",
+      "pty-open": "Terminal opened",
+      "pty-close": "Terminal closed",
+      "file-write": "File write",
+      "host-write": "Host change",
+      "policy-deny": "Policy denied",
+      "quota-reject": "Quota rejected",
+      "quota-disconnect": "Quota disconnect"
+    },
+    "changed": {
+      "command": "Command changed by the Controller before it was approved. It now reads:",
+      "path": "Path changed by the Controller before it was approved. It now reads:",
+      "url": "URL changed by the Controller before it was approved. It now reads:",
+      "lengths": "(was {{from}} characters, now {{to}})"
+    },
+    "result": {
+      "allow": "Allowed",
+      "deny": "Denied",
+      "ok": "OK",
+      "refused": "Refused",
+      "error": "Error",
+      "closed": "Closed"
+    }
+  },
+  "pairHost": {
+    "start": "Pair a Controller",
+    "startTitle": "Start pairing",
+    "startDescription": "Enter your account password to create a pairing code.",
+    "lockedUntil": "Pairing is locked until {{time}} after too many wrong verification codes.",
+    "startFailed": "Pairing could not be started.",
+    "title": "Pair a Controller",
+    "codeLabel": "Pairing code",
+    "codeHelp": "On the Controller, open Settings > Remote work > Pair with a Host and type this code.",
+    "expiresIn": "Code expires in {{time}}",
+    "expired": "The code has expired. Close this window and start again.",
+    "waiting": "Waiting for the Controller to enter the code…",
+    "controllerJoined": "wants to pair.",
+    "sasLabel": "Verification code shown on the Controller",
+    "sasHelp": "Type the 6 digits the Controller displays. They must match, otherwise someone else may be on the line.",
+    "sasConfirm": "Confirm",
+    "sasChecking": "Checking…",
+    "attemptsLeft_one": "Wrong code. {{count}} attempt left.",
+    "attemptsLeft_other": "Wrong code. {{count}} attempts left.",
+    "locked": "Too many wrong codes. Pairing was cancelled and is locked for 15 minutes (until {{time}}).",
+    "failed": "Pairing failed. Close this window and start again.",
+    "confirmFailed": "The code could not be checked. Try again.",
+    "done": "Paired. The Controller can now connect while Accept is on.",
+    "close": "Close"
+  },
+  "pairController": {
+    "start": "Pair with a Host",
+    "title": "Pair with a Host",
+    "codeLabel": "Pairing code",
+    "codePlaceholder": "XXXX-XXXX",
+    "codeHelp": "Open Settings > Remote work on the Host, choose Pair a Controller, and type the code it shows.",
+    "deviceNameLabel": "Name of this browser",
+    "deviceNameDefault": "My browser",
+    "deviceNameHelp": "Shown on the Host, up to 32 letters, digits, spaces, dots, dashes or underscores.",
+    "join": "Pair",
+    "joining": "Connecting to the Host…",
+    "sasLabel": "Verification code",
+    "sasHelp": "Type this code on the Host to finish pairing. Do not continue if the Host asks for something else.",
+    "waitingHost": "Waiting for the Host to confirm…",
+    "done": "Paired. The Host now appears in the list and as a tab.",
+    "tryAgain": "Try again",
+    "close": "Close",
+    "failure": {
+      "expired": "This pairing code has expired. Ask the Host for a new one.",
+      "wrongCode": "That pairing code was not recognised. Check it and try again.",
+      "full": "The Host already has the maximum number of pairings.",
+      "rejected": "The Host did not accept the verification code. Start again with a new code.",
+      "generic": "Pairing failed. Try again with a new code."
+    }
+  },
+  "peers": {
+    "title": "Paired Hosts",
+    "description": "Machines this browser can control. Each one opens as its own tab.",
+    "empty": "No Hosts are paired yet.",
+    "lastConnected": "Last connected {{time}}",
+    "neverConnected": "Never connected",
+    "open": "Open tab",
+    "rename": "Rename",
+    "renameLabel": "Name for this Host",
+    "renameHint": "Shown on its tab instead of the device name. Stays on this browser's server; leave it empty to use the device name again.",
+    "renameSave": "Save name",
+    "renameFailed": "The name could not be saved.",
+    "declaredName": "Device name the Host declared",
+    "forget": "Forget",
+    "forgetConfirm": "Forget {{name}}? This browser stops controlling it; revoke the pairing on the Host as well.",
+    "forgetConfirmButton": "Forget pairing",
+    "cancel": "Cancel",
+    "forgetFailed": "The pairing could not be removed.",
+    "state": {
+      "connecting": "Connecting",
+      "online": "Online",
+      "offline": "Offline",
+      "locked": "Locked",
+      "replaced": "Replaced",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    }
+  },
+  "reauth": {
+    "passwordLabel": "Account password",
+    "confirm": "Confirm",
+    "checking": "Checking…",
+    "cancel": "Cancel",
+    "wrongPassword": "Wrong password. Try again.",
+    "locked": "Too many attempts. Wait a few minutes before trying again."
+  }
+}
