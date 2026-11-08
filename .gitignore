@@ -151,3 +151,14 @@ electron/*.tar.gz
 # Test fixtures created beside the tests (cleaned up by the tests; kept out of the tree if a run is killed)
 server/**/tests/read-only-roots-fixture-*/
 server/**/tests/file-tree-outside-*/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Video generation temporary frames
+video/preview_*.png
+video/frame_*.png
+video/test_*.png
+video/verify_*.png
+
