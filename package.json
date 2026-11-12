@@ -1,20 +1,20 @@
 {
-  "name": "@cloudcli-ai/cloudcli",
-  "version": "1.37.7",
-  "productName": "CloudCLI",
-  "description": "A web-based UI for Claude Code CLI",
+  "name": "@tunghuynh/remotecli",
+  "version": "1.0.0",
+  "productName": "RemoteCLI",
+  "description": "A web-based remote UI for Claude Code CLI",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
-    "cloudcli": "dist-server/server/modules/cli/cli.js"
+    "remotecli": "dist-server/server/modules/cli/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
-    "electron/",
-    "server/",
-    "shared/",
-    "public/api-docs.html",
     "dist/",
     "dist-server/",
+    "public/api-docs.html",
     "scripts/",
     "README.md"
   ],
@@ -68,10 +68,10 @@
     "update:platform": "./update-platform.sh"
   },
   "build": {
-    "appId": "ai.cloudcli.desktop",
-    "productName": "CloudCLI",
+    "appId": "ai.remotecli.desktop",
+    "productName": "RemoteCLI",
     "asar": false,
-    "artifactName": "cloudcli-desktop-${version}-${os}-${arch}.${ext}",
+    "artifactName": "remotecli-desktop-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release/desktop"
     },
@@ -90,9 +90,9 @@
     ],
     "protocols": [
       {
-        "name": "CloudCLI",
+        "name": "RemoteCLI",
         "schemes": [
-          "cloudcli"
+          "remotecli"
         ]
       }
     ],

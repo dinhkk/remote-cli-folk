@@ -99,9 +99,13 @@ const DEFAULT_SETTINGS: BrowserUseSettings = {
   enabled: false,
 };
 const AGENT_OWNER_ID = 'agent';
-const PROFILE_ROOT = path.join(os.homedir(), '.cloudcli', 'browser-use', 'profiles');
-const MCP_SERVER_NAME = 'cloudcli-browser';
-const LEGACY_MCP_SERVER_NAMES = ['cloudcli-browser-use'];
+const PROFILE_ROOT = path.join(
+  process.env.REMOTECLI_CONFIG_DIR || process.env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.remotecli'),
+  'browser-use',
+  'profiles',
+);
+const MCP_SERVER_NAME = 'remotecli-browser';
+const LEGACY_MCP_SERVER_NAMES = ['cloudcli-browser', 'cloudcli-browser-use'];
 const RUNTIME_READINESS_CACHE_TTL_MS = 30_000;
 
 function readSettings(): BrowserUseSettings {
@@ -491,6 +495,8 @@ export const browserUseService = {
       command,
       args,
       env: {
+        REMOTECLI_BROWSER_USE_MCP_TOKEN: getOrCreateMcpToken(),
+        REMOTECLI_BROWSER_USE_API_URL: getMcpApiUrl(),
         CLOUDCLI_BROWSER_USE_MCP_TOKEN: getOrCreateMcpToken(),
         CLOUDCLI_BROWSER_USE_API_URL: getMcpApiUrl(),
       },

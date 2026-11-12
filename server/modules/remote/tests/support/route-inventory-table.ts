@@ -32,7 +32,7 @@ export const ROUTE_MODULES: readonly RouteModule[] = [
   { prefix: '/api/taskmaster', file: 'modules/taskmaster/taskmaster.routes.ts', mountedAs: 'taskmasterRoutes', registrations: 12 },
   { prefix: '/api/commands', file: 'modules/commands/commands.routes.ts', mountedAs: 'commandsRoutes', registrations: 2 },
   { prefix: '/api/settings', file: 'modules/settings/settings.routes.ts', mountedAs: 'settingsRoutes', registrations: 13 },
-  { prefix: '/api/system', file: 'modules/system/system.routes.ts', mountedAs: 'systemRoutes', registrations: 1 },
+  { prefix: '/api/system', file: 'modules/system/system.routes.ts', mountedAs: 'systemRoutes', registrations: 2 },
   { prefix: '/api/notifications', file: 'modules/notifications/notifications.routes.ts', mountedAs: 'notificationRoutes', registrations: 4 },
   { prefix: '/api/user', file: 'modules/user/user.routes.ts', mountedAs: 'userRoutes', registrations: 11 },
   { prefix: '/api/plugins', file: 'modules/plugins/plugins.routes.ts', mountedAs: 'pluginsRoutes', registrations: 8 },
@@ -90,7 +90,7 @@ export function mountMismatches(indexSource: string, modules: readonly RouteModu
 }
 
 /** Rows (method x path) the whole inventory expands to: 94 allow + 95 deny. Pinned: a different number is a route change to review. */
-export const EXPECTED_INVENTORY_ROWS = 191;
+export const EXPECTED_INVENTORY_ROWS = 192;
 
 /** The literal-path registrations of `server/index.ts` that are not router mounts (everything else must be in ROUTE_MODULES). */
 export const INDEX_OTHER_LITERALS: ReadonlyArray<{ call: string; note: string }> = [

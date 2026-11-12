@@ -21,12 +21,17 @@ describe('Remote WebSocket upgrade', () => {
   it('upgrades /r/<peerId>/ws with the tab token in the subprotocol and echoes the marker, never the token', async () => {
     await withGatewayHarness({}, async (h) => {
       const socket = await h.openTab();
-      assert.equal(socket.protocol, 'cloudcli-tab');
+      assert.equal(socket.protocol, 'remotecli-tab');
       assert.ok(!socket.protocol.includes(h.tabToken));
       const stream = await h.nextStream();
       assert.equal(stream.open.kind, 'ws');
       assert.deepEqual(stream.open.kind === 'ws' ? stream.open.meta : null, { path: '/ws' });
       socket.close();
+
+      // Legacy subprotocol fallback for rolling upgrades
+      const legacySocket = await h.openTab({ protocols: ['cloudcli-tab', h.tabToken] });
+      assert.equal(legacySocket.protocol, 'cloudcli-tab');
+      legacySocket.close();
     });
   });
 
@@ -336,6 +341,7 @@ describe('Remote WebSocket gateway: close codes and edge cases', () => {
   it('offers the marker only when the browser asked for it', async () => {
     await withGatewayHarness({}, async (h) => {
       const gateway = idleGateway(h);
+      assert.equal(gateway.selectProtocol(new Set(['remotecli-tab', 'token'])), 'remotecli-tab');
       assert.equal(gateway.selectProtocol(new Set(['cloudcli-tab', 'token'])), 'cloudcli-tab');
       assert.equal(gateway.selectProtocol(new Set(['token'])), false);
       assert.equal(gateway.owns('/r/anything'), true);

@@ -15,7 +15,7 @@ import path from 'node:path';
 import { remoteConfigDb } from '@/modules/database/index.js';
 import type { RemotePairingStore } from '@/shared/types.js';
 
-import { MASTER_KEY_ENV, createAppConfigMasterKeyStore, resolveMasterKey } from '../crypto/master-key.js';
+import { LEGACY_MASTER_KEY_ENV, MASTER_KEY_ENV, createAppConfigMasterKeyStore, resolveMasterKey } from '../crypto/master-key.js';
 import { createSecretBox, secretAad, type SecretBox } from '../crypto/secret-box.js';
 import { createPairingStore } from '../pairing/pairing-store.service.js';
 
@@ -24,7 +24,8 @@ const RELAY_SECRET_KEY = 'remote.relay_secret_sealed';
 const MAX_RELAY_SECRET_LENGTH = 1024;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-export const MASTER_KEY_FILE_ENV = 'CLOUDCLI_REMOTE_MASTER_KEY_FILE';
+export const MASTER_KEY_FILE_ENV = 'REMOTECLI_MASTER_KEY_FILE';
+export const LEGACY_MASTER_KEY_FILE_ENV = 'CLOUDCLI_REMOTE_MASTER_KEY_FILE';
 
 export type RemoteConfigErrorCode = 'INVALID_RELAY_URL' | 'INVALID_RELAY_SECRET';
 
@@ -108,14 +109,19 @@ export const createRemoteConfigService = ({ box }: { box: SecretBox }) => ({
 type RemoteStorageOptions = {
   /** Environment to read the master key from (and scrub); defaults to `process.env`. */
   env?: NodeJS.ProcessEnv;
-  /** Master key file used when the env variable is absent; defaults to `~/.cloudcli/remote-master.key`. */
+  /** Master key file used when the env variable is absent; defaults to `~/.remotecli/remote-master.key`. */
   keyFilePath?: string;
   /** Time source of the pairing records (default: the system clock). Idle expiry compares them with the runtime clock, so both must agree. */
   now?: () => number;
 };
 
 const defaultKeyFilePath = (env: NodeJS.ProcessEnv): string =>
-  env[MASTER_KEY_FILE_ENV] || path.join(os.homedir(), '.cloudcli', 'remote-master.key');
+  env[MASTER_KEY_FILE_ENV] ||
+  env[LEGACY_MASTER_KEY_FILE_ENV] ||
+  path.join(
+    env.REMOTECLI_CONFIG_DIR || env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.remotecli'),
+    'remote-master.key',
+  );
 
 /**
  * True when Remote has been used before or is configured to be: the master key is in the environment, its
@@ -126,7 +132,7 @@ const defaultKeyFilePath = (env: NodeJS.ProcessEnv): string =>
  * Consumed by: the Remote module's `start()`.
  */
 export const shouldOpenRemoteStorageAtStart = ({ env = process.env, keyFilePath }: RemoteStorageOptions = {}): boolean => {
-  if (env[MASTER_KEY_ENV] !== undefined) return true;
+  if (env[MASTER_KEY_ENV] !== undefined || env[LEGACY_MASTER_KEY_ENV] !== undefined) return true;
   if (existsSync(keyFilePath ?? defaultKeyFilePath(env))) return true;
   try {
     return remoteConfigDb.get(RELAY_URL_KEY) !== null || createAppConfigMasterKeyStore().hasSealedData();

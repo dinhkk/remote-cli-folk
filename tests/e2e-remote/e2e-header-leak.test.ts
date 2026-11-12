@@ -136,7 +136,7 @@ describe('a hostile Host cannot leak credentials, cookies or script into the Con
       stream.setHandlers({});
     });
     const socket = await RemoteSocket.open(controller.baseUrl, host.peerId, 'ws', token);
-    assert.equal(socket.protocol, 'cloudcli-tab', 'only the fixed subprotocol is echoed, never the token');
+    assert.equal(socket.protocol, 'remotecli-tab', 'only the fixed subprotocol is echoed, never the token');
     await new Promise((resolve) => setTimeout(resolve, 300));
     const open = host.wsOpens.at(-1);
     assert.ok(open, 'the Host saw the WebSocket open');

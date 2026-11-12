@@ -11,7 +11,7 @@
       The real in-memory storage, synced to the Controller page, replaces these
       stand-ins in src/shared/transport/storage-shim.ts once the app boots.
     -->
-    <script data-cloudcli-target-shim>
+    <script data-cloudcli-target-shim data-remotecli-target-shim>
       (function () {
         try {
           // Same rule as initTargetContext (src/shared/transport/target-context.ts):
@@ -34,9 +34,11 @@
             var tabName = String(window.name);
             inTab = queryTarget !== null
               ? idPattern.test(queryTarget)
-              : tabName.indexOf('cloudcli-target:') === 0 && idPattern.test(tabName.slice('cloudcli-target:'.length));
+              : (tabName.indexOf('remotecli-target:') === 0 && idPattern.test(tabName.slice('remotecli-target:'.length)))
+                || (tabName.indexOf('cloudcli-target:') === 0 && idPattern.test(tabName.slice('cloudcli-target:'.length)));
           }
           if (!inTab) return;
+          window.__REMOTECLI_TARGET__ = true;
           window.__CLOUDCLI_TARGET__ = true;
 
           var memoryStorage = function () {
@@ -101,7 +103,7 @@
     
     <!-- Service Worker Registration -->
     <script>
-      if ('serviceWorker' in navigator && !window.__CLOUDCLI_TARGET__) {
+      if ('serviceWorker' in navigator && !window.__REMOTECLI_TARGET__ && !window.__CLOUDCLI_TARGET__) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(registration => {

@@ -44,7 +44,7 @@ describe('main page security headers', () => {
       }
       const tab = await send(rig.port, { path: '/?target=some-peer' });
       const policy = directives(tab.headers['content-security-policy']);
-      assert.deepEqual(policy.filter((directive) => directive.startsWith('connect-src')), ["connect-src 'self'"]);
+      assert.deepEqual(policy.filter((directive) => directive.startsWith('connect-src')), ["connect-src 'self' https: wss: http: ws:"]);
       for (const directive of directives(TARGET_PAGE_CSP)) assert.ok(policy.includes(directive), `the tab page lost: ${directive}`);
       assert.equal(tab.headers['x-content-type-options'], 'nosniff');
     });
@@ -97,7 +97,7 @@ describe('main page security headers', () => {
           assert.equal(response.headers['x-content-type-options'], 'nosniff');
         }
         const tab = await send(rig.port, { path: '/?target=some-peer' });
-        assert.deepEqual(directives(tab.headers['content-security-policy']).filter((directive) => directive.startsWith('connect-src')), ["connect-src 'self'"]);
+        assert.deepEqual(directives(tab.headers['content-security-policy']).filter((directive) => directive.startsWith('connect-src')), ["connect-src 'self' https: wss: http: ws:"]);
         const api = await send(rig.port, { path: '/api/remote/relay-config', headers: { authorization: `Bearer ${rig.jwt}`, 'sec-fetch-site': 'same-origin' } });
         assert.notEqual(api.status, 404, 'the Remote API is still mounted');
       });

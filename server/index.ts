@@ -70,17 +70,21 @@ const installMode = fs.existsSync(path.join(APP_ROOT, '.git')) ? 'git' : 'npm';
 // while this long-lived process still runs the OLD code. The frontend bundle is
 // rebuilt on update, so a mismatch between this value and the frontend's
 // build-time version means the server was updated but not restarted.
-const RUNNING_VERSION = (() => {
+const packageJson = (() => {
     try {
-        return JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'package.json'), 'utf8')).version || null;
+        return JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'package.json'), 'utf8'));
     } catch {
-        return null;
+        return {};
     }
 })();
+const RUNNING_VERSION = packageJson.version || null;
+const PACKAGE_NAME = packageJson.name || '@tunghuynh/remotecli';
 const systemRoutes = createSystemModule({
     appRoot: APP_ROOT,
     installMode,
     isPlatform: IS_PLATFORM,
+    packageName: PACKAGE_NAME,
+    currentVersion: RUNNING_VERSION || '1.0.0',
 });
 console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 
@@ -157,12 +161,15 @@ app.use(express.json({
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Public health check endpoint (no authentication required)
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+    const versionCheck = await systemRoutes.checkSystemVersion().catch(() => null);
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         installMode,
-        version: RUNNING_VERSION
+        version: RUNNING_VERSION,
+        latestVersion: versionCheck?.latestVersion ?? null,
+        updateAvailable: versionCheck?.updateAvailable ?? false,
     });
 });
 
@@ -178,7 +185,7 @@ app.use('/api/file-tree', authenticateToken, fileTreeRoutes);
 // Projects API Routes (protected)
 app.use('/api/projects', authenticateToken, projectModuleRoutes);
 
-// Chat attachment upload/serving (global ~/.cloudcli/assets store, protected)
+// Chat attachment upload/serving (global ~/.remotecli/assets store, protected)
 app.use('/api/assets', authenticateToken, assetsRoutes);
 
 // Git API Routes (protected)
@@ -245,7 +252,7 @@ app.use(express.static(path.join(APP_ROOT, 'dist'), {
 // Frontend now uses window.location for WebSocket URLs
 
 // Chat uploads live under /api/assets (server/modules/assets), which stores
-// images and general files in the global ~/.cloudcli/assets folder.
+// images and general files in the global ~/.remotecli/assets folder.
 
 // Serve React app for all other routes (excluding static files)
 app.get('*', (req, res) => {
@@ -300,7 +307,10 @@ const SERVER_PORT = Number.parseInt(process.env.SERVER_PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const DISPLAY_HOST = getConnectableHost(HOST);
 const VITE_PORT = process.env.VITE_PORT || 5173;
-const LOCAL_SERVER_MARKER_PATH = path.join(os.homedir(), '.cloudcli', 'local-server.json');
+const LOCAL_SERVER_MARKER_PATH = path.join(
+  process.env.REMOTECLI_CONFIG_DIR || process.env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.remotecli'),
+  'local-server.json',
+);
 
 function getErrorCode(error: unknown): string | undefined {
     if (typeof error !== 'object' || error === null || !('code' in error)) {

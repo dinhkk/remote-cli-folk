@@ -19,12 +19,14 @@ import {
 } from '@/modules/sidebar/utils/sidebarStoredPreferences';
 
 
-const EXPANDED_PROJECTS_STORAGE_KEY = 'cloudcli-expanded-projects';
+const EXPANDED_PROJECTS_STORAGE_KEY = 'remotecli-expanded-projects';
+const LEGACY_EXPANDED_PROJECTS_STORAGE_KEY = 'cloudcli-expanded-projects';
 
 /** Read browser-local project expansion, tolerating missing or invalid storage. */
 function readExpandedProjects(): Set<string> | null {
   try {
-    const saved: unknown = JSON.parse(localStorage.getItem(EXPANDED_PROJECTS_STORAGE_KEY) ?? 'null');
+    const raw = localStorage.getItem(EXPANDED_PROJECTS_STORAGE_KEY) ?? localStorage.getItem(LEGACY_EXPANDED_PROJECTS_STORAGE_KEY);
+    const saved: unknown = JSON.parse(raw ?? 'null');
     return Array.isArray(saved)
       ? new Set(saved.filter((id): id is string => typeof id === 'string'))
       : null;

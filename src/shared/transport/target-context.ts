@@ -16,7 +16,7 @@ import { TAB_TOKEN_REQUEST_MIN_INTERVAL_MS } from '@/shared/constants';
  */
 
 /** WebSocket subprotocol that announces a tab token (contracts.md section 1). */
-export const TAB_TOKEN_SUBPROTOCOL = 'cloudcli-tab';
+export const TAB_TOKEN_SUBPROTOCOL = 'remotecli-tab';
 
 /** What a frame knows about its target: the Host's pairing id and, on a fresh load only, the one-time handshake nonce. */
 export type TargetInfo = { peerId: string; nonce: string | null };
@@ -30,7 +30,8 @@ export type TargetLinkEvent =
 const TARGET_QUERY_PARAM = 'target';
 const NONCE_HASH_PARAM = 'n';
 // window.name survives navigate() and reloads inside the frame; the query and hash do not.
-const WINDOW_NAME_PREFIX = 'cloudcli-target:';
+const WINDOW_NAME_PREFIX = 'remotecli-target:';
+const LEGACY_WINDOW_NAME_PREFIX = 'cloudcli-target:';
 const PEER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const JWT_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
@@ -64,7 +65,7 @@ export const initTargetContext = (win: Window = window): TargetInfo | null => {
   // (a stranger's window.open(url, 'cloudcli-target:x') or a link to /?target=x)
   // stays Local, and a stale tab name is dropped so reloads do not stay broken.
   if (win.parent === win) {
-    if (win.name.startsWith(WINDOW_NAME_PREFIX)) {
+    if (win.name.startsWith(WINDOW_NAME_PREFIX) || win.name.startsWith(LEGACY_WINDOW_NAME_PREFIX)) {
       win.name = '';
     }
     return null;
@@ -83,6 +84,9 @@ export const initTargetContext = (win: Window = window): TargetInfo | null => {
     fromUrl = true;
   } else if (win.name.startsWith(WINDOW_NAME_PREFIX)) {
     const remembered = win.name.slice(WINDOW_NAME_PREFIX.length);
+    peerId = isValidPeerId(remembered) ? remembered : null;
+  } else if (win.name.startsWith(LEGACY_WINDOW_NAME_PREFIX)) {
+    const remembered = win.name.slice(LEGACY_WINDOW_NAME_PREFIX.length);
     peerId = isValidPeerId(remembered) ? remembered : null;
   }
 
@@ -280,7 +284,7 @@ export const requestTabToken = (): boolean => {
 };
 
 /**
- * WebSocket subprotocols that carry the tab token (`['cloudcli-tab', token]`),
+ * WebSocket subprotocols that carry the tab token (`['remotecli-tab', token]`),
  * or undefined in Local mode and while no usable token exists. The token goes in
  * a subprotocol, never the URL, so it stays out of proxy logs. The one place
  * that assembles the subprotocol list; used when the chat and shell sockets open.

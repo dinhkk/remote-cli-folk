@@ -49,7 +49,7 @@ test('reads the peer from ?target and the nonce from #n=, and remembers the peer
 
   assert.deepEqual(ctx.initTargetContext(), { peerId: PEER, nonce: NONCE });
   assert.equal(ctx.isTargetMode(), true);
-  assert.equal(window.name, `cloudcli-target:${PEER}`);
+  assert.equal(window.name, `remotecli-target:${PEER}`);
   // The nonce is a one-time handshake secret: it must not linger in the address bar.
   assert.equal(window.location.hash, '');
 });
@@ -121,7 +121,7 @@ test('the tab token travels as a subprotocol, never in the URL', async () => {
   const token = tokenExpiringIn(600);
   ctx.setTabToken(token);
 
-  assert.deepEqual(ctx.wsProtocols(), ['cloudcli-tab', token]);
+  assert.deepEqual(ctx.wsProtocols(), ['remotecli-tab', token]);
   assert.equal(ctx.wsUrl('/ws').includes(token), false);
 });
 

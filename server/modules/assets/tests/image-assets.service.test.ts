@@ -11,7 +11,10 @@ import {
   resolveImageAssetFile,
 } from '@/modules/assets/services/image-assets.service.js';
 
-const ASSETS_DIR = path.join(os.homedir(), '.cloudcli', 'assets');
+const ASSETS_DIR = path.join(
+  process.env.REMOTECLI_CONFIG_DIR || process.env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.remotecli'),
+  'assets',
+);
 
 test('isAllowedImageMimeType accepts image formats and rejects the rest', () => {
   assert.equal(isAllowedImageMimeType('image/png'), true);

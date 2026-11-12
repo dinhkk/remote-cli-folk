@@ -130,7 +130,7 @@ export const withGatewayHarness = async (options: GatewayHarnessOptions, run: (h
       registry,
       issueFor,
       openTab: ({ channel = 'ws', peerId = peer.id, token = tabToken, protocols, query = '' } = {}) =>
-        connect(`ws://127.0.0.1:${server.port}/r/${peerId}/${channel}${query}`, protocols ?? ['cloudcli-tab', token]),
+        connect(`ws://127.0.0.1:${server.port}/r/${peerId}/${channel}${query}`, protocols ?? ['remotecli-tab', token]),
       openRegular: (token = mainJwt) => connect(`ws://127.0.0.1:${server.port}/desktop-notifications?token=${token}`),
       async refusal(path, protocols) {
         try {

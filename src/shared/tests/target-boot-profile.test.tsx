@@ -156,7 +156,7 @@ test('every request a booting tab makes is addressed to /r/<peerId>/', async () 
   }
   for (const { url, protocols } of spy.sockets) {
     assert.equal(url.startsWith(`ws://localhost:3000${PREFIX}`), true, `unprefixed socket: ${url}`);
-    assert.equal(Array.isArray(protocols) && protocols[0] === 'cloudcli-tab', true);
+    assert.equal(Array.isArray(protocols) && protocols[0] === 'remotecli-tab', true);
   }
   assert.equal(spy.sockets.length >= 1, true, 'the chat socket should have opened');
 });

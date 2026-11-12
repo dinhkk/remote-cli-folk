@@ -4,12 +4,18 @@ import spawn from 'cross-spawn';
 import type { Router } from 'express';
 
 import { createSystemRouter } from './system.routes.js';
-import { createSystemUpdateService } from './system.service.js';
+import { createSystemUpdateService, type VersionCheckResult } from './system.service.js';
 
 type SystemModuleOptions = {
   appRoot: string;
   installMode: 'git' | 'npm';
   isPlatform: boolean;
+  packageName?: string;
+  currentVersion?: string;
+};
+
+export type SystemRouterModule = Router & {
+  checkSystemVersion(): Promise<VersionCheckResult>;
 };
 
 function runShellCommand(
@@ -48,7 +54,7 @@ function runShellCommand(
  * Builds the authenticated system router for the server entrypoint using the
  * installation details it already resolves for health and startup metadata.
  */
-export function createSystemModule(options: SystemModuleOptions): Router {
+export function createSystemModule(options: SystemModuleOptions): SystemRouterModule {
   const systemUpdateService = createSystemUpdateService({
     ...options,
     homeDirectory: os.homedir(),
@@ -58,5 +64,7 @@ export function createSystemModule(options: SystemModuleOptions): Router {
     logError: (message, detail) => console.error(message, detail ?? ''),
   });
 
-  return createSystemRouter(systemUpdateService);
+  const router = createSystemRouter(systemUpdateService) as SystemRouterModule;
+  router.checkSystemVersion = () => systemUpdateService.checkSystemVersion();
+  return router;
 }

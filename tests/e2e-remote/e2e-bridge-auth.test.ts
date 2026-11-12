@@ -42,7 +42,7 @@ describe('bridge authentication against the real Host middleware', () => {
 
   it('answers the chat WebSocket and the shell WebSocket through the same middleware', async () => {
     const chat = await world.openChat(token);
-    assert.equal(chat.protocol, 'cloudcli-tab');
+    assert.equal(chat.protocol, 'remotecli-tab');
     const sessionId = await world.createSession(token);
     chat.send({ type: 'chat.subscribe', sessions: [{ sessionId, lastSeq: 0 }] });
     const subscribed = await chat.waitFor((m) => m.kind === 'chat_subscribed', 'chat_subscribed');

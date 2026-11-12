@@ -7,7 +7,7 @@
   "commitmentHex": "727af8eebb79ff4268aadc4744e252225bf9bed1c63bb57a3f8020dd0bc3f6da",
   "transcriptHex": "697fbf7a3ea49052449f4340438ab9453f80dfcb49decfdf1fec39972c7c5b06",
   "sas": "979770",
-  "pairingKeyHex": "3ee39fb222ac48113b9ddf008f481562ca882eaa3ac337de7f060f5402a4661f",
-  "hostConfirmHex": "ae07e535da5880da2cf6aed2e9b239f892f8fdd8604d6d5fd43783503472d1ca",
-  "controllerConfirmHex": "e3b98e605d27254198793bbb31c886224995e1a51e0ee81fa78cdb27f99e65b9"
+  "pairingKeyHex": "b89ced23e6ef7353f978547c15447017f6ab8c1762ba5a1a13b8c33fded359c5",
+  "hostConfirmHex": "d05a56e9b22e70e45b25b8742e1e56bb59e6187cf97d5d9c8e1672d843fdfe5e",
+  "controllerConfirmHex": "0fc4fd2844718d1ac238b721ea43978b329bd4aeaeeb405eb887733a9cb42a70"
 }

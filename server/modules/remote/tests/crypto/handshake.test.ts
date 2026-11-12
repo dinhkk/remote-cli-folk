@@ -301,7 +301,7 @@ test('handshake errors never contain key material', () => {
 });
 
 test('HELLO2 and HELLO3 MACs match an independent HMAC computation over the documented inputs', () => {
-  const macKey = Buffer.from(crypto.hkdfSync('sha256', K, Buffer.alloc(0), 'cloudcli-remote/v1/mac', 32));
+  const macKey = Buffer.from(crypto.hkdfSync('sha256', K, Buffer.alloc(0), 'remotecli/v1/mac', 32));
   const hmac = (...parts: Buffer[]) => {
     const mac = crypto.createHmac('sha256', macKey);
     for (const part of parts) mac.update(part);

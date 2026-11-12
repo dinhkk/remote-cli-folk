@@ -81,14 +81,14 @@ Der schnellste Einstieg – keine lokale Einrichtung erforderlich. Erhalte eine 
 CloudCLI UI sofort mit **npx** ausprobieren (erfordert **Node.js** v22+):
 
 ```bash
-npx @cloudcli-ai/cloudcli
+npx @tunghuynh/remotecli
 ```
 
 Oder **global** installieren für regelmäßige Nutzung:
 
 ```bash
-npm install -g @cloudcli-ai/cloudcli
-cloudcli
+npm install -g @tunghuynh/remotecli
+remotecli
 ```
 
 Öffne `http://localhost:3001` – alle vorhandenen Sitzungen werden automatisch erkannt.
@@ -100,7 +100,7 @@ Die **[Dokumentation →](https://cloudcli.ai/docs)** enthält weitere Konfigura
 Agents in isolierten Sandboxes mit Hypervisor-Isolation ausführen. Standardmäßig wird Claude Code gestartet. Erfordert die [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/).
 
 ```
-npx @cloudcli-ai/cloudcli@latest sandbox ~/my-project
+npx @tunghuynh/remotecli@latest sandbox ~/my-project
 ```
 
 Unterstützt Claude Code und Codex. Weitere Details in der [Sandbox-Dokumentation](../docker/).
@@ -115,7 +115,7 @@ CloudCLI UI ist die Open-Source-UI-Schicht, die CloudCLI Cloud antreibt. Du kann
 |---|---|---|
 | **Am besten für** | Entwickler:innen, die eine vollständige UI für lokale Agent-Sitzungen auf ihrem eigenen Rechner möchten | Teams und Entwickler:innen, die Agents in der Cloud betreiben möchten, überall erreichbar |
 | **Zugriff** | Browser via `[deineIP]:port` | Browser, jede IDE, REST API, n8n |
-| **Einrichtung** | `npx @cloudcli-ai/cloudcli` | Keine Einrichtung erforderlich |
+| **Einrichtung** | `npx @tunghuynh/remotecli` | Keine Einrichtung erforderlich |
 | **Rechner muss laufen** | Ja | Nein |
 | **Mobiler Zugriff** | Jeder Browser im Netzwerk | Jedes Gerät, native App in Entwicklung |
 | **Verfügbare Sitzungen** | Alle Sitzungen automatisch aus `~/.claude` erkannt | Alle Sitzungen in deiner Cloud-Umgebung |

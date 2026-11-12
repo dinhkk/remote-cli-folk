@@ -1,4 +1,5 @@
-const OPEN_TAB_EVENT = 'cloudcli:remote-open-tab';
+const OPEN_TAB_EVENT = 'remotecli:remote-open-tab';
+const LEGACY_OPEN_TAB_EVENT = 'cloudcli:remote-open-tab';
 
 /**
  * Asks the Remote tab bar to bring one Host's tab to the front. Settings and the
@@ -16,5 +17,9 @@ export const onOpenRemoteTabRequest = (listener: (peerId: string) => void): (() 
     if (typeof peerId === 'string') listener(peerId);
   };
   window.addEventListener(OPEN_TAB_EVENT, handler);
-  return () => window.removeEventListener(OPEN_TAB_EVENT, handler);
+  window.addEventListener(LEGACY_OPEN_TAB_EVENT, handler);
+  return () => {
+    window.removeEventListener(OPEN_TAB_EVENT, handler);
+    window.removeEventListener(LEGACY_OPEN_TAB_EVENT, handler);
+  };
 };

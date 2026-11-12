@@ -81,14 +81,14 @@ Başlamanın en hızlı yolu — yerel kurulum yok. Web, mobil uygulama, API vey
 CloudCLI UI'yi **npx** ile anında dene (**Node.js** v22+ gerekir):
 
 ```
-npx @cloudcli-ai/cloudcli
+npx @tunghuynh/remotecli
 ```
 
 Veya düzenli kullanım için **genel olarak** kur:
 
 ```
-npm install -g @cloudcli-ai/cloudcli
-cloudcli
+npm install -g @tunghuynh/remotecli
+remotecli
 ```
 
 `http://localhost:3001` adresini aç — mevcut tüm oturumların otomatik olarak keşfedilir.
@@ -100,7 +100,7 @@ Tam yapılandırma seçenekleri, PM2, uzak sunucu kurulumu ve daha fazlası içi
 Ajanları hipervizör seviyesinde izolasyonlu sandbox'larda çalıştır. Varsayılan olarak Claude Code başlar. [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/) gerekir.
 
 ```
-npx @cloudcli-ai/cloudcli@latest sandbox ~/my-project
+npx @tunghuynh/remotecli@latest sandbox ~/my-project
 ```
 
 Claude Code ve Codex'i destekler. Kurulum ve gelişmiş seçenekler için [sandbox dokümantasyonuna](../docker/) bak.
@@ -116,7 +116,7 @@ CloudCLI UI, CloudCLI Cloud'u güçlendiren açık kaynak arayüz katmanıdır. 
 |---|---|---|---|
 | **En iyi şunun için** | Kendi makinende yerel ajan oturumları | Web/mobil IDE ile izole ajanlar | Ajanlarını bulutta isteyen ekipler |
 | **Nasıl erişilir** | `[yourip]:port` üzerinden tarayıcıda | `localhost:port` üzerinden tarayıcıda | Tarayıcı, herhangi bir IDE, REST API, n8n |
-| **Kurulum** | `npx @cloudcli-ai/cloudcli` | `npx @cloudcli-ai/cloudcli@latest sandbox ~/project` | Kurulum gerekmez |
+| **Kurulum** | `npx @tunghuynh/remotecli` | `npx @tunghuynh/remotecli@latest sandbox ~/project` | Kurulum gerekmez |
 | **İzolasyon** | Kendi host'unda çalışır | Hipervizör seviyesi sandbox (microVM) | Tam bulut izolasyonu |
 | **Makinenin açık kalması gerek** | Evet | Evet | Hayır |
 | **Mobil erişim** | Ağındaki herhangi bir tarayıcı | Ağındaki herhangi bir tarayıcı | Herhangi bir cihaz, native uygulama yolda |

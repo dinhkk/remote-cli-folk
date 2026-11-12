@@ -11,6 +11,7 @@
  */
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -34,7 +35,7 @@ const __dirname = path.dirname(__filename);
  *   2. Legacy path: server/database/auth.db
  */
 function resolveDatabasePath(): string {
-    // process.env.DATABASE_PATH is set by load-env-vars.js to either the .env value or a default(~/.cloudcli/auth.db) in the user's home directory. 
+    // process.env.DATABASE_PATH is set by load-env.js to either the .env value or a default(~/.remotecli/auth.db) in the user's home directory.
     return process.env.DATABASE_PATH || resolveLegacyDatabasePath();
 }
 
@@ -60,7 +61,7 @@ function ensureDatabaseDirectory(dbPath: string): void {
 }
 
 /**
- * If the database was moved to an external location (e.g. ~/.cloudcli/)
+ * If the database was moved to an external location (e.g. ~/.remotecli/)
  * but the user still has a legacy auth.db inside the install directory,
  * copy it to the new location as a one-time migration.
  */
@@ -75,8 +76,7 @@ function migrateLegacyDatabase(targetPath: string): void {
     fs.copyFileSync(legacyPath, targetPath);
     console.log('Migrated legacy database', { from: legacyPath, to: targetPath });
 
-
-    // copy the write-ahead log and shared memory files (auth.db-wal, auth.db-shm) if they exist, to preserve any uncommitted transactions
+    // copy the write-ahead log and shared memory files (auth.db-wal, auth.db-shm) if they exist
     for (const suffix of ['-wal', '-shm']) {
       const src = legacyPath + suffix;
       if (fs.existsSync(src)) {

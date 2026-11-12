@@ -9,7 +9,8 @@ import { getAuthEpoch } from './auth-epoch.service.js';
 
 export const TAB_TOKEN_MAX_AGE_SECONDS = 900;
 const LOOPBACK_TOKEN_TTL_SECONDS = 300;
-const TAB_TOKEN_KEY_LABEL = 'cloudcli-remote/v1/tab-token';
+const TAB_TOKEN_KEY_LABEL = 'remotecli/v1/tab-token';
+const LEGACY_TAB_TOKEN_KEY_LABEL = 'cloudcli-remote/v1/tab-token';
 
 export type TabTokenClaims = {
   typ: 'remote-tab';
@@ -29,10 +30,10 @@ export type TabTokenVerification =
  * fixed label. A different key is what makes the stock `jwt.verify(token, mainSecret)` in
  * authenticateToken/authenticateWebSocket reject them, and what kills them when the epoch moves.
  */
-function deriveTabTokenKey(): Buffer {
+function deriveTabTokenKey(label: string = TAB_TOKEN_KEY_LABEL): Buffer {
   return crypto
     .createHmac('sha256', `${getJwtSecret()}|${getAuthEpoch()}`)
-    .update(TAB_TOKEN_KEY_LABEL)
+    .update(label)
     .digest();
 }
 
@@ -54,20 +55,29 @@ export function issueTabToken(input: {
 
 /** Accepts only an unexpired tab token of the current epoch that was issued for `peerId`. */
 export function verifyTabToken(token: string, peerId: string): TabTokenVerification {
-  try {
-    const claims = jwt.verify(token, deriveTabTokenKey(), { algorithms: ['HS256'] }) as TabTokenClaims;
-    if (
-      claims.typ !== 'remote-tab'
-      || claims.peerId !== peerId
-      || typeof claims.userId !== 'number'
-      || claims.exp - claims.iat > TAB_TOKEN_MAX_AGE_SECONDS
-    ) {
-      return { ok: false, reason: 'invalid' };
+  const tryVerify = (key: Buffer): TabTokenVerification => {
+    try {
+      const claims = jwt.verify(token, key, { algorithms: ['HS256'] }) as TabTokenClaims;
+      if (
+        claims.typ !== 'remote-tab'
+        || claims.peerId !== peerId
+        || typeof claims.userId !== 'number'
+        || claims.exp - claims.iat > TAB_TOKEN_MAX_AGE_SECONDS
+      ) {
+        return { ok: false, reason: 'invalid' };
+      }
+      return { ok: true, claims };
+    } catch (error) {
+      return { ok: false, reason: error instanceof jwt.TokenExpiredError ? 'expired' : 'invalid' };
     }
-    return { ok: true, claims };
-  } catch (error) {
-    return { ok: false, reason: error instanceof jwt.TokenExpiredError ? 'expired' : 'invalid' };
-  }
+  };
+
+  const primary = tryVerify(deriveTabTokenKey(TAB_TOKEN_KEY_LABEL));
+  if (primary.ok || primary.reason === 'expired') return primary;
+
+  // Fallback to legacy key label for rolling upgrades
+  const fallback = tryVerify(deriveTabTokenKey(LEGACY_TAB_TOKEN_KEY_LABEL));
+  return fallback.ok ? fallback : primary;
 }
 
 /**

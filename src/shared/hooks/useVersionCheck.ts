@@ -7,17 +7,17 @@ import type { InstallMode, ReleaseInfo } from '@/shared/types';
 /**
  * What the UI knows about the running install.
  *
- * This fork never asks GitHub for a newer release: the check used to call `api.github.com` every five
- * minutes, which told a third party about every machine using the UI and failed on networks that block
- * it. Updates of this fork are deployed by its operator, so `updateAvailable` stays false and the
- * release fields stay empty (the consumers keep their shape). The only request left is the local
- * `/health`, which reports the install mode and whether the server process runs the version baked
- * into this bundle. Used by Sidebar and AboutTab.
+ * Checks the local backend `/health` endpoint to obtain the running version,
+ * installation mode, and any latest available version discovered by the backend's
+ * cached NPM registry check. Remote target tabs skip this check as they do not
+ * talk directly to local host health routes.
  */
 export const useVersionCheck = () => {
   const [installMode, setInstallMode] = useState<InstallMode>('git');
   const [runningVersion, setRunningVersion] = useState<string | null>(null);
   const [restartRequired, setRestartRequired] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
 
   // A Remote tab does not ask its Host for /health: it is not on the Host's allow-list.
   const disabled = isTargetMode();
@@ -40,6 +40,12 @@ export const useVersionCheck = () => {
           setRunningVersion(data.version);
           setRestartRequired(data.version !== APP_VERSION);
         }
+        if (typeof data.latestVersion === 'string' && data.latestVersion.length > 0) {
+          setLatestVersion(data.latestVersion);
+        }
+        if (typeof data.updateAvailable === 'boolean') {
+          setUpdateAvailable(data.updateAvailable);
+        }
       } catch {
         // Default to git / no restart hint on error
       }
@@ -47,8 +53,14 @@ export const useVersionCheck = () => {
     fetchHealth();
   }, [disabled]);
 
-  // Typed as nullable (not the literal `null`) so the consumers that read these keep compiling.
-  const latestVersion = null as string | null;
   const releaseInfo = null as ReleaseInfo | null;
-  return { updateAvailable: false, latestVersion, currentVersion: APP_VERSION, releaseInfo, installMode, runningVersion, restartRequired };
+  return {
+    updateAvailable,
+    latestVersion,
+    currentVersion: APP_VERSION,
+    releaseInfo,
+    installMode,
+    runningVersion,
+    restartRequired,
+  };
 };

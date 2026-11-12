@@ -8,7 +8,7 @@ import { waitUntil } from './e2e-util.js';
 export type RemoteMessage = Record<string, any>;
 
 export type OpenOptions = {
-  /** Replaces ['cloudcli-tab', token] (for negative tests). */
+  /** Replaces ['remotecli-tab', token] (for negative tests). */
   protocols?: string[];
   headers?: Record<string, string>;
 };
@@ -17,7 +17,7 @@ export type OpenOptions = {
 export class RemoteSocket {
   readonly inbox: RemoteMessage[] = [];
   closed: { code: number; reason: string } | null = null;
-  /** Subprotocol the server selected (must be `cloudcli-tab`, never the token). */
+  /** Subprotocol the server selected (must be `remotecli-tab`, never the token). */
   protocol = '';
   private waiters: Array<() => void> = [];
 
@@ -44,7 +44,7 @@ export class RemoteSocket {
   /** Connects; rejects with the HTTP status when the upgrade is refused. */
   static open(baseUrl: string, peerId: string, channel: 'ws' | 'shell', token: string | null, options: OpenOptions = {}): Promise<RemoteSocket> {
     const url = `${baseUrl.replace(/^http/, 'ws')}/r/${peerId}/${channel}`;
-    const protocols = options.protocols ?? (token ? ['cloudcli-tab', token] : []);
+    const protocols = options.protocols ?? (token ? ['remotecli-tab', token] : []);
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url, protocols, { headers: options.headers });
       const socket = new RemoteSocket(ws);

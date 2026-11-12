@@ -95,7 +95,7 @@ test('a token signed with the main secret is rejected (wrong key)', async () => 
 /** Signs with the genuine derived key, so only the claim checks can reject the result. */
 function signWithDerivedKey(claims: Record<string, unknown>, options: jwt.SignOptions) {
   const key = createHmac('sha256', `${getJwtSecret()}|${getAuthEpoch()}`)
-    .update('cloudcli-remote/v1/tab-token')
+    .update('remotecli/v1/tab-token')
     .digest();
   return jwt.sign(claims, key, { algorithm: 'HS256', ...options });
 }

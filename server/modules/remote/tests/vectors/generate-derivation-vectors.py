@@ -12,7 +12,7 @@ import hashlib
 import hmac
 import json
 
-PREFIX = "cloudcli-remote/v1/"
+PREFIX = "remotecli/v1/"
 
 
 def hkdf(ikm: bytes, info: str, length: int, salt: bytes = b"") -> bytes:

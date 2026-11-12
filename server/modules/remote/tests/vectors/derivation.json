@@ -1,27 +1,27 @@
 {
   "link": {
     "kHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-    "roomId": "89ebf947fd57d521d2760b3fdfe59a1e",
-    "hostToken": "PBWABbVSs_ZCtn9b5Ql0PRXNHJ0u0Iz6defwmPucUHY",
-    "controllerToken": "nenCJ-vpWClz62GgXOknt_84qCaUkPwRIsztpbpP9Rk",
-    "macKeyHex": "4ea046146c16ef1ae7d2f9c1fcb7ea45c2809dcd7cf0ad7a149abe005a8b8f96"
+    "roomId": "6eed582fa090a89c2ef1bdbd2074459e",
+    "hostToken": "KBWvRSnKJS3IiDMSuRbICG137Ci_1niEJPqXtN6TT54",
+    "controllerToken": "rr2ayjdJBn2mxVYFAen1RflihJVQUW4a2bqAE9ga2-M",
+    "macKeyHex": "cf8ed59bf03e32fdefcaee3466087da6d9b43303185d0968e20704d9cce1a289"
   },
   "gate": {
     "relaySecret": "test-relay-secret",
-    "link": "39cb8b6a4ff0324cc0a35c84ed450a542f655744173658c36a924c56644b89b0",
-    "pair": "493198a7f1045faa4de88451acd79ace2da06d8eacead4dc77b962a8b1fcb014"
+    "link": "fa6e4618e0e7171bd001c3349e6d6e711d99d8bc4bde99f8d09dbebd5c42187e",
+    "pair": "2ced9118ea85433c4da95a0e658a13ee0f4c6afa69f4589c49ab70c6915737d9"
   },
   "pair": {
     "normalizedCode": "ABCDEFGH",
-    "pairRoomId": "ef07d253f666a1bc1c94802cd592950a",
-    "pairToken": "Hf6A8TB1IRaC-XijQtmEfHTlyrWPrTeFSu7_X_HMVOE"
+    "pairRoomId": "7dedb6f9fb7f9c59994b92d4f7f0c2ce",
+    "pairToken": "Bj9y49RIdSte33KWKDrApTpa2ZQSgLUEUfPBOFn2ONI"
   },
   "session": {
     "ecdhHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
     "nonceCHex": "404142434445464748494a4b4c4d4e4f",
     "nonceHHex": "505152535455565758595a5b5c5d5e5f",
-    "keyC2HHex": "a8d2b4c91b452041a6d228182a0efbe8938ee65f277f8d78fde0c1b740acb514",
-    "keyH2CHex": "c121cd2b5bc8bf6339f51f4b8f5d3cc68f75a45d9c8a383f80778325f2a40b92",
-    "pairingKeyHex": "3ee39fb222ac48113b9ddf008f481562ca882eaa3ac337de7f060f5402a4661f"
+    "keyC2HHex": "836bb89df0a463e3481d0afce20efe361f0a4b3a335a787854746b27542f0589",
+    "keyH2CHex": "8a18f2efc4dc038e21fe42ef683034a1f0a39dd4cb1295066a860f92781e7f1b",
+    "pairingKeyHex": "b89ced23e6ef7353f978547c15447017f6ab8c1762ba5a1a13b8c33fded359c5"
   }
 }

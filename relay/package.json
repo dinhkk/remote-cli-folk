@@ -1,8 +1,8 @@
 {
-  "name": "cloudcli-remote-relay",
+  "name": "remotecli-relay",
   "version": "0.0.0",
   "private": true,
-  "description": "Cloudflare Worker + Durable Object relay for CloudCLI Remote Work (opaque E2E-encrypted frame forwarder).",
+  "description": "Cloudflare Worker + Durable Object relay for RemoteCLI Remote Work (opaque E2E-encrypted frame forwarder).",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

@@ -18,7 +18,8 @@ import { getConnection } from '@/modules/database/index.js';
 
 import { SecretBoxError, computeMasterKeyId } from './secret-box.js';
 
-export const MASTER_KEY_ENV = 'CLOUDCLI_REMOTE_MASTER_KEY';
+export const MASTER_KEY_ENV = 'REMOTECLI_MASTER_KEY';
+export const LEGACY_MASTER_KEY_ENV = 'CLOUDCLI_REMOTE_MASTER_KEY';
 
 const KEY_BYTES = 32;
 const KEY_ID_CONFIG_KEY = 'remote.master_key_id';
@@ -163,17 +164,26 @@ export type ResolveMasterKeyOptions = {
 
 /** Resolves the active master key and verifies it against the recorded id (see module comment). */
 export const resolveMasterKey = ({ env = process.env, keyFilePath, store, fs = nodeFs, scrubEnv = false }: ResolveMasterKeyOptions): ResolvedMasterKey => {
-  const envValue = env[MASTER_KEY_ENV];
+  const envKey =
+    env[MASTER_KEY_ENV] !== undefined
+      ? MASTER_KEY_ENV
+      : env[LEGACY_MASTER_KEY_ENV] !== undefined
+        ? LEGACY_MASTER_KEY_ENV
+        : undefined;
+  const envValue = envKey ? env[envKey] : undefined;
   let key: Buffer | null = null;
   let source: 'env' | 'file' = 'env';
   let created = false;
 
   // A variable that is set but blank is a misconfiguration, not "unset": falling back to a key
   // file (or generating one) behind the operator's back could orphan sealed data.
-  if (envValue !== undefined) {
+  if (envValue !== undefined && envKey !== undefined) {
     // Scrub first: a malformed value (a quoted key, a typo) is still a secret that must not reach the PTYs.
-    if (scrubEnv) delete env[MASTER_KEY_ENV];
-    key = decodeKey(envValue, MASTER_KEY_ENV);
+    if (scrubEnv) {
+      delete env[MASTER_KEY_ENV];
+      delete env[LEGACY_MASTER_KEY_ENV];
+    }
+    key = decodeKey(envValue, envKey);
   } else {
     source = 'file';
     key = readKeyFile(fs, keyFilePath);

@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http';
 import type { Readable } from 'node:stream';
+
 import type { WebSocket } from 'ws';
 
 //----------------- HTTP RESPONSE SHAPES ------------
@@ -1641,6 +1642,7 @@ export type CliEnvironment = Record<string, string | undefined>;
  * injects only the fields the service needs.
  */
 export type CliPackageMetadata = {
+  name?: string;
   version: string;
   homepage?: string;
   bugsUrl?: string;

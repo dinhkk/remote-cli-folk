@@ -5,7 +5,7 @@ import path from 'node:path';
 /**
  * Shared chat-attachment plumbing for every provider runtime.
  *
- * Uploaded chat files are persisted once in the global `~/.cloudcli/assets`
+ * Uploaded chat files are persisted once in the global `~/.remotecli/assets`
  * folder and referenced by absolute path everywhere else:
  * - Claude: paths are read back into base64 `image` content blocks.
  * - Codex: paths become `local_image` input items.
@@ -19,7 +19,10 @@ import path from 'node:path';
 
 /** Global storage folder for uploaded chat image attachments. */
 export function getGlobalImageAssetsDir(): string {
-  return path.join(os.homedir(), '.cloudcli', 'assets');
+  return path.join(
+    process.env.REMOTECLI_CONFIG_DIR || process.env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.remotecli'),
+    'assets',
+  );
 }
 
 export type ImageAttachmentDescriptor = {
@@ -148,7 +151,8 @@ function getDirectoryPathVariants(directory: string): string[] {
  * refused, so a caller-supplied descriptor can never leak arbitrary files.
  */
 export function isAllowedImageSourcePath(resolvedPath: string, cwd?: string): boolean {
-  return [getGlobalImageAssetsDir(), cwd || process.cwd()].some((directory) =>
+  const legacyDir = path.join(os.homedir(), '.cloudcli', 'assets');
+  return [getGlobalImageAssetsDir(), legacyDir, cwd || process.cwd()].some((directory) =>
     getDirectoryPathVariants(directory).some((directoryVariant) =>
       isPathInsideDirectory(resolvedPath, directoryVariant)
     )

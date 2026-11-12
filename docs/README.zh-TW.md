@@ -77,14 +77,14 @@
 啟動 CloudCLI UI，只需一行 `npx`（需要 Node.js v22+）：
 
 ```bash
-npx @cloudcli-ai/cloudcli
+npx @tunghuynh/remotecli
 ```
 
 或進行全域安裝，便於日常使用：
 
 ```bash
-npm install -g @cloudcli-ai/cloudcli
-cloudcli
+npm install -g @tunghuynh/remotecli
+remotecli
 ```
 
 開啟 `http://localhost:3001`，系統會自動發現所有現有工作階段。
@@ -96,7 +96,7 @@ cloudcli
 在隔離的沙箱中執行代理，具有虛擬機管理程式等級的隔離。預設啟動 Claude Code。需要 [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/)。
 
 ```bash
-npx @cloudcli-ai/cloudcli@latest sandbox ~/my-project
+npx @tunghuynh/remotecli@latest sandbox ~/my-project
 ```
 
 支援 Claude Code 和 Codex。詳情請參閱[沙箱文件](../docker/)。
@@ -111,7 +111,7 @@ CloudCLI UI 是 CloudCLI Cloud 的開源 UI 層。你可以在本機上自架它
 |---|---|---|
 | **適合對象** | 需要為本機代理工作階段提供完整 UI 的開發者 | 需要部署在雲端，隨時從任何地方存取代理的團隊與開發者 |
 | **存取方式** | 透過 `[yourip]:port` 在瀏覽器中存取 | 瀏覽器、任意 IDE、REST API、n8n |
-| **設定** | `npx @cloudcli-ai/cloudcli` | 無需設定 |
+| **設定** | `npx @tunghuynh/remotecli` | 無需設定 |
 | **機器需保持開機嗎** | 是 | 否 |
 | **行動裝置存取** | 網路內任意瀏覽器 | 任意裝置（原生應用程式即將推出） |
 | **可用工作階段** | 自動發現 `~/.claude` 中的所有工作階段 | 雲端環境內的工作階段 |

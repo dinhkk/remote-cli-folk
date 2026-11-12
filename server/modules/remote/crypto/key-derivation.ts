@@ -2,7 +2,7 @@
  * Key derivation for Remote (contracts section 5).
  *
  * Everything is HKDF-SHA256 over `node:crypto`, with the versioned label prefix
- * `cloudcli-remote/v1/`, so the relay Worker (WebCrypto) derives identical bytes. The fixed
+ * `remotecli/v1/`, so the relay Worker (WebCrypto) derives identical bytes. The fixed
  * vectors in `tests/vectors/derivation.json` come from an independent stdlib-only reference.
  */
 
@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 
 import type { RemoteLinkKeys, RemoteRelayRoomKind } from '@/shared/types.js';
 
-export const REMOTE_LABEL_PREFIX = 'cloudcli-remote/v1/';
+export const REMOTE_LABEL_PREFIX = 'remotecli/v1/';
 
 const KEY_BYTES = 32;
 const NONCE_BYTES = 16;

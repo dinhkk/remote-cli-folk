@@ -40,7 +40,27 @@ try {
 
 // Keep the default database in a stable user-level location so rebuilding dist-server
 // never changes where the backend stores auth.db when DATABASE_PATH is not set explicitly.
-const DEFAULT_DATABASE_PATH = path.join(os.homedir(), '.cloudcli', 'auth.db');
+const DEFAULT_DATABASE_PATH = path.join(
+  process.env.REMOTECLI_CONFIG_DIR || process.env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.remotecli'),
+  'auth.db',
+);
+
+// Ensure ~/.remotecli exists and migrate legacy ~/.cloudcli if needed
+const remotecliDir = path.dirname(DEFAULT_DATABASE_PATH);
+const legacyDir = process.env.CLOUDCLI_CONFIG_DIR || path.join(os.homedir(), '.cloudcli');
+try {
+  if (!fs.existsSync(remotecliDir)) {
+    if (fs.existsSync(legacyDir)) {
+      console.log(`[migration] Copying legacy data from ${legacyDir} to ${remotecliDir}...`);
+      fs.cpSync(legacyDir, remotecliDir, { recursive: true });
+      console.log(`[migration] Migration complete. Preserved backup at ${legacyDir}`);
+    } else {
+      fs.mkdirSync(remotecliDir, { recursive: true });
+    }
+  }
+} catch (e: any) {
+  console.error('[migration] Failed to initialize directory:', e.message);
+}
 
 if (!process.env.DATABASE_PATH) {
   process.env.DATABASE_PATH = DEFAULT_DATABASE_PATH;

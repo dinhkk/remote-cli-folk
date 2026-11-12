@@ -11,7 +11,7 @@ or MAC them.
     SAS           = decimal(uint32_be(h[0:4]) mod 10^6), zero padded to 6 digits
     K             = HKDF(ECDH, salt = Nc || Nh, info "pairing-key")
     macKey        = HKDF(K, info "mac")
-    confirmation  = HMAC-SHA256(macKey, "cloudcli-remote/v1/pair-confirm-<role>" || h)
+    confirmation  = HMAC-SHA256(macKey, "remotecli/v1/pair-confirm-<role>" || h)
 
 Run: python generate-pairing-vectors.py > pairing.json
 """
@@ -19,7 +19,7 @@ import hashlib
 import hmac
 import json
 
-PREFIX = "cloudcli-remote/v1/"
+PREFIX = "remotecli/v1/"
 
 
 def hkdf(ikm: bytes, info: str, length: int, salt: bytes = b"") -> bytes:

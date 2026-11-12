@@ -74,11 +74,11 @@ describe('tab token isolation (hostile iframe simulation)', () => {
     assert.notEqual(queryWs, 'open', 'a token in the URL must not open a tab socket');
     // The subprotocol form works and the server echoes the fixed name only.
     const ok = await RemoteSocket.open(world.controller.baseUrl, world.peerId, 'ws', tokenA);
-    assert.equal(ok.protocol, 'cloudcli-tab');
+    assert.equal(ok.protocol, 'remotecli-tab');
     ok.close();
     // A token without the fixed marker name, or a marker without a token, does not authenticate.
     await assert.rejects(RemoteSocket.open(world.controller.baseUrl, world.peerId, 'ws', null, { protocols: [tokenA] }), (error: { status?: number }) => error.status === 401);
-    await assert.rejects(RemoteSocket.open(world.controller.baseUrl, world.peerId, 'ws', null, { protocols: ['cloudcli-tab'] }), (error: { status?: number }) => error.status === 401);
+    await assert.rejects(RemoteSocket.open(world.controller.baseUrl, world.peerId, 'ws', null, { protocols: ['remotecli-tab'] }), (error: { status?: number }) => error.status === 401);
   });
 
   it('exposes no long-lived credential: /api/auth/* is answered locally or refused, and Host answers carry no JWT', async () => {

@@ -64,7 +64,7 @@ test('different labels give different keys from the same input', () => {
 });
 
 test('hkdf uses the versioned label prefix and honours salt and length', () => {
-  assert.equal(REMOTE_LABEL_PREFIX, 'cloudcli-remote/v1/');
+  assert.equal(REMOTE_LABEL_PREFIX, 'remotecli/v1/');
   const noSalt = hkdf(K, 'room', 16);
   assert.equal(noSalt.length, 16);
   assert.notDeepEqual(hkdf(K, 'room', 16, Buffer.from('salt')), noSalt);

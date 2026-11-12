@@ -1,7 +1,7 @@
 {
   // Worker name and any custom domain are chosen by the user at deploy time (phase 13);
   // this placeholder must never be deployed as-is.
-  "name": "cloudcli-remote-relay-dev",
+  "name": "remotecli-relay-dev",
   "main": "src/index.ts",
   // The relay has no routes of its own: it is reached on <worker>.<subdomain>.workers.dev (phase 13 picks the names).
   "workers_dev": true,

@@ -99,7 +99,7 @@ test('the chat socket in a tab connects through /r/<peerId>/ws with the token as
   assert.equal(FakeWebSocket.instances.length, 1);
   const socket = FakeWebSocket.instances[0] as FakeWebSocket;
   assert.equal(socket.url, `ws://localhost:3000/r/${PEER}/ws`);
-  assert.deepEqual(socket.protocols, ['cloudcli-tab', token]);
+  assert.deepEqual(socket.protocols, ['remotecli-tab', token]);
   assert.equal(socket.url.includes('token='), false);
 });
 
@@ -130,7 +130,7 @@ test('a reconnect after the token was refreshed offers the new token', async () 
   });
 
   assert.equal(FakeWebSocket.instances.length, 2);
-  assert.deepEqual((FakeWebSocket.instances[1] as FakeWebSocket).protocols, ['cloudcli-tab', second]);
+  assert.deepEqual((FakeWebSocket.instances[1] as FakeWebSocket).protocols, ['remotecli-tab', second]);
 });
 
 test('without a usable token the chat socket waits and retries instead of giving up', async () => {
@@ -172,7 +172,7 @@ test('the shell socket goes through /r/<peerId>/shell with the subprotocol', asy
   const socketUtils = await import('@/modules/shell/utils/socket');
 
   assert.equal(socketUtils.getShellWebSocketUrl(), `ws://localhost:3000/r/${PEER}/shell`);
-  assert.deepEqual(socketUtils.getShellWebSocketProtocols(), ['cloudcli-tab', token]);
+  assert.deepEqual(socketUtils.getShellWebSocketProtocols(), ['remotecli-tab', token]);
 });
 
 test('the shell socket is not opened without a token in a tab', async () => {

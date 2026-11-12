@@ -32,7 +32,8 @@ import { createShellUpgradeThrottle } from './shell-upgrade-throttle.js';
 import type { TabTokenService } from './tab-token.service.js';
 
 /** The subprotocol the frame offers first; the token is the second entry and is never echoed. */
-const TAB_SUBPROTOCOL = 'cloudcli-tab';
+export const TAB_SUBPROTOCOL = 'remotecli-tab';
+export const LEGACY_TAB_SUBPROTOCOL = 'cloudcli-tab';
 /** Smallest gap between two `/shell` upgrades of one pairing (contracts section 1). */
 const SHELL_UPGRADE_MIN_INTERVAL_MS = 2000;
 /** `/shell` upgrades of one pairing that may wait for their slot; one more is refused with 429. */
@@ -165,7 +166,8 @@ export function createRemoteWebSocketGateway(options: RemoteWebSocketGatewayOpti
       .split(',')
       .map((entry) => entry.trim())
       .filter(Boolean);
-    if (offered.length !== 2 || offered[0] !== TAB_SUBPROTOCOL) return refuse(401, 'unauthorized');
+    const validProtocol = offered.length === 2 && (offered[0] === TAB_SUBPROTOCOL || offered[0] === LEGACY_TAB_SUBPROTOCOL);
+    if (!validProtocol) return refuse(401, 'unauthorized');
     const token = offered[1];
     const verdict = checkAccess(token, peerId);
     if (!verdict.ok) return verdict;
@@ -277,7 +279,11 @@ export function createRemoteWebSocketGateway(options: RemoteWebSocketGatewayOpti
     owns: (pathname) => pathname.startsWith('/r/'),
     maxPayloadBytes: Math.max(REMOTE_SOCKET_MAX_PAYLOAD_BYTES, maxMessage * 2),
     verifyUpgrade,
-    selectProtocol: (protocols) => (protocols.has(TAB_SUBPROTOCOL) ? TAB_SUBPROTOCOL : false),
+    selectProtocol: (protocols) => {
+      if (protocols.has(TAB_SUBPROTOCOL)) return TAB_SUBPROTOCOL;
+      if (protocols.has(LEGACY_TAB_SUBPROTOCOL)) return LEGACY_TAB_SUBPROTOCOL;
+      return false;
+    },
     handleConnection,
   };
 }

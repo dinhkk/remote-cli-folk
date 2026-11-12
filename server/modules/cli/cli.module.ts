@@ -21,8 +21,9 @@ export function createCliApplication(): CliApplication {
   const applicationRoot = findApplicationRoot(getModuleDirectory(import.meta.url));
   const packageMetadataJson = JSON.parse(
     fs.readFileSync(path.join(applicationRoot, 'package.json'), 'utf8'),
-  ) as { version: string; homepage?: string; bugs?: { url?: string } };
+  ) as { name?: string; version: string; homepage?: string; bugs?: { url?: string } };
   const packageMetadata: CliPackageMetadata = {
+    name: packageMetadataJson.name,
     version: packageMetadataJson.version,
     homepage: packageMetadataJson.homepage,
     bugsUrl: packageMetadataJson.bugs?.url,
@@ -62,7 +63,10 @@ export function createCliApplication(): CliApplication {
 
   return createCliService({
     applicationRoot,
-    defaultDatabasePath: path.join(homeDirectory, '.cloudcli', 'auth.db'),
+    defaultDatabasePath:
+      process.env.REMOTECLI_CONFIG_DIR ||
+      process.env.CLOUDCLI_CONFIG_DIR ||
+      path.join(homeDirectory, '.remotecli', 'auth.db'),
     homeDirectory,
     packageMetadata,
     environment: process.env,
@@ -73,13 +77,15 @@ export function createCliApplication(): CliApplication {
       // Yield first so the default `start` command can begin loading the server
       // before this best-effort npm registry check runs.
       await new Promise<void>((resolve) => setImmediate(resolve));
+      const packageName = packageMetadata.name || '@tunghuynh/remotecli';
       return execSync(
-        'npm show @cloudcli-ai/cloudcli version',
+        `npm show ${packageName} version`,
         { encoding: 'utf8' },
       ).trim();
     },
     updateGlobalPackage: () => {
-      execSync('npm update -g @cloudcli-ai/cloudcli', { stdio: 'inherit' });
+      const packageName = packageMetadata.name || '@tunghuynh/remotecli';
+      execSync(`npm update -g ${packageName}`, { stdio: 'inherit' });
     },
     startServer: async () => {
       // The server executable is an entrypoint rather than a feature module,
