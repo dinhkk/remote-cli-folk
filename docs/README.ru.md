@@ -4,17 +4,6 @@
  <p>Десктопный и мобильный UI для <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, <a href="https://developers.openai.com/codex">Codex</a>.<br>Используйте локально или удалённо, чтобы просматривать активные проекты и сессии отовсюду.</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">Документация</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Сообщить об ошибке</a> · <a href="../CONTRIBUTING.md">Участие в разработке</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
 <div align="right"><i><a href="../README.md">English</a> · <b>Русский</b> · <a href="./README.de.md">Deutsch</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.zh-TW.md">繁體中文</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.tr.md">Türkçe</a> · <a href="./README.id.md">Bahasa Indonesia</a></i></div>
 
 ---
@@ -48,8 +37,6 @@
 </tr>
 </table>
 
-
-
 </div>
 
 ## Возможности
@@ -64,15 +51,11 @@
 - **Интеграция с TaskMaster AI** *(опционально)* - продвинутое управление проектами с планированием задач на базе AI, разбором PRD и автоматизацией workflow
 - **Совместимость с моделями** - работает с семействами моделей Claude и GPT (полный список поддерживаемых моделей доступен через `GET /api/providers/:provider/models`)
 
-
 ## Быстрый старт
 
 ### CloudCLI Cloud (рекомендуется)
 
 Самый быстрый способ начать — локальная настройка не требуется. Получите полностью управляемую контейнеризированную среду разработки с доступом из веба, мобильного приложения, API или вашей любимой IDE.
-
-**[Начать с CloudCLI Cloud](https://cloudcli.ai)**
-
 
 ### Self-Hosted (Open source)
 
@@ -92,8 +75,6 @@ remotecli
 ```
 
 Откройте `http://localhost:3001` — все ваши существующие сессии будут обнаружены автоматически.
-
-Посетите **[документацию →](https://cloudcli.ai/docs)**, чтобы узнать про дополнительные варианты конфигурации, PM2, настройку удалённого сервера и многое другое.
 
 #### Docker Sandboxes (Экспериментально)
 
@@ -176,8 +157,6 @@ CloudCLI UI — это open source UI-слой, на котором постро
 
 **[Plugin Starter Template →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — сделайте форк этого репозитория, чтобы создать свой плагин. В шаблоне есть рабочий пример с рендерингом на фронтенде, live-обновлением контекста и RPC-коммуникацией с бэкенд-сервером.
 
-**[Plugin Documentation →](https://cloudcli.ai/docs/plugin-overview)** — полный гайд по plugin API, формату манифеста, модели безопасности и другому.
-
 ---
 ## FAQ
 
@@ -223,9 +202,8 @@ CloudCLI UI и CloudCLI Cloud расширяют Claude Code, а не работ
 
 ## Сообщество и поддержка
 
-- **[Документация](https://cloudcli.ai/docs)** — установка, настройка, возможности и устранение неполадок
 - **[Discord](https://discord.gg/buxwujPNRE)** — помощь и общение с другими пользователями
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — сообщения об ошибках и запросы новых функций
+
 - **[Руководство для контрибьюторов](../CONTRIBUTING.md)** — как участвовать в развитии проекта
 
 ## Лицензия
@@ -246,9 +224,8 @@ GNU General Public License v3.0 - подробности в файле [LICENSE]
 - **[CodeMirror](https://codemirror.net/)** - продвинутый редактор кода
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(опционально)* - AI-управление проектами и планирование задач
 
-
 ### Спонсоры
-- [Siteboon - AI powered website builder](https://siteboon.ai)
+
 ---
 
 <div align="center">

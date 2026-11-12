@@ -4,17 +4,6 @@
  <p><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>、<a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>、<a href="https://developers.openai.com/codex">Codex</a> のためのデスクトップ／モバイル UI。<br>ローカルでもリモートでも使え、アクティブなプロジェクトとセッションをどこからでも閲覧できます。</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">ドキュメント</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">バグ報告</a> · <a href="../CONTRIBUTING.md">コントリビュート</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord コミュニティに参加"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
 <div align="right"><i><a href="../README.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.zh-TW.md">繁體中文</a> · <b>日本語</b> · <a href="./README.tr.md">Türkçe</a> · <a href="./README.id.md">Bahasa Indonesia</a></i></div>
 
 ---
@@ -48,8 +37,6 @@
 </tr>
 </table>
 
-
-
 </div>
 
 ## 機能
@@ -67,8 +54,6 @@
 ### CloudCLI Cloud（推奨）
 
 最速で始める方法 — ローカルのセットアップは不要です。Web、モバイルアプリ、API、またはお気に入りの IDE からアクセスできる、フルマネージドでコンテナ化された開発環境を利用できます。
-
-**[CloudCLI Cloud を始める](https://cloudcli.ai)**
 
 ### セルフホスト（オープンソース）
 
@@ -88,8 +73,6 @@ remotecli
 ```
 
 `http://localhost:3001` を開いてください — 既存のセッションは自動的に検出されます。
-
-より詳細な設定オプション、PM2、リモートサーバー設定などについては **[ドキュメントはこちら →](https://cloudcli.ai/docs)** を参照してください。
 
 #### Docker Sandboxes（実験的）
 
@@ -170,8 +153,6 @@ CloudCLI にはプラグインシステムがあり、独自のフロントエ�
 
 **[Plugin Starter Template →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — このリポジトリを fork して独自プラグインを作れます。フロントエンド描画、ライブコンテキスト更新、バックエンドサーバーへの RPC 通信を含む動作例が入っています。
 
-**[プラグインのドキュメント →](https://cloudcli.ai/docs/plugin-overview)** — プラグイン API、manifest 形式、セキュリティモデルなどの完全ガイド。
-
 ---
 ## FAQ
 
@@ -215,9 +196,8 @@ CloudCLI UI と CloudCLI Cloud は、Claude Code の横に別物として存在�
 
 ## コミュニティとサポート
 
-- **[ドキュメント](https://cloudcli.ai/docs)** — インストール、設定、機能、トラブルシューティング
 - **[Discord](https://discord.gg/buxwujPNRE)** — ヘルプを得たり、ユーザー同士で交流したりできます
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — バグ報告と機能要望
+
 - **[コントリビューションガイド](../CONTRIBUTING.md)** — プロジェクトへの貢献方法
 
 ## ライセンス
@@ -240,7 +220,7 @@ GNU General Public License v3.0 - 詳細は [LICENSE](../LICENSE) ファイル�
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(オプション)* - AI を活用したプロジェクト管理とタスク計画
 
 ## スポンサー
-- [Siteboon - AI を活用したウェブサイトビルダー](https://siteboon.ai)
+
 ---
 
 <div align="center">

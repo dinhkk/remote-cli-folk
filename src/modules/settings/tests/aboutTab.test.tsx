@@ -26,7 +26,7 @@ describe('Settings > About', () => {
     render(<AboutTab />);
 
     expect(screen.getByText('RemoteCLI')).toBeTruthy();
-    expect(screen.getByText('v1.2.3')).toBeTruthy();
+    expect(screen.getAllByText('v1.2.3').length).toBeGreaterThan(0);
     expect(screen.getByText('Tùng Huynh')).toBeTruthy();
     const github = screen.getByText('tunghuynh').closest('a');
     expect(github?.getAttribute('href')).toBe('https://github.com/tunghuynh');

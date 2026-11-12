@@ -85,7 +85,7 @@ export class CursorProviderModels implements IProviderModels {
         return buildDefaultProviderCurrentActiveModel(CURSOR_PREDEFINED_MODELS);
       }
 
-      const { default: Database } = await import('better-sqlite3');
+      const { Database } = await import('@/modules/database/index.js');
       const db = new Database(storeDbPath, { readonly: true, fileMustExist: true });
 
       try {

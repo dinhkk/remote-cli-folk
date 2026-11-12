@@ -1,19 +1,8 @@
 <div align="center">
- <img src="public/logo.svg" alt="CloudCLI UI" width="64" height="64">
- <h1>Cloud CLI (aka Claude Code UI)</h1>
- <p>A desktop and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Use it locally or remotely to view your active projects and sessions from everywhere.</p>
+ <img src="public/logo.svg" alt="RemoteCLI" width="64" height="64">
+ <h1>RemoteCLI</h1>
+ <p>A modern web-based remote UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Access and manage your active coding agent sessions from any device, anywhere.</p>
 </div>
-
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">Documentation</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Bug Reports</a> · <a href="CONTRIBUTING.md">Contributing</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
 
 <div align="right"><i><b>English</b> · <a href="./docs/README.ru.md">Русский</a> · <a href="./docs/README.de.md">Deutsch</a> · <a href="./docs/README.ko.md">한국어</a> · <a href="./docs/README.zh-CN.md">简体中文</a> · <a href="./docs/README.zh-TW.md">繁體中文</a> · <a href="./docs/README.ja.md">日本語</a> · <a href="./docs/README.tr.md">Türkçe</a> · <a href="./docs/README.id.md">Bahasa Indonesia</a></i></div>
 
@@ -61,59 +50,39 @@
 - **Git Explorer** - View, stage and commit your changes. You can also switch branches 
 - **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
 - **Session Management** - Resume conversations, manage multiple sessions, and track history
-- **Plugin System** - Extend CloudCLI with custom plugins — add new tabs, backend services, and integrations. [Build your own →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
+- **Plugin System** - Extend RemoteCLI with custom plugins — add new tabs, backend services, and integrations.
 - **TaskMaster AI Integration** *(Optional)* - Advanced project management with AI-powered task planning, PRD parsing, and workflow automation
 - **Model Compatibility** - Works with Claude and GPT model families (the full list of supported models is available at runtime via `GET /api/providers/:provider/models`)
 
 
 ## Quick Start
 
-### CloudCLI Cloud (Recommended)
+### npm
 
-The fastest way to get started — no local setup required. Get a fully managed, containerized development environment accessible from the web, mobile app, API, or your favorite IDE.
+Try RemoteCLI instantly with **npx** (requires **Node.js** v22+):
 
-**[Get started with CloudCLI Cloud](https://cloudcli.ai)**
-
-### Self-Hosted (Open source)
-
-#### npm
-
-Try RemoteCLI UI instantly with **npx** (requires **Node.js** v22+):
-
-```
+```bash
 npx @tunghuynh/remotecli
 ```
 
 Or install **globally** for regular use:
 
-```
+```bash
 npm install -g @tunghuynh/remotecli
 remotecli
 ```
 
 Open `http://localhost:3001` — all your existing sessions are discovered automatically.
 
-Visit the **[documentation →](https://cloudcli.ai/docs)** for full configuration options, PM2, remote server setup and more.
-
-#### Docker Sandboxes (Experimental)
+### Docker Sandboxes (Experimental)
 
 Run agents in isolated sandboxes with hypervisor-level isolation. Starts Claude Code by default. Requires the [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/).
 
-```
+```bash
 npx @tunghuynh/remotecli@latest sandbox ~/my-project
 ```
 
 Supports Claude Code and Codex. See the [sandbox docs](docker/) for setup and advanced options.
-
-### Desktop Companion App
-
-CloudCLI Desktop is an optional native companion for CloudCLI Cloud and Local CloudCLI. It ships from this repository's GitHub Releases and keeps CloudCLI available from your menu bar or tray.
-
-- **[macOS](https://cloudcli.ai/download/macos)**
-- **[Windows](https://cloudcli.ai/download/windows)**
-- **[Download page](https://cloudcli.ai/download)** · **[GitHub Releases and checksums](https://github.com/siteboon/claudecodeui/releases)**
-
-Use it to open CloudCLI Cloud environments, switch between local and remote workspaces, and copy mobile/browser URLs. To work locally, choose **Local CloudCLI** in the desktop app; it will use your running local server or start one for you.
 
 
 ---
@@ -186,8 +155,6 @@ CloudCLI has a plugin system that lets you add custom tabs with their own fronte
 
 **[Plugin Starter Template →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — fork this repo to create your own plugin. It includes a working example with frontend rendering, live context updates, and RPC communication to a backend server.
 
-**[Plugin Documentation →](https://cloudcli.ai/docs/plugin-overview)** — full guide to the plugin API, manifest format, security model, and more.
-
 ### Private Repositories
 
 The server installs and updates plugins with `git clone` and `git pull`, using the git credentials of the operating-system user it runs as (for a systemd service, the unit's `User=`). The server cannot answer a password or passphrase prompt during an install, so set up credentials for that user before installing from a private repository:
@@ -240,20 +207,11 @@ Yes, for self-hosted. CloudCLI UI reads from and writes to the same `~/.claude` 
 
 ---
 
-## Community & Support
-
-- **[Documentation](https://cloudcli.ai/docs)** — installation, configuration, features, and troubleshooting
-- **[Discord](https://discord.gg/buxwujPNRE)** — get help and connect with other users
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — bug reports and feature requests
-- **[Contributing Guide](CONTRIBUTING.md)** — how to contribute to the project
-
 ## License
 
 GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [LICENSE](LICENSE) for the full text, including additional terms under Section 7.
 
 This project is open source and free to use, modify, and distribute under the AGPL-3.0-or-later license. If you modify this software and run it as a network service, you must make your modified source code available to users of that service.
-
-CloudCLI UI - (https://cloudcli.ai).
 
 ## Acknowledgments
 
@@ -267,9 +225,6 @@ CloudCLI UI - (https://cloudcli.ai).
 - **[CodeMirror](https://codemirror.net/)** - Advanced code editor
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - AI-powered project management and task planning
 
-
-### Sponsors
-- [Siteboon - AI powered website builder](https://siteboon.ai)
 ---
 
 <div align="center">

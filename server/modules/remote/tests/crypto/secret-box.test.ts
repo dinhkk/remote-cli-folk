@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import Database from 'better-sqlite3';
+import { Database } from '@/modules/database/index.js';
 
 import {
   MASTER_KEY_ENV,

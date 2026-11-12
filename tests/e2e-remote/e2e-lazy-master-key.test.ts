@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import Database from 'better-sqlite3';
+import Database from '@/modules/database/sqlite.js';
 
 import { startE2eRelay, type E2eRelay } from './support/e2e-relay.js';
 import { type E2eServer, startE2eServer } from './support/e2e-server.js';

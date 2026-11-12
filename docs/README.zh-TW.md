@@ -4,17 +4,6 @@
  <p><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>、<a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>、<a href="https://developers.openai.com/codex">Codex</a> 的桌面和行動裝置 UI。可在本機或遠端使用，從任何地方查看您的專案與工作階段。</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">文件</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Bug 回報</a> · <a href="../CONTRIBUTING.md">貢獻指南</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="加入 Discord 社群"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
 <div align="right"><i><a href="../README.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.zh-CN.md">简体中文</a> · <b>繁體中文</b> · <a href="./README.ja.md">日本語</a> · <a href="./README.tr.md">Türkçe</a> · <a href="./README.id.md">Bahasa Indonesia</a></i></div>
 
 ---
@@ -68,8 +57,6 @@
 
 無需本機設定即可快速啟動。提供可透過網路瀏覽器、行動應用程式、API 或慣用的 IDE 存取的完全容器化託管開發環境。
 
-**[立即開始 CloudCLI Cloud](https://cloudcli.ai)**
-
 ### 自架（開源）
 
 #### npm
@@ -88,8 +75,6 @@ remotecli
 ```
 
 開啟 `http://localhost:3001`，系統會自動發現所有現有工作階段。
-
-更多設定選項、PM2、遠端伺服器設定等，請參閱 **[文件 →](https://cloudcli.ai/docs)**。
 
 #### Docker Sandboxes（實驗性）
 
@@ -170,8 +155,6 @@ CloudCLI 配備外掛系統，允許你新增帶有自訂前端 UI 和選用 Nod
 
 **[Plugin Starter Template →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — Fork 該儲存庫以建構自己的外掛。範例包括前端渲染、即時上下文更新和 RPC 通訊。
 
-**[外掛文件 →](https://cloudcli.ai/docs/plugin-overview)** — 提供外掛 API、清單格式、安全模型等完整指南。
-
 ---
 
 ## 常見問題
@@ -216,9 +199,8 @@ CloudCLI UI 與 CloudCLI Cloud 是對 Claude Code 的擴充，而非旁觀 — M
 
 ## 社群與支援
 
-- **[文件](https://cloudcli.ai/docs)** — 安裝、設定、功能與疑難排解指南
 - **[Discord](https://discord.gg/buxwujPNRE)** — 取得協助並與社群交流
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — 回報 Bug 與建議功能
+
 - **[貢獻指南](../CONTRIBUTING.md)** — 如何參與專案貢獻
 
 ## 授權條款
@@ -240,7 +222,7 @@ GNU Affero 通用公共授權條款 v3.0 或更高版本 (AGPL-3.0-or-later) —
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(選用)* — AI 驅動的專案管理與任務規劃
 
 ### 贊助商
-- [Siteboon - AI powered website builder](https://siteboon.ai)
+
 ---
 
 <div align="center">

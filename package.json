@@ -4,6 +4,9 @@
   "productName": "RemoteCLI",
   "description": "A web-based remote UI for Claude Code CLI",
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "main": "dist-server/server/index.js",
   "bin": {
     "remotecli": "dist-server/server/modules/cli/cli.js"
@@ -19,14 +22,6 @@
     "scripts/promote-dist-server.mjs",
     "README.md"
   ],
-  "homepage": "https://cloudcli.ai",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/siteboon/claudecodeui.git"
-  },
-  "bugs": {
-    "url": "https://github.com/siteboon/claudecodeui/issues"
-  },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server:dev\" \"npm run client\"",
     "preserver": "node scripts/promote-dist-server.mjs recover",
@@ -105,13 +100,13 @@
         "dmg"
       ],
       "extendInfo": {
-        "CFBundleName": "CloudCLI",
-        "CFBundleDisplayName": "CloudCLI",
+        "CFBundleName": "RemoteCLI",
+        "CFBundleDisplayName": "RemoteCLI",
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "CloudCLI",
+            "CFBundleURLName": "RemoteCLI",
             "CFBundleURLSchemes": [
-              "cloudcli"
+              "remotecli"
             ]
           }
         ]
@@ -129,10 +124,10 @@
     }
   },
   "keywords": [
+    "remotecli",
     "claude code",
     "claude-code",
     "claude-code-ui",
-    "cloudcli",
     "codex",
     "cursor",
     "cursor-cli",
@@ -144,7 +139,7 @@
     "ui",
     "mobile IDE"
   ],
-  "author": "CloudCLI UI Contributors",
+  "author": "Tùng Huỳnh",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.165",
@@ -170,8 +165,7 @@
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
-    "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.6.2",
+    "bcryptjs": "^3.0.3",
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -217,7 +211,7 @@
     "@release-it/conventional-changelog": "^10.0.5",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/cross-spawn": "^6.0.6",
     "@types/express": "^5.0.6",

@@ -230,8 +230,8 @@ export class CursorSessionsProvider implements IProviderSessions {
    * order. Cursor history is stored as content-addressed blobs rather than JSONL.
    */
   private async loadCursorBlobs(sessionId: string, projectPath: string): Promise<CursorMessageBlob[]> {
-    // Lazy-import better-sqlite3 so the module doesn't fail if it's unavailable
-    const { default: Database } = await import('better-sqlite3');
+    // Lazy-import sqlite adapter so the module doesn't fail if it's unavailable
+    const { Database } = await import('@/modules/database/index.js');
 
     const cwdId = crypto.createHash('md5').update(projectPath || process.cwd()).digest('hex');
     const safeSessionId = sanitizeLeafDirectoryName(sessionId, 'cursor session id');

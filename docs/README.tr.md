@@ -4,17 +4,6 @@
  <p><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, <a href="https://developers.openai.com/codex">Codex</a> için masaüstü ve mobil arayüz.<br>Yerel ya da uzaktan kullanarak aktif projelerine ve oturumlarına her yerden erişebilirsin.</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">Dokümantasyon</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Sorun Bildir</a> · <a href="../CONTRIBUTING.md">Katkıda Bulun</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Hemen_Dene-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Toplulu%C4%9Fa%20Kat%C4%B1l-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord'a Katıl"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
 <div align="right"><i><a href="../README.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.zh-TW.md">繁體中文</a> · <a href="./README.ja.md">日本語</a> · <b>Türkçe</b> · <a href="./README.id.md">Bahasa Indonesia</a></i></div>
 
 ---
@@ -48,8 +37,6 @@
 </tr>
 </table>
 
-
-
 </div>
 
 ## Özellikler
@@ -64,15 +51,11 @@
 - **TaskMaster AI Entegrasyonu** *(İsteğe Bağlı)* — AI destekli görev planlama, PRD ayrıştırma ve iş akışı otomasyonu ile gelişmiş proje yönetimi
 - **Model Uyumluluğu** — Claude ve GPT model aileleriyle çalışır (desteklenen tüm modeller için `GET /api/providers/:provider/models` API'sine bak)
 
-
 ## Hızlı Başlangıç
 
 ### CloudCLI Cloud (Önerilen)
 
 Başlamanın en hızlı yolu — yerel kurulum yok. Web, mobil uygulama, API veya favori IDE'nden erişilebilen, tam yönetilen, konteyner tabanlı bir geliştirme ortamına sahip ol.
-
-**[CloudCLI Cloud ile başla](https://cloudcli.ai)**
-
 
 ### Kendin Barındır (Açık Kaynak)
 
@@ -93,8 +76,6 @@ remotecli
 
 `http://localhost:3001` adresini aç — mevcut tüm oturumların otomatik olarak keşfedilir.
 
-Tam yapılandırma seçenekleri, PM2, uzak sunucu kurulumu ve daha fazlası için **[dokümantasyonu ziyaret et →](https://cloudcli.ai/docs)**.
-
 #### Docker Sandbox'lar (Deneysel)
 
 Ajanları hipervizör seviyesinde izolasyonlu sandbox'larda çalıştır. Varsayılan olarak Claude Code başlar. [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/) gerekir.
@@ -104,7 +85,6 @@ npx @tunghuynh/remotecli@latest sandbox ~/my-project
 ```
 
 Claude Code ve Codex'i destekler. Kurulum ve gelişmiş seçenekler için [sandbox dokümantasyonuna](../docker/) bak.
-
 
 ---
 
@@ -175,8 +155,6 @@ CloudCLI, kendi frontend UI'sı ve isteğe bağlı Node.js arka ucu olan özel s
 
 **[Plugin Starter Şablonu →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — kendi eklentini oluşturmak için bu repo'yu fork'la. Frontend render, canlı bağlam güncellemeleri ve arka uç sunucusuyla RPC iletişimi içeren çalışan bir örnek içerir.
 
-**[Plugin Dokümantasyonu →](https://cloudcli.ai/docs/plugin-overview)** — plugin API'sı, manifest formatı, güvenlik modeli ve daha fazlası için tam rehber.
-
 ---
 ## Sık Sorulan Sorular
 
@@ -222,9 +200,8 @@ Evet, kendin barındırdığında. CloudCLI UI, Claude Code'un yerel olarak kull
 
 ## Topluluk ve Destek
 
-- **[Dokümantasyon](https://cloudcli.ai/docs)** — kurulum, yapılandırma, özellikler ve sorun giderme
 - **[Discord](https://discord.gg/buxwujPNRE)** — yardım al ve diğer kullanıcılarla tanış
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — hata raporları ve özellik istekleri
+
 - **[Katkı Rehberi](../CONTRIBUTING.md)** — projeye nasıl katkıda bulunulur
 
 ## Lisans
@@ -232,8 +209,6 @@ Evet, kendin barındırdığında. CloudCLI UI, Claude Code'un yerel olarak kull
 GNU Affero General Public License v3.0 veya sonrası (AGPL-3.0-or-later) — tam metin ve Bölüm 7 altındaki ek şartlar için [LICENSE](../LICENSE) dosyasına bak.
 
 Bu proje açık kaynaklıdır ve AGPL-3.0-or-later lisansı altında özgürce kullanılabilir, değiştirilebilir ve dağıtılabilir. Bu yazılımı değiştirir ve bir ağ servisi olarak çalıştırırsan, değiştirilmiş kaynak kodunu o servisin kullanıcılarına sunmak zorundasın.
-
-CloudCLI UI — (https://cloudcli.ai).
 
 ## Teşekkürler
 
@@ -247,9 +222,8 @@ CloudCLI UI — (https://cloudcli.ai).
 - **[CodeMirror](https://codemirror.net/)** — Gelişmiş kod editörü
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(İsteğe Bağlı)* — AI destekli proje yönetimi ve görev planlama
 
-
 ### Sponsorlar
-- [Siteboon — AI destekli web sitesi oluşturucu](https://siteboon.ai)
+
 ---
 
 <div align="center">

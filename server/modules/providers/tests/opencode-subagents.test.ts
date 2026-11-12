@@ -4,8 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import Database from 'better-sqlite3';
-
+import { Database } from '@/modules/database/index.js';
 import { OpenCodeSessionsProvider } from '@/modules/providers/list/opencode/opencode-sessions.provider.js';
 
 // A `task` call as opencode 1.18 stores it: the child session id lives in `state.metadata`.

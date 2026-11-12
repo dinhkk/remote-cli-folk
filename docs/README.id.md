@@ -4,17 +4,6 @@
  <p>UI desktop dan mobile untuk <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, dan <a href="https://developers.openai.com/codex">Codex</a>.<br>Gunakan secara lokal atau remote untuk melihat project dan session aktif Anda dari mana saja.</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">Dokumentasi</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Laporan Bug</a> · <a href="../CONTRIBUTING.md">Kontribusi</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
 <div align="right"><i><a href="../README.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.de.md">Deutsch</a> · <a href="./README.ko.md">한국어</a> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.zh-TW.md">繁體中文</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.tr.md">Türkçe</a> · <b>Bahasa Indonesia</b></i></div>
 
 ---
@@ -48,8 +37,6 @@
 </tr>
 </table>
 
-
-
 </div>
 
 ## Fitur
@@ -65,14 +52,11 @@
 - **Integrasi TaskMaster AI** *(Opsional)* - Manajemen project tingkat lanjut dengan perencanaan tugas berbasis AI, parsing PRD, dan otomatisasi workflow
 - **Kompatibilitas Model** - Mendukung keluarga model Claude dan GPT (daftar lengkap model yang didukung tersedia saat runtime melalui `GET /api/providers/:provider/models`)
 
-
 ## Mulai Cepat
 
 ### CloudCLI Cloud (Direkomendasikan)
 
 Cara tercepat untuk memulai — tanpa setup lokal. Dapatkan lingkungan pengembangan berbasis container yang dikelola sepenuhnya dan dapat diakses melalui web, aplikasi mobile, API, atau IDE favorit Anda.
-
-**[Mulai dengan CloudCLI Cloud](https://cloudcli.ai)**
 
 ### Self-Hosted (Open Source)
 
@@ -93,8 +77,6 @@ remotecli
 
 Buka `http://localhost:3001` — semua session Anda yang sudah ada akan ditemukan secara otomatis.
 
-Kunjungi **[dokumentasi →](https://cloudcli.ai/docs)** untuk opsi konfigurasi lengkap, PM2, setup server remote, dan lainnya.
-
 #### Docker Sandboxes (Eksperimental)
 
 Jalankan agent di sandbox terisolasi dengan isolasi tingkat hypervisor. Claude Code dijalankan secara default. Memerlukan [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/).
@@ -109,12 +91,7 @@ Mendukung Claude Code dan Codex. Lihat [dokumentasi sandbox](../docker/) untuk s
 
 CloudCLI Desktop adalah aplikasi native pendamping opsional untuk CloudCLI Cloud dan Local CloudCLI. Aplikasi ini dirilis melalui GitHub Releases repository ini dan membuat CloudCLI tetap mudah diakses dari menu bar atau tray Anda.
 
-- **[macOS](https://cloudcli.ai/download/macos)**
-- **[Windows](https://cloudcli.ai/download/windows)**
-- **[Halaman unduhan](https://cloudcli.ai/download)** · **[GitHub Releases dan checksum](https://github.com/siteboon/claudecodeui/releases)**
-
 Gunakan untuk membuka lingkungan CloudCLI Cloud, berpindah antara workspace lokal dan remote, serta menyalin URL mobile/browser. Untuk bekerja secara lokal, pilih **Local CloudCLI** di aplikasi desktop; aplikasi akan menggunakan server lokal yang sedang berjalan atau menjalankannya untuk Anda.
-
 
 ---
 
@@ -186,8 +163,6 @@ CloudCLI memiliki sistem plugin yang memungkinkan Anda menambahkan tab kustom de
 
 **[Template Plugin Starter →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — fork repository ini untuk membuat plugin Anda sendiri. Template ini menyertakan contoh yang berfungsi dengan rendering frontend, pembaruan konteks secara langsung, dan komunikasi RPC ke server backend.
 
-**[Dokumentasi Plugin →](https://cloudcli.ai/docs/plugin-overview)** — panduan lengkap untuk API plugin, format manifest, model keamanan, dan lainnya.
-
 ---
 ## FAQ
 
@@ -233,9 +208,8 @@ Ya, untuk self-hosted. CloudCLI UI membaca dan menulis konfigurasi `~/.claude` y
 
 ## Komunitas & Dukungan
 
-- **[Dokumentasi](https://cloudcli.ai/docs)** — instalasi, konfigurasi, fitur, dan pemecahan masalah
 - **[Discord](https://discord.gg/buxwujPNRE)** — dapatkan bantuan dan terhubung dengan pengguna lain
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — laporan bug dan permintaan fitur
+
 - **[Panduan Kontribusi](../CONTRIBUTING.md)** — cara berkontribusi pada project
 
 ## Lisensi
@@ -243,8 +217,6 @@ Ya, untuk self-hosted. CloudCLI UI membaca dan menulis konfigurasi `~/.claude` y
 GNU Affero General Public License v3.0 atau yang lebih baru (AGPL-3.0-or-later) — lihat [LICENSE](../LICENSE) untuk teks lengkap, termasuk ketentuan tambahan pada Bagian 7.
 
 Project ini bersifat open source dan bebas digunakan, dimodifikasi, serta didistribusikan berdasarkan lisensi AGPL-3.0-or-later. Jika Anda memodifikasi software ini dan menjalankannya sebagai layanan jaringan, Anda harus menyediakan kode sumber hasil modifikasi kepada pengguna layanan tersebut.
-
-CloudCLI UI - (https://cloudcli.ai).
 
 ## Ucapan Terima Kasih
 
@@ -258,9 +230,8 @@ CloudCLI UI - (https://cloudcli.ai).
 - **[CodeMirror](https://codemirror.net/)** - Editor kode tingkat lanjut
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Opsional)* - Manajemen project dan perencanaan tugas berbasis AI
 
-
 ### Sponsor
-- [Siteboon - pembuat website berbasis AI](https://siteboon.ai)
+
 ---
 
 <div align="center">

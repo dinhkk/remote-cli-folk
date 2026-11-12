@@ -2,10 +2,9 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import Database from 'better-sqlite3';
 import spawn from 'cross-spawn';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { Database, sessionsDb } from '@/modules/database/index.js';
 import type { IProviderModels } from '@/shared/interfaces.js';
 import type {
   ProviderCurrentActiveModel,

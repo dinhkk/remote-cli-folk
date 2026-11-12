@@ -1,5 +1,3 @@
-import { Database } from 'better-sqlite3';
-
 import {
   APP_CONFIG_TABLE_SCHEMA_SQL,
   LAST_SCANNED_AT_SQL,
@@ -15,6 +13,8 @@ import {
   USER_NOTIFICATION_PREFERENCES_TABLE_SCHEMA_SQL,
   VAPID_KEYS_TABLE_SCHEMA_SQL,
 } from '@/modules/database/schema.js';
+
+import { Database } from './sqlite.js';
 
 const SQLITE_UUID_SQL = `
 lower(hex(randomblob(4))) || '-' ||

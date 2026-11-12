@@ -162,10 +162,10 @@ Environment Variables:
   CONTEXT_WINDOW      Fallback context window size (default: 160000)
 
 Documentation:
-  ${dependencies.packageMetadata.homepage || 'https://github.com/siteboon/claudecodeui'}
+  ${dependencies.packageMetadata.homepage || 'https://www.npmjs.com/package/@tunghuynh/remotecli'}
 
 Report Issues:
-  ${dependencies.packageMetadata.bugsUrl || 'https://github.com/siteboon/claudecodeui/issues'}
+  ${dependencies.packageMetadata.bugsUrl || 'https://www.npmjs.com/package/@tunghuynh/remotecli'}
 `);
 }
 

@@ -14,7 +14,7 @@ import { userDb } from '@/modules/database/index.js';
 
 import { send, serve } from './http-test-client.js';
 
-const bcrypt = createRequire(import.meta.url)('bcrypt') as { hash(password: string, rounds: number): Promise<string> };
+const bcrypt = createRequire(import.meta.url)('bcryptjs') as { hash(password: string, rounds: number): Promise<string> };
 
 export const TEST_PASSWORD = 'correct horse battery staple';
 

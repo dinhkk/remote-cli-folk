@@ -38,7 +38,6 @@ import { readdir, readFile, readlink } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 
-import Database from 'better-sqlite3';
 import { createOpencodeClient, createOpencodeServer } from '@opencode-ai/sdk/v2';
 import type {
   Config as OpenCodeConfig,
@@ -50,6 +49,7 @@ import type {
   QuestionRequest as OpenCodeQuestionRequest,
 } from '@opencode-ai/sdk/v2';
 
+import { Database } from '@/modules/database/index.js';
 import {
   appendFilesInputTag,
   appendImagesInputTag,

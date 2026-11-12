@@ -1,7 +1,6 @@
 import fsSync from 'node:fs';
 
-import Database from 'better-sqlite3';
-
+import { Database } from '@/modules/database/index.js';
 import { isOpenCodeSessionActive } from '@/modules/providers/list/opencode/opencode-runtime.provider.js';
 import { parseFilesInputTag, parseImagesInputTag } from '@/shared/image-attachments.js';
 import type { IProviderSessions } from '@/shared/interfaces.js';

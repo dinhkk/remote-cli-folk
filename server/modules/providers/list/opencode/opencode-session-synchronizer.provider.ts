@@ -1,9 +1,7 @@
 import fsSync from 'node:fs';
 import path from 'node:path';
 
-import Database from 'better-sqlite3';
-
-import { sessionsDb } from '@/modules/database/index.js';
+import { Database, sessionsDb } from '@/modules/database/index.js';
 import type { IProviderSessionSynchronizer } from '@/shared/interfaces.js';
 import {
   getOpenCodeDatabasePath,

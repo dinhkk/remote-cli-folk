@@ -4,9 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import Database from 'better-sqlite3';
-
-import { closeConnection, initializeDatabase, sessionsDb } from '@/modules/database/index.js';
+import { closeConnection, Database, initializeDatabase, sessionsDb } from '@/modules/database/index.js';
 import { OpenCodeSessionSynchronizer } from '@/modules/providers/list/opencode/opencode-session-synchronizer.provider.js';
 import { OpenCodeSessionsProvider } from '@/modules/providers/list/opencode/opencode-sessions.provider.js';
 import { appendImagesInputTag } from '@/shared/image-attachments.js';

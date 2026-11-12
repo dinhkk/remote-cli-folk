@@ -13,7 +13,7 @@ import { DUMMY_PASSWORD_HASH, authRoutes, verifyPassword } from '../auth.module.
 
 import { withIsolatedAuthDatabase } from './with-isolated-auth-database.js';
 
-const bcrypt = createRequire(import.meta.url)('bcrypt') as {
+const bcrypt = createRequire(import.meta.url)('bcryptjs') as {
   hash(password: string, rounds: number): Promise<string>;
   getRounds(hash: string): number;
 };

@@ -4,17 +4,6 @@
  <p>Eine Desktop- und Mobile-Oberfläche für <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a> und <a href="https://developers.openai.com/codex">Codex</a>.<br>Lokal oder remote nutzbar – verwalte deine aktiven Projekte und Sitzungen von überall.</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">Dokumentation</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Fehler melden</a> · <a href="../CONTRIBUTING.md">Mitwirken</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Community"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
 <div align="right"><i><a href="../README.md">English</a> · <a href="./README.ru.md">Русский</a> · <b>Deutsch</b> · <a href="./README.ko.md">한국어</a> · <a href="./README.zh-CN.md">简体中文</a> · <a href="./README.zh-TW.md">繁體中文</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.tr.md">Türkçe</a> · <a href="./README.id.md">Bahasa Indonesia</a></i></div>
 
 ---
@@ -48,8 +37,6 @@
 </tr>
 </table>
 
-
-
 </div>
 
 ## Funktionen
@@ -64,15 +51,11 @@
 - **TaskMaster AI Integration** *(Optional)* – Erweitertes Projektmanagement mit KI-gestützter Aufgabenplanung, PRD-Parsing und Workflow-Automatisierung
 - **Modell-Kompatibilität** – Funktioniert mit den Claude- und GPT-Modellfamilien (vollständige Liste unterstützter Modelle zur Laufzeit über `GET /api/providers/:provider/models`)
 
-
 ## Schnellstart
 
 ### CloudCLI Cloud (Empfohlen)
 
 Der schnellste Einstieg – keine lokale Einrichtung erforderlich. Erhalte eine vollständig verwaltete, containerisierte Entwicklungsumgebung, die über Web, Mobile App, API oder deine bevorzugte IDE erreichbar ist.
-
-**[Mit CloudCLI Cloud starten](https://cloudcli.ai)**
-
 
 ### Self-Hosted (Open Source)
 
@@ -92,8 +75,6 @@ remotecli
 ```
 
 Öffne `http://localhost:3001` – alle vorhandenen Sitzungen werden automatisch erkannt.
-
-Die **[Dokumentation →](https://cloudcli.ai/docs)** enthält weitere Konfigurationsoptionen, PM2, Remote-Server-Einrichtung und mehr.
 
 #### Docker Sandboxes (Experimentell)
 
@@ -176,8 +157,6 @@ CloudCLI verfügt über ein Plugin-System, mit dem benutzerdefinierte Tabs mit e
 
 **[Plugin-Starter-Vorlage →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** – Forke dieses Repository, um ein eigenes Plugin zu erstellen. Es enthält ein funktionierendes Beispiel mit Frontend-Rendering, Live-Kontext-Updates und RPC-Kommunikation zu einem Backend-Server.
 
-**[Plugin-Dokumentation →](https://cloudcli.ai/docs/plugin-overview)** – Vollständige Anleitung zur Plugin-API, zum Manifest-Format, zum Sicherheitsmodell und mehr.
-
 ---
 ## FAQ
 
@@ -223,9 +202,8 @@ Ja, bei Self-Hosted. CloudCLI UI liest aus und schreibt in dieselbe `~/.claude`-
 
 ## Community & Support
 
-- **[Dokumentation](https://cloudcli.ai/docs)** — Installation, Konfiguration, Funktionen und Fehlerbehebung
 - **[Discord](https://discord.gg/buxwujPNRE)** — Hilfe erhalten und mit anderen Nutzer:innen in Kontakt treten
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — Fehlerberichte und Feature-Anfragen
+
 - **[Beitragsrichtlinien](../CONTRIBUTING.md)** — So kannst du zum Projekt beitragen
 
 ## Lizenz
@@ -246,9 +224,8 @@ Dieses Projekt ist Open Source und kann unter der GPL v3-Lizenz kostenlos genutz
 - **[CodeMirror](https://codemirror.net/)** - Erweiterter Code-Editor
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - KI-gestütztes Projektmanagement und Aufgabenplanung
 
-
 ### Sponsoren
-- [Siteboon - KI-gestützter Website-Builder](https://siteboon.ai)
+
 ---
 
 <div align="center">

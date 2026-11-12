@@ -14,10 +14,10 @@ type BcryptAdapter = {
   compare(password: string, passwordHash: string): Promise<boolean>;
 };
 
-// bcrypt does not ship TypeScript declarations in this project, so the
+// bcryptjs does not ship TypeScript declarations in this project, so the
 // composition root narrows its CommonJS runtime surface before injecting it.
 const require = createRequire(import.meta.url);
-const bcrypt = require('bcrypt') as BcryptAdapter;
+const bcrypt = require('bcryptjs') as BcryptAdapter;
 
 // bcrypt (cost 12) of random data that no one knows. Compared when a login names a user that
 // does not exist, so unknown and known usernames cost the same time.
