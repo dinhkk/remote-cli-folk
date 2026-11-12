@@ -1,10 +1,33 @@
 <div align="center">
- <img src="public/logo.svg" alt="RemoteCLI" width="64" height="64">
- <h1>RemoteCLI</h1>
- <p>A modern web-based remote UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Access and manage your active coding agent sessions from any device, anywhere.</p>
+  <img src="public/logo.svg" alt="RemoteCLI Logo" width="80" height="80">
+  <h1>RemoteCLI</h1>
+  <p><b>A modern web-based remote UI for Claude Code, Cursor CLI, and OpenAI Codex.</b><br>
+  Access, manage, and collaborate with your coding agents from any device, anywhere.</p>
+
+  <p>
+    <a href="https://www.npmjs.com/package/@tunghuynh/remotecli"><img src="https://img.shields.io/npm/v/@tunghuynh/remotecli.svg?style=flat-square&color=2563eb" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/@tunghuynh/remotecli"><img src="https://img.shields.io/npm/dm/@tunghuynh/remotecli.svg?style=flat-square&color=blue" alt="npm downloads"></a>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22.5.0-brightgreen.svg?style=flat-square" alt="Node.js Version"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square" alt="License"></a>
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg?style=flat-square" alt="Platform">
+  </p>
 </div>
 
-<div align="right"><i><b>English</b> · <a href="./docs/README.ru.md">Русский</a> · <a href="./docs/README.de.md">Deutsch</a> · <a href="./docs/README.ko.md">한국어</a> · <a href="./docs/README.zh-CN.md">简体中文</a> · <a href="./docs/README.zh-TW.md">繁體中文</a> · <a href="./docs/README.ja.md">日本語</a> · <a href="./docs/README.tr.md">Türkçe</a> · <a href="./docs/README.id.md">Bahasa Indonesia</a></i></div>
+---
+
+## Overview
+
+**RemoteCLI** provides an intuitive, responsive web interface for local AI coding CLI tools like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview), and [OpenAI Codex](https://developers.openai.com/codex).
+
+Instead of being tethered to a single terminal window, RemoteCLI lets you monitor agent executions, edit files, inspect diffs, approve permissions, and run shell commands from any desktop browser, laptop, tablet, or mobile phone.
+
+### ✨ Highlights
+
+- ⚡ **Zero C++ Build Tools Needed**: Powered entirely by Node.js built-in `node:sqlite` and pure-JavaScript `bcryptjs`. No Visual Studio C++ Build Tools on Windows, no Xcode on macOS, and no `node-gyp` compilation errors.
+- 🔄 **Direct CLI & Config Sync**: Reads and writes directly to your local configuration (`~/.claude`). Your existing projects, session history, and MCP tools are discovered automatically.
+- 📱 **Mobile & PWA Ready**: Fully responsive mobile UI with touch navigation, virtual quick-keys, and iOS/Android home screen installation support.
+- 🤖 **Multi-Agent Support**: Switch between Claude Code, Cursor CLI, and Codex within the same unified dashboard.
+- 🔒 **100% Local & Private**: All data, sessions, and databases remain strictly on your own hardware. No external telemetry or cloud lock-in.
 
 ---
 
@@ -15,218 +38,177 @@
 <table>
 <tr>
 <td align="center">
-<h3>Desktop View</h3>
-<img src="public/screenshots/desktop-main.png" alt="Desktop Interface" width="400">
+<h3>Desktop Interface</h3>
+<img src="public/screenshots/desktop-main.png" alt="Desktop Interface" width="480">
 <br>
-<em>Main interface showing project overview and chat</em>
+<em>Full workspace with project explorer, active sessions, interactive chat, and tool execution logs</em>
 </td>
 <td align="center">
 <h3>Mobile Experience</h3>
-<img src="public/screenshots/mobile-chat.png" alt="Mobile Interface" width="250">
+<img src="public/screenshots/mobile-chat.png" alt="Mobile Interface" width="280">
 <br>
-<em>Responsive mobile design with touch navigation</em>
+<em>Responsive mobile design with touch controls, live diff views, and tool details</em>
 </td>
 </tr>
 <tr>
-<td align="center" colspan="2">
-<h3>CLI Selection</h3>
+<td align="center">
+<h3>CLI & Model Selection</h3>
 <img src="public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
 <br>
-<em>Select between Claude Code, Cursor CLI and Codex</em>
+<em>Switch seamlessly between Claude Code, Cursor CLI, and Codex</em>
+</td>
+<td align="center">
+<h3>Safe Tool Permission Controls</h3>
+<img src="public/screenshots/tools-modal.png" alt="Tools Settings Modal" width="400">
+<br>
+<em>Fine-grained control over allowed and disallowed agent tools</em>
 </td>
 </tr>
 </table>
 
-
-
 </div>
 
-## Features
-
-- **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Agents from mobile 
-- **Interactive Chat Interface** - Built-in chat interface for seamless communication with the Agents
-- **Integrated Shell Terminal** - Direct access to the Agents CLI through built-in shell functionality
-- **File Explorer** - Interactive file tree with syntax highlighting and live editing
-- **Git Explorer** - View, stage and commit your changes. You can also switch branches 
-- **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
-- **Session Management** - Resume conversations, manage multiple sessions, and track history
-- **Plugin System** - Extend RemoteCLI with custom plugins — add new tabs, backend services, and integrations.
-- **TaskMaster AI Integration** *(Optional)* - Advanced project management with AI-powered task planning, PRD parsing, and workflow automation
-- **Model Compatibility** - Works with Claude and GPT model families (the full list of supported models is available at runtime via `GET /api/providers/:provider/models`)
-
+---
 
 ## Quick Start
 
-### npm
+### Run Instantly with npx
 
-Try RemoteCLI instantly with **npx** (requires **Node.js** v22+):
+No installation required. Requires **Node.js >= 22.5.0**:
 
 ```bash
 npx @tunghuynh/remotecli
 ```
 
-Or install **globally** for regular use:
+### Global Installation (Recommended)
+
+Install globally via npm for regular use:
 
 ```bash
 npm install -g @tunghuynh/remotecli
+```
+
+Then start RemoteCLI anytime with:
+
+```bash
 remotecli
 ```
 
-Open `http://localhost:3001` — all your existing sessions are discovered automatically.
+Open your browser at **`http://localhost:3001`**. All your active projects and existing agent sessions will be ready immediately.
 
-### Docker Sandboxes (Experimental)
+---
 
-Run agents in isolated sandboxes with hypervisor-level isolation. Starts Claude Code by default. Requires the [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/).
+## Access From Mobile or LAN
 
-```bash
-npx @tunghuynh/remotecli@latest sandbox ~/my-project
+To use RemoteCLI from your smartphone, tablet, or another laptop on your local network:
+
+1. Start RemoteCLI on your host machine:
+   ```bash
+   remotecli
+   ```
+2. Find your machine's local IP address (e.g. `192.168.1.50`).
+3. Open `http://<YOUR_LOCAL_IP>:3001` in your mobile browser.
+4. *(Optional)* Tap **"Add to Home Screen"** in Safari / Chrome for a standalone full-screen mobile app experience.
+
+> **Tip:** You can also use secure mesh networks like [Tailscale](https://tailscale.com/) or WireGuard to access your coding agents remotely from anywhere outside your local network.
+
+---
+
+## CLI Commands & Options
+
+```
+RemoteCLI - Command Line Tool
+
+Usage:
+  remotecli [command] [options]
+
+Commands:
+  start            Start the RemoteCLI server (default)
+  status           Show current configuration, paths, and database status
+  update           Check and update RemoteCLI to the latest version
+  version          Show installed package version
+  help             Show CLI help and usage information
+  sandbox          Manage Docker sandbox environments (experimental)
+  browser-use-mcp  Run Browser MCP stdio server
+
+Options:
+  -p, --port <port>        Set server port (default: 3001)
+  --database-path <path>   Set custom SQLite database path
+  -h, --help               Show this help information
+  -v, --version            Show version information
 ```
 
-Supports Claude Code and Codex. See the [sandbox docs](docker/) for setup and advanced options.
+### Examples
 
+```bash
+# Start on default port 3001
+remotecli
 
----
+# Start on a custom port
+remotecli --port 8080
 
-## Which option is right for you?
+# Inspect configuration and database storage location
+remotecli status
 
-CloudCLI UI is the open source UI layer that powers CloudCLI Cloud. You can self-host it on your own machine, run it in a Docker sandbox for isolation, or use CloudCLI Cloud for a fully managed environment.
+# Update to latest version
+remotecli update
+```
 
-| | Self-Hosted (npm) | Self-Hosted (Docker Sandbox) *(Experimental)* | CloudCLI Cloud |
-|---|---|---|---|
-| **Best for** | Local agent sessions on your own machine | Isolated agents with web/mobile IDE | Teams who want agents in the cloud |
-| **How you access it** | Browser via `[yourip]:port` | Browser via `localhost:port` | Browser, any IDE, REST API, n8n |
-| **Setup** | `npx @tunghuynh/remotecli` | `npx @tunghuynh/remotecli@latest sandbox ~/project` | No setup required |
-| **Isolation** | Runs on your host | Hypervisor-level sandbox (microVM) | Full cloud isolation |
-| **Machine needs to stay on** | Yes | Yes | No |
-| **Mobile access** | Any browser on your network | Any browser on your network | Any device |
-| **Desktop companion** | Optional. Choose Local CloudCLI | Optional. Choose Local CloudCLI | Optional. Opens cloud environments |
-| **Agents supported** | Claude Code, Cursor CLI, Codex | Claude Code, Codex | Claude Code, Cursor CLI, Codex |
-| **File explorer and Git** | Yes | Yes | Yes |
-| **MCP configuration** | Synced with `~/.claude` | Managed via UI | Managed via UI |
-| **REST API** | Yes | Yes | Yes |
-| **Team sharing** | No | No | Yes |
-| **Platform cost** | Free, open source | Free, open source | Starts at €7/month |
+### Environment Variables
 
-> All options use your own AI subscriptions (Claude, Cursor, etc.) — CloudCLI provides the environment, not the AI.
+| Variable | Description | Default |
+|---|---|---|
+| `SERVER_PORT` | Port the web server listens on | `3001` |
+| `DATABASE_PATH` | Path to the SQLite storage database | `~/.remotecli/data.db` (or application root) |
+| `CLAUDE_CLI_PATH` | Custom path to the Claude Code CLI binary | `claude` |
+| `CONTEXT_WINDOW` | Fallback context window token limit | `160000` |
 
 ---
 
-## Security & Tools Configuration
+## Features
 
-**🔒 Important Notice**: All Claude Code tools are **disabled by default**. This prevents potentially harmful operations from running automatically.
+### 🤖 Multi-Agent Orchestration
+Work with **Claude Code**, **Cursor CLI**, or **OpenAI Codex** within a single dashboard. RemoteCLI dynamically fetches available models at runtime, allowing you to choose the best model for your task.
 
-### Enabling Tools
+### 💬 Interactive Chat & Diff Inspection
+Real-time response streaming, syntax-highlighted code blocks, unified diff viewers, and collapsible tool executions give you complete transparency into what the agent is doing.
 
-To use Claude Code's full functionality, you'll need to manually enable tools:
+### 💻 Integrated Terminal (xterm.js)
+Open full terminal sessions directly in the browser to run builds, test suites, or git operations alongside your agent conversations.
 
-1. **Open Tools Settings** - Click the gear icon in the sidebar
-2. **Enable Selectively** - Turn on only the tools you need
-3. **Apply Settings** - Your preferences are saved locally
+### 📁 File & Git Explorer
+- **File Explorer**: Browse project directories, view file contents with syntax highlighting, and make quick edits.
+- **Git Integration**: View modified files, inspect side-by-side diffs, stage files, switch branches, and commit changes.
 
-<div align="center">
+### 🛡️ Safe by Default Tool Permissions
+All agent tools (such as Bash, Write, Edit, Glob, Grep) can be inspected, allowed, or blocked through the **Tools Settings** modal. Prevent unintended destructive commands from running automatically.
 
-![Tools Settings Modal](public/screenshots/tools-modal.png)
-*Tools Settings interface - enable only what you need*
+### 🧩 Extensible Plugin System
+Add custom tabs with their own frontend components and backend services. Install community plugins or develop custom extensions for task queues, session intelligence, or custom dashboards.
 
-</div>
+---
 
-**Recommended approach**: Start with basic tools enabled and add more as needed. You can always adjust these settings later.
+## System Requirements
+
+- **Node.js**: `>= 22.5.0` (with built-in `node:sqlite` support)
+- **Operating System**: Windows 10/11, macOS, or Linux
+- **AI CLI**: At least one supported CLI installed on your machine:
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code): `npm install -g @anthropic-ai/claude-code`
+  - [Cursor CLI](https://docs.cursor.com/en/cli/overview)
+  - [Codex](https://developers.openai.com/codex)
 
 ---
 
-## Plugins
+## Security & Privacy
 
-CloudCLI has a plugin system that lets you add custom tabs with their own frontend UI and optional Node.js backend. Install plugins from git repos directly in **Settings > Plugins**, or build your own.
-
-### Available Plugins
-
-| Plugin | Description |
-|---|---|
-| **[Project Stats](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** | Shows file counts, lines of code, file-type breakdown, largest files, and recently modified files for your current project |
-| **[Web Terminal](https://github.com/cloudcli-ai/cloudcli-plugin-terminal)** | Full xterm.js terminal with multi-tab support |
-| **[CloudCLI Scheduler](https://github.com/grostim/cloudcli-cron)** | Create workspace-scoped scheduled prompts and execute them through a local CLI such as Codex or Claude Code |
-| **[PRISM CloudCLI](https://github.com/jakeefr/cloudcli-plugin-prism)** | Session intelligence for Claude Code inside CloudCLI, including token burn visibility |
-| **[Sessions](https://github.com/strykereye2/cloudcli-plugin-session-manager)** | View, manage, and kill active Claude Code sessions |
-| **[Token Cost Calculator](https://github.com/NightmareAway/cloudcli-plugin-token-cost-calculator)** | Calculate API costs from model prices and token usage, with preset model pricing support |
-| **[Task Queue](https://github.com/TadMSTR/cloudcli-plugin-task-queue)** | Task queue dashboard to view, filter, and launch agent tasks |
-| **[GitHub Issues Board](https://github.com/szmidtpiotr/claude-github-issue)** | Kanban board for GitHub Issues with bidirectional TaskMaster sync and /github-task CLI skill auto-install |
-
-### Build Your Own
-
-**[Plugin Starter Template →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — fork this repo to create your own plugin. It includes a working example with frontend rendering, live context updates, and RPC communication to a backend server.
-
-### Private Repositories
-
-The server installs and updates plugins with `git clone` and `git pull`, using the git credentials of the operating-system user it runs as (for a systemd service, the unit's `User=`). The server cannot answer a password or passphrase prompt during an install, so set up credentials for that user before installing from a private repository:
-
-- **`https://` URLs:** configure a git credential helper, for example `gh auth login` followed by `gh auth setup-git`, or a token in `~/.git-credentials` with `git config --global credential.helper store`.
-- **`git@` URLs:** give that user an SSH key the git host accepts and that works without a prompt: either it has no passphrase, or it is loaded into an `ssh-agent` whose `SSH_AUTH_SOCK` the server process inherits. Also add the host to that user's `~/.ssh/known_hosts`, for example by running `ssh -T git@github.com` once as that user.
-
-Without credentials, an `https://` install fails with a message saying that the repository is private or does not exist. Most git hosts, GitHub included, answer the same way for both. If the host rejects the credentials (wrong, expired or revoked), or ssh cannot log in for a `git@` URL, the message says so.
-
----
-## FAQ
-
-<details>
-<summary>How is this different from Claude Code Remote Control?</summary>
-
-Claude Code Remote Control lets you send messages to a session already running in your local terminal. Your machine has to stay on, your terminal has to stay open, and sessions time out after roughly 10 minutes without a network connection.
-
-CloudCLI UI and CloudCLI Cloud extend Claude Code rather than sit alongside it — your MCP servers, permissions, settings, and sessions are the exact same ones Claude Code uses natively. Nothing is duplicated or managed separately.
-
-Here's what that means in practice:
-
-- **All your sessions, not just one** — CloudCLI UI auto-discovers every session from your `~/.claude` folder. Remote Control only exposes the single active session to make it available in the Claude mobile app.
-- **Your settings are your settings** — MCP servers, tool permissions, and project config you change in CloudCLI UI are written directly to your Claude Code config and take effect immediately, and vice versa.
-- **Works with more agents** — Claude Code, Cursor CLI and Codex, not just Claude Code.
-- **Full UI, not just a chat window** — file explorer, Git integration, MCP management, and a shell terminal are all built in.
-- **CloudCLI Cloud runs in the cloud** — close your laptop, the agent keeps running. No terminal to babysit, no machine to keep awake.
-
-</details>
-
-<details>
-<summary>Do I need to pay for an AI subscription separately?</summary>
-
-Yes. CloudCLI provides the environment, not the AI. You bring your own Claude, Cursor, or Codex subscription. CloudCLI Cloud starts at €7/month for the hosted environment on top of that.
-
-</details>
-
-<details>
-<summary>Can I use CloudCLI UI on my phone?</summary>
-
-Yes. For self-hosted, run the server on your machine and open `[yourip]:port` in any browser on your network. For CloudCLI Cloud, open it from any device — no VPN, no port forwarding, no setup. A native app is also in the works.
-
-</details>
-
-<details>
-<summary>Will changes I make in the UI affect my local Claude Code setup?</summary>
-
-Yes, for self-hosted. CloudCLI UI reads from and writes to the same `~/.claude` config that Claude Code uses natively. MCP servers you add via the UI show up in Claude Code immediately and vice versa.
-
-</details>
+- **Local Execution**: RemoteCLI runs as a local web service on your machine.
+- **Your Own Credentials**: RemoteCLI connects directly to your local CLI sessions; you use your own provider authentication.
+- **Permission Safety**: Tool execution permissions match your security preferences and can be toggled per session or globally.
 
 ---
 
 ## License
 
-GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [LICENSE](LICENSE) for the full text, including additional terms under Section 7.
+This project is licensed under the [GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)](LICENSE).
 
-This project is open source and free to use, modify, and distribute under the AGPL-3.0-or-later license. If you modify this software and run it as a network service, you must make your modified source code available to users of that service.
-
-## Acknowledgments
-
-### Built With
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic's official CLI
-- **[Cursor CLI](https://docs.cursor.com/en/cli/overview)** - Cursor's official CLI
-- **[Codex](https://developers.openai.com/codex)** - OpenAI Codex
-- **[React](https://react.dev/)** - User interface library
-- **[Vite](https://vitejs.dev/)** - Fast build tool and dev server
-- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[CodeMirror](https://codemirror.net/)** - Advanced code editor
-- **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - AI-powered project management and task planning
-
----
-
-<div align="center">
- <strong>Made with care for the Claude Code, Cursor and Codex community.</strong>
-</div>
+Author: **Tùng Huỳnh** ([@tunghuynh](https://github.com/tunghuynh))
