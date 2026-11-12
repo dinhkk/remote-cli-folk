@@ -422,7 +422,7 @@ export default function ChatComposer({
 
           <PromptInputBody>
             <div ref={inputHighlightRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-              <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words px-4 py-2 text-sm leading-6 text-transparent">
+              <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words pl-4 pr-11 py-2 text-sm leading-6 text-transparent">
                 {renderInputWithMentions(input)}
               </div>
             </div>
@@ -440,7 +440,49 @@ export default function ChatComposer({
               onBlur={() => onInputFocusChange?.(false)}
               onInput={onTextareaInput}
               placeholder={placeholder}
+              className="pr-11"
             />
+
+            <div className="absolute bottom-1.5 right-2 z-10 flex items-center">
+              <PromptInputSubmit
+                onClick={
+                  canQueueDraft
+                    ? (e: MouseEvent<HTMLButtonElement>) => {
+                        e.preventDefault();
+                        onSubmit(e);
+                      }
+                    : isLoading
+                      ? onAbortSession
+                      : isRecording
+                        ? (e: MouseEvent<HTMLButtonElement>) => {
+                            e.preventDefault();
+                            voiceStop({ send: true });
+                          }
+                        : (e: MouseEvent<HTMLButtonElement>) => {
+                            e.preventDefault();
+                            onSubmit(e);
+                          }
+                }
+                disabled={
+                  isLoading
+                    ? false
+                    : isRecording
+                      ? false
+                      : isTranscribing
+                        ? true
+                        : !input.trim() && attachedFiles.length === 0
+                }
+                aria-label={submitAriaLabel}
+                title={submitAriaLabel}
+                className="h-7 w-7 rounded-lg"
+              >
+                {isTranscribing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : canQueueDraft ? (
+                  <ArrowUpIcon className="h-3.5 w-3.5" />
+                ) : undefined}
+              </PromptInputSubmit>
+            </div>
         </PromptInputBody>
 
         <PromptInputFooter className="flex-wrap gap-y-1">
@@ -467,7 +509,7 @@ export default function ChatComposer({
               <MessageSquareIcon />
               {slashCommandsCount > 0 && (
                 <span
-                  className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
+                  className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground"
                 >
                   {slashCommandsCount}
                 </span>
@@ -486,7 +528,7 @@ export default function ChatComposer({
 
           </PromptInputTools>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-1.5">
             <ScheduleMessagePopover
               disabled={!input.trim()}
               onSchedule={onScheduleMessage}
@@ -508,49 +550,10 @@ export default function ChatComposer({
               onSelectPermissionMode={onSelectPermissionMode}
               providerLabel={providerLabel}
             />
-
-            <PromptInputSubmit
-              onClick={
-                canQueueDraft
-                  ? (e: MouseEvent<HTMLButtonElement>) => {
-                      e.preventDefault();
-                      onSubmit(e);
-                    }
-                  : isLoading
-                    ? onAbortSession
-                    : isRecording
-                      ? (e: MouseEvent<HTMLButtonElement>) => {
-                          e.preventDefault();
-                          voiceStop({ send: true });
-                        }
-                      : (e: MouseEvent<HTMLButtonElement>) => {
-                          e.preventDefault();
-                          onSubmit(e);
-                        }
-              }
-              disabled={
-                isLoading
-                  ? false
-                  : isRecording
-                    ? false
-                    : isTranscribing
-                      ? true
-                      : !input.trim() && attachedFiles.length === 0
-              }
-              aria-label={submitAriaLabel}
-              title={submitAriaLabel}
-              className="h-10 w-10 sm:h-10 sm:w-10"
-            >
-              {isTranscribing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : canQueueDraft ? (
-                <ArrowUpIcon className="h-4 w-4" />
-              ) : undefined}
-            </PromptInputSubmit>
           </div>
 
           <div
-            className={`order-last hidden basis-full px-2 text-center text-xs leading-4 text-muted-foreground/50 transition-opacity duration-200 lg:block ${
+            className={`order-last hidden basis-full px-2 text-center text-[10px] leading-3 text-muted-foreground/50 transition-opacity duration-200 lg:block ${
               input.trim() && !canQueueDraft ? 'opacity-0' : 'opacity-100'
             }`}
           >

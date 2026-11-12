@@ -133,7 +133,7 @@ function ComposerPermissionMenu({
           updateAnchor();
           setIsOpen((current) => !current);
         }}
-        className={`flex h-8 min-w-8 max-w-40 shrink-0 items-center justify-center gap-1.5 rounded-lg border text-xs font-medium transition-colors sm:max-w-48 ${isNameShown ? 'px-2' : 'w-8'} ${activeAppearance.trigger}`}
+        className={`flex h-7 min-w-7 max-w-40 shrink-0 items-center justify-center gap-1 rounded-md border text-[11px] font-medium transition-colors sm:max-w-48 ${isNameShown ? 'px-2' : 'w-7'} ${activeAppearance.trigger}`}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         // The mode name leads the accessible name, so what a screen reader
@@ -145,7 +145,7 @@ function ComposerPermissionMenu({
         })}
         title={t('input.clickToChangeMode')}
       >
-        <ActiveIcon className="h-4 w-4 shrink-0" />
+        <ActiveIcon className="h-3.5 w-3.5 shrink-0" />
         {/* Named, not just drawn: the mode decides what the next message may change. */}
         {isNameShown && <span className="truncate">{activeModeLabel}</span>}
       </button>

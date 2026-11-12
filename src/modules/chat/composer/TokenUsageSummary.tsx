@@ -51,12 +51,12 @@ function TokenUsageSummary({ usage, onClick }: TokenUsageSummaryProps) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-2 sm:px-2.5"
+      className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-background/70 px-1.5 text-[11px] text-muted-foreground shadow-xs transition-colors hover:border-primary/25 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-1.5 sm:px-2"
       title={t('chat:misc.tokensUsed', { count: usedTokens })}
       aria-label={t('chat:misc.showTokenUsage')}
     >
-      <span className="hidden h-5 w-5 place-items-center rounded-md bg-primary/10 text-primary sm:grid">
-        <ActivityIcon className="h-3.5 w-3.5" />
+      <span className="hidden h-4 w-4 place-items-center rounded bg-primary/10 text-primary sm:grid">
+        <ActivityIcon className="h-3 w-3" />
       </span>
       <span className="font-medium text-foreground">{formatTokenCount(usedTokens)}</span>
       <span className="hidden text-muted-foreground/70 sm:inline">

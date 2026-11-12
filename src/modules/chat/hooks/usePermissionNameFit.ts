@@ -7,16 +7,16 @@ import type { RefObject } from 'react';
  */
 const FIT_EPSILON = 0.5;
 
-/** ComposerPermissionMenu's trigger without its name: the 32px (`w-8`) icon button. */
-const ICON_ONLY_WIDTH = 32;
+/** ComposerPermissionMenu's trigger without its name: the 28px (`w-7`) icon button. */
+const ICON_ONLY_WIDTH = 28;
 
 /**
  * Room a hidden name needs to spare before it is shown. That is the clear
  * button the composer adds to its left-hand tools once something is typed
- * (32px plus a 4px gap), so the first keystroke never takes back a name that
+ * (28px plus a 4px gap), so the first keystroke never takes back a name that
  * was just shown.
  */
-const SHOW_MARGIN = 36;
+const SHOW_MARGIN = 32;
 
 type PermissionNameFitInput = {
   /** Width the composer footer lays its tools and controls out in (its content box). */

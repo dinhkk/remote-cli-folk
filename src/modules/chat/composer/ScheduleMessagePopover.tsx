@@ -75,12 +75,12 @@ export function ScheduleMessagePopover({ disabled, onSchedule }: ScheduleMessage
         aria-label={ariaLabel}
         title={ariaLabel}
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-colors',
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-muted-foreground transition-colors',
           disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-muted hover:text-foreground',
           isOpen && 'text-foreground',
         )}
       >
-        <Clock className="h-4 w-4" />
+        <Clock className="h-3.5 w-3.5" />
       </button>
 
       {isOpen && anchor && createPortal(
