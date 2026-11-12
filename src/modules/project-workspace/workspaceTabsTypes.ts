@@ -1,0 +1,51 @@
+import type { LucideIcon } from 'lucide-react';
+import { Bot, ClipboardCheck, Folder, GitBranch, MessageSquare, MonitorPlay, Terminal } from 'lucide-react';
+import type { Dispatch, SetStateAction } from 'react';
+
+import type { AppTab } from '@/shared/types';
+
+export type BuiltInTab = {
+  kind: 'builtin';
+  id: AppTab;
+  labelKey: string;
+  icon: LucideIcon;
+};
+
+export type PluginTab = {
+  kind: 'plugin';
+  id: AppTab;
+  label: string;
+  pluginName: string;
+  iconFile: string;
+};
+
+export type TabDefinition = BuiltInTab | PluginTab;
+
+export type WorkspaceTabsProps = {
+  activeTab: AppTab;
+  setActiveTab: Dispatch<SetStateAction<AppTab>>;
+  shouldShowTasksTab: boolean;
+  shouldShowBrowserTab: boolean;
+};
+
+export const BASE_TABS: BuiltInTab[] = [
+  { kind: 'builtin', id: 'chat',   labelKey: 'tabs.chat',   icon: MessageSquare },
+  { kind: 'builtin', id: 'agents', labelKey: 'tabs.agents', icon: Bot },
+  { kind: 'builtin', id: 'shell',  labelKey: 'tabs.shell',  icon: Terminal },
+  { kind: 'builtin', id: 'files',  labelKey: 'tabs.files',  icon: Folder },
+  { kind: 'builtin', id: 'git',    labelKey: 'tabs.git',    icon: GitBranch },
+];
+
+export const BROWSER_TAB: BuiltInTab = {
+  kind: 'builtin',
+  id: 'browser',
+  labelKey: 'tabs.browser',
+  icon: MonitorPlay,
+};
+
+export const TASKS_TAB: BuiltInTab = {
+  kind: 'builtin',
+  id: 'tasks',
+  labelKey: 'tabs.tasks',
+  icon: ClipboardCheck,
+};

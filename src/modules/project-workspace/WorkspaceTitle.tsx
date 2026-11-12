@@ -20,6 +20,10 @@ function getTabTitle(activeTab: AppTab, shouldShowTasksTab: boolean, t: (key: st
     return pluginDisplayName;
   }
 
+  if (activeTab === 'agents') {
+    return t('tabs.agents');
+  }
+
   if (activeTab === 'files') {
     return t('mainContent.projectFiles');
   }

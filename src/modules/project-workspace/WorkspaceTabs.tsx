@@ -1,56 +1,23 @@
-import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, MonitorPlay, type LucideIcon } from 'lucide-react';
 import { Fragment } from 'react';
-import type { Dispatch, KeyboardEvent, SetStateAction } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Tooltip, PillBar, Pill } from '@/shared/ui';
 import type { AppTab } from '@/shared/types';
-import { usePlugins,PluginIcon } from '@/modules/plugins';
+import { usePlugins, PluginIcon } from '@/modules/plugins';
+import { useOptionalProcessingSessions } from '@/shared/context/SessionProtectionContext';
+import {
+  BASE_TABS,
+  BROWSER_TAB,
+  TASKS_TAB,
+  type BuiltInTab,
+  type PluginTab,
+  type TabDefinition,
+  type WorkspaceTabsProps,
+} from '@/modules/project-workspace/workspaceTabsTypes';
 
-type WorkspaceTabsProps = {
-  activeTab: AppTab;
-  setActiveTab: Dispatch<SetStateAction<AppTab>>;
-  shouldShowTasksTab: boolean;
-  shouldShowBrowserTab: boolean;
-};
-
-type BuiltInTab = {
-  kind: 'builtin';
-  id: AppTab;
-  labelKey: string;
-  icon: LucideIcon;
-};
-
-type PluginTab = {
-  kind: 'plugin';
-  id: AppTab;
-  label: string;
-  pluginName: string;
-  iconFile: string;
-};
-
-type TabDefinition = BuiltInTab | PluginTab;
-
-const BASE_TABS: BuiltInTab[] = [
-  { kind: 'builtin', id: 'chat',  labelKey: 'tabs.chat',  icon: MessageSquare },
-  { kind: 'builtin', id: 'shell', labelKey: 'tabs.shell', icon: Terminal },
-  { kind: 'builtin', id: 'files', labelKey: 'tabs.files', icon: Folder },
-  { kind: 'builtin', id: 'git',   labelKey: 'tabs.git',   icon: GitBranch },
-];
-
-const BROWSER_TAB: BuiltInTab = {
-  kind: 'builtin',
-  id: 'browser',
-  labelKey: 'tabs.browser',
-  icon: MonitorPlay,
-};
-
-const TASKS_TAB: BuiltInTab = {
-  kind: 'builtin',
-  id: 'tasks',
-  labelKey: 'tabs.tasks',
-  icon: ClipboardCheck,
-};
+export type { WorkspaceTabsProps, BuiltInTab, PluginTab, TabDefinition };
+export { BASE_TABS, BROWSER_TAB, TASKS_TAB };
 
 /** Rendered by WorkspaceHeader to show the built-in workspace tabs plus any enabled plugin tabs. */
 export default function WorkspaceTabs({
@@ -61,6 +28,16 @@ export default function WorkspaceTabs({
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
   const { plugins } = usePlugins();
+  const processingSessions = useOptionalProcessingSessions();
+
+  let runningTasksCount = 0;
+  if (processingSessions) {
+    for (const activity of processingSessions.values()) {
+      if (activity.tasks) {
+        runningTasksCount += activity.tasks.length;
+      }
+    }
+  }
 
   const builtInTabs: BuiltInTab[] = [
     ...BASE_TABS,
@@ -137,6 +114,11 @@ export default function WorkspaceTabs({
                 <span className={`${isActive ? 'inline max-w-28' : 'hidden'} truncate sm:max-w-36 lg:inline`}>
                   {displayLabel}
                 </span>
+                {tab.id === 'agents' && runningTasksCount > 0 && (
+                  <span className="ml-1.5 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-bold text-white">
+                    {runningTasksCount}
+                  </span>
+                )}
               </Pill>
             </Tooltip>
           </Fragment>

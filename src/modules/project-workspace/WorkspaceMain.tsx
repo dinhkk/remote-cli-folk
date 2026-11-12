@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, type Dispatch, type SetStateAction, useState } from 'react';
 
-import { ChatInterface } from '@/modules/chat';
+import { ChatInterface, useSessionStore } from '@/modules/chat';
 import { FileTree } from '@/modules/file-tree';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitPanel } from '@/modules/git-panel';
@@ -15,6 +15,7 @@ import { EditorSidebar, useEditorSidebar } from '@/modules/code-editor';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
+import { AgentsWorkspaceView } from '@/modules/project-workspace/agents/AgentsWorkspaceView';
 
 type WorkspaceMainProps = {
   selectedProject: Project | null;
@@ -64,6 +65,7 @@ function WorkspaceMain({
 
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
+  const sessionStore = useSessionStore();
 
   useTaskMasterProjectSync(selectedProject);
   // The folder an in-chat `path/` reference asked to reveal. Held as an object
@@ -175,9 +177,23 @@ function WorkspaceMain({
                 externalMessageUpdate={externalMessageUpdate}
                 newSessionTrigger={newSessionTrigger}
                 onShowAllTasks={tasksEnabled ? showAllTasks : null}
+                sessionStore={sessionStore}
               />
             </WorkspaceErrorBoundary>
           </div>
+
+          {activeTab === 'agents' && (
+            <div className="h-full overflow-hidden">
+              <AgentsWorkspaceView
+                selectedProject={selectedProject}
+                selectedSession={selectedSession}
+                setActiveTab={setActiveTab}
+                sendMessage={sendMessage}
+                onFileOpen={handleFileOpen}
+                sessionStore={sessionStore}
+              />
+            </div>
+          )}
 
           {activeTab === 'files' && (
             <div className="h-full overflow-hidden">

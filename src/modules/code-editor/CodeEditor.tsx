@@ -127,23 +127,10 @@ export default function CodeEditor({
     return extension === 'html' || extension === 'htm';
   }, [file.name]);
 
-  const openHtmlPreview = useCallback(() => {
-    const previewWindow = window.open('', '_blank');
-    if (!previewWindow) return;
-
-    previewWindow.opener = null;
-    previewWindow.document.title = file.name;
-    previewWindow.document.body.style.margin = '0';
-
-    const iframe = previewWindow.document.createElement('iframe');
-    iframe.title = file.name;
-    iframe.sandbox.add('allow-forms', 'allow-modals', 'allow-popups', 'allow-scripts');
-    iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;background:white';
-
-    iframe.srcdoc = content;
-
-    previewWindow.document.body.appendChild(iframe);
-  }, [content, file.name]);
+  const isMermaidFile = useMemo(() => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    return extension === 'mmd' || extension === 'mermaid';
+  }, [file.name]);
 
   const minimapExtension = useMemo(
     () => (
@@ -297,12 +284,12 @@ export default function CodeEditor({
             isFullscreen={isFullscreen}
             isMarkdownFile={isMarkdownFile}
             isHtmlPreviewFile={isHtmlPreviewFile}
+            isMermaidFile={isMermaidFile}
             markdownPreview={markdownPreview}
             saving={saving}
             saveSuccess={saveSuccess}
             hasUnsavedChanges={hasUnsavedChanges}
             onToggleMarkdownPreview={() => setMarkdownPreview((previous) => !previous)}
-            onOpenHtmlPreview={openHtmlPreview}
             onOpenSettings={() => paletteOps.openSettings('appearance')}
             onDownload={handleDownload}
             onSave={handleSave}
@@ -314,7 +301,8 @@ export default function CodeEditor({
               pathCopied: t('actions.pathCopied', 'File path copied'),
               editMarkdown: t('actions.editMarkdown'),
               previewMarkdown: t('actions.previewMarkdown'),
-              previewHtml: t('actions.previewHtml', 'Open HTML preview in new tab'),
+              previewHtml: t('actions.previewHtml', 'Preview HTML'),
+              previewMermaid: t('actions.previewMermaid', 'Preview diagram'),
               settings: t('toolbar.settings'),
               download: t('actions.download'),
               save: t('actions.save'),
@@ -339,6 +327,8 @@ export default function CodeEditor({
               onChange={setContent}
               markdownPreview={markdownPreview}
               isMarkdownFile={isMarkdownFile}
+              isHtmlPreviewFile={isHtmlPreviewFile}
+              isMermaidFile={isMermaidFile}
               isDarkMode={isDarkMode}
               fontSize={fontSize}
               showLineNumbers={showLineNumbers}

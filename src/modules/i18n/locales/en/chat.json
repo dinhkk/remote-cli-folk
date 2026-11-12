@@ -404,6 +404,14 @@
     "escClosesModal": "Esc closes the modal.",
     "close": "Close"
   },
+  "pinned": {
+    "jumpToMessage": "Jump to this message",
+    "currentPrompt": "Active Prompt",
+    "processing": "Processing...",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "clickToJump": "Click to scroll to message"
+  },
   "modelLibrary": {
     "effortLevels": "Reasoning levels",
     "effortLevelsHint": "Select the reasoning-effort levels this model accepts. If none are selected, no effort level can be chosen for this model in the composer.",

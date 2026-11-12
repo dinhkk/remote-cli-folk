@@ -83,7 +83,7 @@ export function ActionMenu({
       return;
     }
 
-    const closeOnOutsideClick = (event: MouseEvent) => {
+    const closeOnOutsideClick = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       if (
         rootRef.current
@@ -102,9 +102,11 @@ export function ActionMenu({
     };
 
     document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('touchstart', closeOnOutsideClick);
     document.addEventListener('keydown', closeOnEscape);
     return () => {
       document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('touchstart', closeOnOutsideClick);
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [isOpen, setMenuOpen]);

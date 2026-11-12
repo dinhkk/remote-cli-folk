@@ -74,6 +74,7 @@ export default function ChatExportMenu({
     <ActionMenu
       icon={busyFormat ? Loader2 : Download}
       iconOnly
+      portal
       label={t('export.trigger')}
       ariaLabel={t('export.trigger')}
       triggerClassName="h-8 w-8 rounded-lg border border-border/50 text-muted-foreground hover:bg-accent hover:text-foreground"

@@ -523,7 +523,10 @@ export default function ChatComposer({
                           e.preventDefault();
                           voiceStop({ send: true });
                         }
-                      : undefined
+                      : (e: MouseEvent<HTMLButtonElement>) => {
+                          e.preventDefault();
+                          onSubmit(e);
+                        }
               }
               disabled={
                 isLoading

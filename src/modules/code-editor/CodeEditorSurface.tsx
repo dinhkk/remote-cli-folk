@@ -7,12 +7,16 @@ import type { Extension } from '@codemirror/state';
 import type { CodeEditorGotoTarget } from '@/shared/types';
 
 import MarkdownPreview from '@/modules/code-editor/markdown/MarkdownPreview';
+import { HtmlPreview } from '@/modules/code-editor/preview/HtmlPreview';
+import { MermaidFilePreview } from '@/modules/code-editor/preview/MermaidFilePreview';
 
 type CodeEditorSurfaceProps = {
   content: string;
   onChange: (value: string) => void;
   markdownPreview: boolean;
   isMarkdownFile: boolean;
+  isHtmlPreviewFile?: boolean;
+  isMermaidFile?: boolean;
   isDarkMode: boolean;
   fontSize: number;
   showLineNumbers: boolean;
@@ -21,12 +25,14 @@ type CodeEditorSurfaceProps = {
   gotoTarget?: CodeEditorGotoTarget | null;
 };
 
-/** Rendered by CodeEditor inside the code-editor module to show either the CodeMirror editing surface or the markdown preview. */
+/** Rendered by CodeEditor inside the code-editor module to show either the CodeMirror editing surface or the inline preview (Markdown, HTML, Mermaid). */
 export default function CodeEditorSurface({
   content,
   onChange,
   markdownPreview,
   isMarkdownFile,
+  isHtmlPreviewFile = false,
+  isMermaidFile = false,
   isDarkMode,
   fontSize,
   showLineNumbers,
@@ -57,14 +63,24 @@ export default function CodeEditorSurface({
     });
   }, [view, gotoTarget, content]);
 
-  if (markdownPreview && isMarkdownFile) {
-    return (
-      <div className="h-full overflow-y-auto bg-white dark:bg-gray-900">
-        <div className="prose prose-sm mx-auto max-w-4xl px-8 py-6 dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 prose-code:text-sm prose-pre:bg-gray-900 prose-img:rounded-lg dark:prose-a:text-blue-400">
-          <MarkdownPreview content={content} />
+  if (markdownPreview) {
+    if (isMarkdownFile) {
+      return (
+        <div className="h-full overflow-y-auto bg-white dark:bg-gray-900">
+          <div className="prose prose-sm mx-auto max-w-4xl px-8 py-6 dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 prose-code:text-sm prose-pre:bg-gray-900 prose-img:rounded-lg dark:prose-a:text-blue-400">
+            <MarkdownPreview content={content} />
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    if (isHtmlPreviewFile) {
+      return <HtmlPreview content={content} />;
+    }
+
+    if (isMermaidFile) {
+      return <MermaidFilePreview content={content} />;
+    }
   }
 
   return (

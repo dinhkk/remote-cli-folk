@@ -161,7 +161,7 @@ function SidebarProjectItem({
         <div className="bg-background">
           <div
             className={cn(
-              'p-3 mx-3 my-1 rounded-lg bg-card border border-border/50 active:scale-[0.98] transition-all duration-150',
+              'px-2.5 py-1.5 mx-2 my-0.5 rounded-lg bg-card border border-border/50 active:scale-[0.98] transition-all duration-150',
               isSelected && 'bg-primary/5 border-primary/20',
               isStarred &&
                 !isSelected &&
@@ -169,11 +169,11 @@ function SidebarProjectItem({
             )}
             onClick={toggleProject}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <button
                   className={cn(
-                    'w-8 h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 border',
+                    'w-6 h-6 rounded-md flex items-center justify-center shrink-0 active:scale-90 transition-all duration-150 border',
                     isStarred
                       ? 'bg-yellow-500/10 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800'
                       : 'bg-gray-500/10 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800',
@@ -186,7 +186,7 @@ function SidebarProjectItem({
                 >
                   <Star
                     className={cn(
-                      'w-4 h-4 transition-colors',
+                      'w-3.5 h-3.5 transition-colors',
                       isStarred
                         ? 'text-yellow-600 dark:text-yellow-400 fill-current'
                         : 'text-gray-600 dark:text-gray-400',
@@ -201,7 +201,7 @@ function SidebarProjectItem({
                       type="text"
                       value={renameDraft}
                       onChange={(event) => onRenameDraftChange(event.target.value)}
-                      className="w-full rounded-lg border-2 border-primary/40 bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-all duration-200 focus:border-primary focus:shadow-md focus:outline-none"
+                      className="w-full rounded-md border-2 border-primary/40 bg-background px-2 py-1 text-xs text-foreground shadow-sm transition-all duration-200 focus:border-primary focus:shadow-md focus:outline-none"
                       placeholder={t('projects.projectNamePlaceholder')}
                       autoFocus
                       autoComplete="off"
@@ -218,74 +218,65 @@ function SidebarProjectItem({
                         }
                       }}
                       style={{
-                        fontSize: '16px',
+                        fontSize: '14px',
                         WebkitAppearance: 'none',
-                        borderRadius: '8px',
+                        borderRadius: '6px',
                       }}
                     />
                   ) : (
-                    <>
-                      <div className="flex min-w-0 flex-1 items-center justify-between">
-                        <h3 className="truncate text-sm font-normal text-foreground">{project.displayName}</h3>
-                        {tasksEnabled && (
-                          <TaskIndicator
-                            status={taskStatus}
-                            size="xs"
-                            className="ml-2 hidden flex-shrink-0 md:inline-flex"
-                          />
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{sessionCountLabel}</p>
-                    </>
+                    <div className="flex min-w-0 items-center justify-between gap-1.5">
+                      <h3 className="truncate text-xs font-medium text-foreground">{project.displayName}</h3>
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{sessionCountLabel}</span>
+                    </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 {isEditing ? (
                   <>
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500 shadow-sm transition-all duration-150 active:scale-90 active:shadow-none dark:bg-green-600"
+                      className="flex h-6 w-6 items-center justify-center rounded-md bg-green-500 shadow-sm transition-all duration-150 active:scale-90 active:shadow-none dark:bg-green-600"
                       onClick={(event) => {
                         event.stopPropagation();
                         saveProjectName();
                       }}
                     >
-                      <Check className="h-4 w-4 text-white" />
+                      <Check className="h-3.5 w-3.5 text-white" />
                     </button>
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-500 shadow-sm transition-all duration-150 active:scale-90 active:shadow-none dark:bg-gray-600"
+                      className="flex h-6 w-6 items-center justify-center rounded-md bg-gray-500 shadow-sm transition-all duration-150 active:scale-90 active:shadow-none dark:bg-gray-600"
                       onClick={(event) => {
                         event.stopPropagation();
                         onCancelEditingProject();
                       }}
                     >
-                      <X className="h-4 w-4 text-white" />
+                      <X className="h-3.5 w-3.5 text-white" />
                     </button>
                   </>
                 ) : (
                   <>
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-500/10 active:scale-90 dark:border-red-800 dark:bg-red-900/30"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-red-200 bg-red-500/10 active:scale-90 dark:border-red-800 dark:bg-red-900/30"
                       onClick={(event) => {
                         event.stopPropagation();
                         onDeleteProject(project);
                       }}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
                     </button>
 
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 active:scale-90 dark:border-primary/30 dark:bg-primary/20"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-primary/20 bg-primary/10 active:scale-90 dark:border-primary/30 dark:bg-primary/20"
                       onClick={(event) => {
                         event.stopPropagation();
                         onStartEditingProject(project);
                       }}
                     >
-                      <Edit3 className="h-4 w-4 text-primary" />
+                      <Edit3 className="h-3 w-3 text-primary" />
                     </button>
 
-                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-muted/30">
+                    <div className="flex h-5 w-5 items-center justify-center rounded bg-muted/30">
                       {isExpanded ? (
                         <ChevronDown className="h-3 w-3 text-muted-foreground" />
                       ) : (

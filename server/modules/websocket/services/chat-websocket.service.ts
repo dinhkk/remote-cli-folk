@@ -178,23 +178,25 @@ function resolveSendTarget(
   dependencies: ChatWebSocketDependencies,
   frameName: string,
 ): ResolvedSendTarget | null {
-  const sessionId = readRequiredSessionId(data);
-  if (!sessionId) {
+  const rawSessionId = readRequiredSessionId(data);
+  if (!rawSessionId) {
     sendProtocolError(ws, 'SESSION_ID_REQUIRED', `${frameName} requires a sessionId.`);
     return null;
   }
 
-  const session = sessionsDb.getSessionById(sessionId);
+  const session = sessionsDb.getSessionById(rawSessionId)
+    ?? sessionsDb.getSessionByProviderSessionId(rawSessionId);
   if (!session) {
     sendProtocolError(
       ws,
       'SESSION_NOT_FOUND',
-      `Session "${sessionId}" was not found. Create it via POST /api/providers/sessions first.`,
-      sessionId
+      `Session "${rawSessionId}" was not found. Create it via POST /api/providers/sessions first.`,
+      rawSessionId
     );
     return null;
   }
 
+  const sessionId = session.session_id;
   const provider = session.provider as LLMProvider;
   if (!dependencies.runtime.hasRuntime(provider)) {
     sendProtocolError(ws, 'UNSUPPORTED_PROVIDER', `Provider "${provider}" is not available.`, sessionId);
@@ -422,19 +424,24 @@ async function handleChatAbort(
   data: AnyRecord,
   dependencies: ChatWebSocketDependencies
 ): Promise<void> {
-  const sessionId = readRequiredSessionId(data);
-  if (!sessionId) {
+  const rawSessionId = readRequiredSessionId(data);
+  if (!rawSessionId) {
     sendProtocolError(ws, 'SESSION_ID_REQUIRED', 'chat.abort requires a sessionId.');
     return;
   }
 
-  const run = chatRunRegistry.getRun(sessionId);
+  const session = sessionsDb.getSessionById(rawSessionId)
+    ?? sessionsDb.getSessionByProviderSessionId(rawSessionId);
+  const sessionId = session ? session.session_id : rawSessionId;
+
+  const run = chatRunRegistry.getRun(sessionId)
+    ?? (sessionId !== rawSessionId ? chatRunRegistry.getRun(rawSessionId) : undefined);
   if (!run || run.status !== 'running') {
-    sendProtocolError(ws, 'NO_ACTIVE_RUN', `Session "${sessionId}" has no active run.`, sessionId);
+    sendProtocolError(ws, 'NO_ACTIVE_RUN', `Session "${rawSessionId}" has no active run.`, rawSessionId);
     return;
   }
 
-  const success = await dependencies.runtime.abort(run.provider, sessionId);
+  const success = await dependencies.runtime.abort(run.provider, run.appSessionId);
 
   // Scoped to the run that was stopped: a stop can take a round trip, and a
   // new run of the session may have started by the time it returns.
@@ -457,24 +464,26 @@ async function handleChatStopTask(
   data: AnyRecord,
   dependencies: ChatWebSocketDependencies
 ): Promise<void> {
-  const sessionId = readRequiredSessionId(data);
-  if (!sessionId) {
+  const rawSessionId = readRequiredSessionId(data);
+  if (!rawSessionId) {
     sendProtocolError(ws, 'SESSION_ID_REQUIRED', 'chat.stop-task requires a sessionId.');
     return;
   }
 
   const taskId = typeof data.taskId === 'string' ? data.taskId.trim() : '';
   if (!taskId) {
-    sendProtocolError(ws, 'TASK_ID_REQUIRED', 'chat.stop-task requires a taskId.', sessionId);
+    sendProtocolError(ws, 'TASK_ID_REQUIRED', 'chat.stop-task requires a taskId.', rawSessionId);
     return;
   }
 
-  const session = sessionsDb.getSessionById(sessionId);
+  const session = sessionsDb.getSessionById(rawSessionId)
+    ?? sessionsDb.getSessionByProviderSessionId(rawSessionId);
   if (!session) {
-    sendProtocolError(ws, 'SESSION_NOT_FOUND', `Session "${sessionId}" was not found.`, sessionId);
+    sendProtocolError(ws, 'SESSION_NOT_FOUND', `Session "${rawSessionId}" was not found.`, rawSessionId);
     return;
   }
 
+  const sessionId = session.session_id;
   const stopped = await dependencies.runtime.stopBackgroundTask(
     session.provider as LLMProvider,
     sessionId,
@@ -484,8 +493,8 @@ async function handleChatStopTask(
     sendProtocolError(
       ws,
       'NO_SUCH_TASK',
-      `Session "${sessionId}" has no running background task "${taskId}".`,
-      sessionId,
+      `Session "${rawSessionId}" has no running background task "${taskId}".`,
+      rawSessionId,
       // Names the task so the client can settle a chip whose end it missed.
       { taskId },
     );
@@ -505,27 +514,37 @@ function handleChatSubscribe(
   data: AnyRecord,
   dependencies: ChatWebSocketDependencies
 ): void {
-  const targets = Array.isArray(data.sessions) ? data.sessions : [];
+  const targets = Array.isArray(data.sessions)
+    ? data.sessions
+    : (typeof data.sessionId === 'string' && data.sessionId.trim())
+      ? [{ sessionId: data.sessionId, lastSeq: data.lastSeq }]
+      : [];
 
   for (const target of targets) {
     if (!target || typeof target !== 'object') {
       continue;
     }
 
-    const sessionId = typeof (target as AnyRecord).sessionId === 'string'
+    const rawSessionId = typeof (target as AnyRecord).sessionId === 'string'
       ? ((target as AnyRecord).sessionId as string).trim()
       : '';
-    if (!sessionId) {
+    if (!rawSessionId) {
       continue;
     }
+
+    const dbSession = sessionsDb.getSessionById(rawSessionId)
+      ?? sessionsDb.getSessionByProviderSessionId(rawSessionId);
+    const sessionId = dbSession ? dbSession.session_id : rawSessionId;
 
     const lastSeqRaw = (target as AnyRecord).lastSeq;
     const lastSeq = typeof lastSeqRaw === 'number' && Number.isFinite(lastSeqRaw)
       ? Math.max(0, Math.floor(lastSeqRaw))
       : 0;
 
-    const run = chatRunRegistry.getRun(sessionId);
-    const isProcessing = chatRunRegistry.isProcessing(sessionId);
+    const run = chatRunRegistry.getRun(sessionId)
+      ?? (sessionId !== rawSessionId ? chatRunRegistry.getRun(rawSessionId) : undefined);
+    const isProcessing = chatRunRegistry.isProcessing(sessionId)
+      || (sessionId !== rawSessionId && chatRunRegistry.isProcessing(rawSessionId));
 
     // Future live events for this run should land on the socket that asked —
     // this is what makes mid-stream page refreshes work for all providers.
@@ -535,6 +554,9 @@ function handleChatSubscribe(
     // work attaches too; the registry keeps the run while the work lasts.
     if (isProcessing || dependencies.runtime.hasBackgroundWork(sessionId)) {
       chatRunRegistry.attachConnection(sessionId, ws);
+      if (sessionId !== rawSessionId) {
+        chatRunRegistry.attachConnection(rawSessionId, ws);
+      }
     }
 
     // Pending approvals are tracked under the app session id inside the
@@ -543,12 +565,25 @@ function handleChatSubscribe(
 
     sendJson(ws, {
       kind: 'chat_subscribed',
-      sessionId,
+      sessionId: rawSessionId,
+      canonicalSessionId: sessionId,
       isProcessing,
       lastSeq: run?.lastSeq ?? 0,
       pendingPermissions,
       timestamp: new Date().toISOString(),
     });
+
+    if (sessionId !== rawSessionId) {
+      sendJson(ws, {
+        kind: 'chat_subscribed',
+        sessionId,
+        canonicalSessionId: sessionId,
+        isProcessing,
+        lastSeq: run?.lastSeq ?? 0,
+        pendingPermissions,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Replay only for RUNNING runs, strictly after the ack. Completed runs
     // are fully persisted to the provider transcript and served over REST —
@@ -557,6 +592,11 @@ function handleChatSubscribe(
     if (isProcessing) {
       for (const event of chatRunRegistry.replayEvents(sessionId, lastSeq)) {
         sendJson(ws, event);
+      }
+      if (sessionId !== rawSessionId) {
+        for (const event of chatRunRegistry.replayEvents(rawSessionId, lastSeq)) {
+          sendJson(ws, event);
+        }
       }
     }
   }

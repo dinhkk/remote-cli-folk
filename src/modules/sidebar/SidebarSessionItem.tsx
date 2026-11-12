@@ -181,7 +181,7 @@ function SidebarSessionItem({
           aria-disabled={isSelecting && !isSelectable ? true : undefined}
           tabIndex={isSelecting ? 0 : undefined}
           className={cn(
-            'p-2 mx-3 my-0.5 rounded-md bg-card border active:scale-[0.98] transition-all duration-150 relative',
+            'px-2 py-1 mx-2 my-0.5 rounded-md bg-card border active:scale-[0.98] transition-all duration-150 relative',
             isSelected ? 'bg-primary/5 border-primary/20' : '',
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20'
@@ -193,43 +193,37 @@ function SidebarSessionItem({
           onClick={isSelecting ? (isSelectable ? toggleSelected : undefined) : selectMobileSession}
           onKeyDown={isSelecting ? handleSelectionKeyDown : undefined}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {selectionIcon}
             <div
               className={cn(
-                'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0',
+                'w-4 h-4 rounded flex items-center justify-center flex-shrink-0',
                 isSelected ? 'bg-primary/10' : 'bg-muted/50',
               )}
             >
-              <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
+              <LLMProviderLogo provider={session.__provider} className="h-2.5 w-2.5" />
             </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div
-                  className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
-                  title={sessionView.sessionName}
-                >
-                  {sessionView.sessionName}
-                </div>
-                {isProcessing ? (
-                  <span className="ml-auto flex-shrink-0">
-                    <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      </span>
-                    </Tooltip>
-                  </span>
-                ) : compactSessionAge && (
-                  <span className="ml-auto flex-shrink-0 text-[11px] text-muted-foreground">{compactSessionAge}</span>
-                )}
-              </div>
-              <div className="mt-0.5 flex items-center">
+            <div className="min-w-0 flex-1 flex items-center justify-between gap-1.5">
+              <span
+                className="min-w-0 truncate text-xs font-normal text-foreground"
+                title={sessionView.sessionName}
+              >
+                {sessionView.sessionName}
+              </span>
+              <div className="flex shrink-0 items-center gap-1">
                 {sessionView.messageCount > 0 && (
-                  <Badge variant="secondary" className="px-1 py-0 text-xs">
+                  <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">
                     {sessionView.messageCount}
-                  </Badge>
+                  </span>
                 )}
+                {isProcessing ? (
+                  <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                  </Tooltip>
+                ) : compactSessionAge ? (
+                  <span className="text-[10px] text-muted-foreground tabular-nums">{compactSessionAge}</span>
+                ) : null}
               </div>
             </div>
 
@@ -239,13 +233,13 @@ function SidebarSessionItem({
                 aria-label={`Session options for ${sessionView.sessionName}`}
                 aria-haspopup="dialog"
                 aria-expanded={isMobileOptionsOpen}
-                className="ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted active:scale-95"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted active:scale-95"
                 onClick={(event) => {
                   event.stopPropagation();
                   setMobileOptionsOpen(true);
                 }}
               >
-                <MoreHorizontal className="h-4 w-4" />
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             )}
           </div>

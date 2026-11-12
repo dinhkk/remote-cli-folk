@@ -21,7 +21,7 @@ import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessag
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
-import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
+import { useSessionStore, type SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import {
   useProcessingSessions,
   useSessionProtectionActions,
@@ -47,6 +47,7 @@ type ChatInterfaceProps = {
   newSessionTrigger?: number;
   onTaskClick?: (...args: unknown[]) => void;
   onShowAllTasks?: (() => void) | null;
+  sessionStore?: SessionStore;
 };
 
 /**
@@ -70,6 +71,7 @@ function ChatInterface({
   externalMessageUpdate,
   newSessionTrigger,
   onShowAllTasks,
+  sessionStore: injectedSessionStore,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe } = useWebSocket();
@@ -82,7 +84,8 @@ function ChatInterface({
     getSessionActivity,
   } = useSessionProtectionActions();
 
-  const sessionStore = useSessionStore();
+  const localSessionStore = useSessionStore();
+  const sessionStore = injectedSessionStore || localSessionStore;
   const streamTimerRef = useRef<number | null>(null);
   const accumulatedStreamRef = useRef('');
   // When each session's `chat.subscribe` was last sent; idle acks older than
@@ -160,6 +163,8 @@ function ChatInterface({
     scrollToBottom,
     scrollToBottomAndReset,
     handleScroll,
+    handleTouchStart,
+    handleTouchEnd,
     requestLatestMessages,
   } = useChatSessionState({
     isActive,
@@ -467,7 +472,8 @@ function ChatInterface({
               // scrollable at all and never emits `scroll`. Wheel and touch are
               // then the only way to reach the top pager or the "load all" overlay.
               onWheel={handleScroll}
-              onTouchMove={handleScroll}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
               isLoadingSessionMessages={isLoadingSessionMessages}
               isProcessing={isProcessing}
               hasActivityIndicator={hasActivityIndicator}

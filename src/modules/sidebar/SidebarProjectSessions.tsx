@@ -123,11 +123,11 @@ export default function SidebarProjectSessions({
       : t('sessions.selectAll');
 
   return (
-    <div className="ml-3 space-y-1 border-l border-border pl-3">
+    <div className={cn(isCompact ? 'ml-2 space-y-0.5 border-l border-border pl-1.5' : 'ml-3 space-y-1 border-l border-border pl-3')}>
       {isCompact ? (
-        <div className="px-3 pb-1 pt-1">
+        <div className="px-2 pb-0.5 pt-0.5">
           <button
-            className="flex h-8 w-full items-center justify-center gap-2 rounded-md bg-primary text-xs font-medium text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+            className="flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
             onClick={() => {
               onProjectSelect(project);
               onNewSession(project);

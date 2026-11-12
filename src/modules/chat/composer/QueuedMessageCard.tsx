@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PencilIcon, XIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, PencilIcon, XIcon } from 'lucide-react';
+import { cn } from '@/shared/utils';
 
 type QueuedMessageCardProps = {
   content: string;
@@ -20,6 +22,7 @@ export default function QueuedMessageCard({
   onDelete,
 }: QueuedMessageCardProps) {
   const { t } = useTranslation('chat');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <div className="settings-content-enter mx-auto mb-2 max-w-[54.25rem] rounded-xl rounded-t-none border border-dashed border-primary/25 bg-primary/[0.04] px-3 py-2">
@@ -33,13 +36,25 @@ export default function QueuedMessageCard({
               · {t('input.queue.willSend', { defaultValue: 'Will send when this finishes' })}
             </span>
           </div>
-          {/* Follow-ups queued while one waits are joined into this message, so
-              it scrolls instead of clamping: everything that will be sent stays
-              readable, with each follow-up on its own lines. Focusable, so it
-              can also be scrolled from the keyboard. */}
+          {/* Follow-ups queued while one waits are joined into this message.
+              Allows expanding to full readable scroll view or collapsing to 1 line
+              truncated with ellipsis. */}
           <p
             tabIndex={0}
-            className="mt-0.5 max-h-28 overflow-y-auto whitespace-pre-wrap break-words rounded-sm text-sm text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsExpanded((prev) => !prev);
+              }
+            }}
+            className={cn(
+              'mt-0.5 cursor-pointer text-sm text-foreground/90 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              isExpanded
+                ? 'max-h-28 overflow-y-auto whitespace-pre-wrap break-words rounded-sm'
+                : 'line-clamp-1 truncate',
+            )}
+            title={isExpanded ? t('input.queue.collapse', { defaultValue: 'Click to collapse' }) : t('input.queue.expand', { defaultValue: 'Click to expand' })}
           >
             {content}
           </p>
@@ -51,6 +66,15 @@ export default function QueuedMessageCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            aria-label={isExpanded ? t('input.queue.collapse', { defaultValue: 'Collapse queued message' }) : t('input.queue.expand', { defaultValue: 'Expand queued message' })}
+            title={isExpanded ? t('input.queue.collapse', { defaultValue: 'Collapse queued message' }) : t('input.queue.expand', { defaultValue: 'Expand queued message' })}
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
           <button
             type="button"
             onClick={onEdit}

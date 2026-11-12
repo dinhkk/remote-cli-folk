@@ -246,6 +246,10 @@ export function useProcessingSessions(): SessionActivityMap {
   return processingSessions;
 }
 
+export function useOptionalProcessingSessions(): SessionActivityMap | null {
+  return useContext(SessionProtectionStateContext);
+}
+
 export function useSessionProtectionActions(): SessionProtectionActions {
   const actions = useContext(SessionProtectionActionsContext);
   if (!actions) {

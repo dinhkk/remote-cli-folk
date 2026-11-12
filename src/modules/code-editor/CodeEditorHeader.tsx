@@ -10,12 +10,12 @@ type CodeEditorHeaderProps = {
   isFullscreen: boolean;
   isMarkdownFile: boolean;
   isHtmlPreviewFile: boolean;
+  isMermaidFile?: boolean;
   markdownPreview: boolean;
   saving: boolean;
   saveSuccess: boolean;
   hasUnsavedChanges: boolean;
   onToggleMarkdownPreview: () => void;
-  onOpenHtmlPreview: () => void;
   onOpenSettings: () => void;
   onDownload: () => void;
   onSave: () => void;
@@ -28,6 +28,7 @@ type CodeEditorHeaderProps = {
     editMarkdown: string;
     previewMarkdown: string;
     previewHtml: string;
+    previewMermaid?: string;
     settings: string;
     download: string;
     save: string;
@@ -47,12 +48,12 @@ export default function CodeEditorHeader({
   isFullscreen,
   isMarkdownFile,
   isHtmlPreviewFile,
+  isMermaidFile = false,
   markdownPreview,
   saving,
   saveSuccess,
   hasUnsavedChanges,
   onToggleMarkdownPreview,
-  onOpenHtmlPreview,
   onOpenSettings,
   onDownload,
   onSave,
@@ -124,7 +125,7 @@ export default function CodeEditorHeader({
 
       {/* Buttons - don't shrink, always visible */}
       <div className="flex shrink-0 items-center gap-0.5">
-        {isMarkdownFile && (
+        {(isMarkdownFile || isHtmlPreviewFile || isMermaidFile) && (
           <button
             type="button"
             onClick={onToggleMarkdownPreview}
@@ -133,20 +134,17 @@ export default function CodeEditorHeader({
                 ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'
             }`}
-            title={markdownPreview ? labels.editMarkdown : labels.previewMarkdown}
+            title={
+              markdownPreview
+                ? labels.editMarkdown
+                : isHtmlPreviewFile
+                  ? labels.previewHtml
+                  : isMermaidFile
+                    ? (labels.previewMermaid || 'Preview diagram')
+                    : labels.previewMarkdown
+            }
           >
             {markdownPreview ? <Code2 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        )}
-
-        {isHtmlPreviewFile && (
-          <button
-            type="button"
-            onClick={onOpenHtmlPreview}
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-            title={labels.previewHtml}
-          >
-            <Eye className="h-4 w-4" />
           </button>
         )}
 

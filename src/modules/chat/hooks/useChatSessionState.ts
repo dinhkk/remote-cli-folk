@@ -117,7 +117,7 @@ type ScrollRestoreState = {
 function captureScrollRestoreState(container: HTMLDivElement): ScrollRestoreState {
   const containerBounds = container.getBoundingClientRect();
   const anchor = Array.from(container.querySelectorAll<HTMLElement>('.chat-message'))
-    .find((element) => element.getBoundingClientRect().bottom >= containerBounds.top)
+    .find((element) => element.getBoundingClientRect().bottom >= containerBounds.top + 10)
     ?? null;
 
   return {
@@ -530,6 +530,12 @@ export function useChatSessionState({
     [hasMoreMessages, isActive, isLoadingMoreMessages, selectedProject, selectedSession, sessionStore],
   );
 
+  const isTouchActiveRef = useRef(false);
+
+  const handleTouchStart = useCallback(() => {
+    isTouchActiveRef.current = true;
+  }, []);
+
   const handleScroll = useCallback(async () => {
     if (!isActive) return;
     const container = scrollContainerRef.current;
@@ -566,10 +572,23 @@ export function useChatSessionState({
         if (container.scrollTop > 20) topLoadLockRef.current = false;
         return;
       }
+      // If the user is currently actively dragging on touch screen, do not trigger pagination
+      // until they release their finger to preserve smooth inertia momentum
+      if (isTouchActiveRef.current) {
+        return;
+      }
       const didLoad = await loadOlderMessages(container);
       if (didLoad) topLoadLockRef.current = true;
     }
   }, [hasMoreMessages, isActive, isNearBottom, loadOlderMessages]);
+
+  const handleTouchEnd = useCallback(() => {
+    isTouchActiveRef.current = false;
+    const container = scrollContainerRef.current;
+    if (container && container.scrollTop < 100 && hasMoreMessages && !allMessagesLoadedRef.current) {
+      void handleScroll();
+    }
+  }, [handleScroll, hasMoreMessages]);
 
   const wasChatActiveRef = useRef(isActive);
   useLayoutEffect(() => {
@@ -1174,6 +1193,8 @@ export function useChatSessionState({
     scrollToBottom,
     scrollToBottomAndReset,
     handleScroll,
+    handleTouchStart,
+    handleTouchEnd,
     requestLatestMessages,
   };
 }
