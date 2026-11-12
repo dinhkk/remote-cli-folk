@@ -570,6 +570,37 @@
 
   .chat-composer-shell {
     contain: layout style;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  }
+
+  @supports (padding-bottom: constant(safe-area-inset-bottom)) {
+    .chat-composer-shell {
+      padding-bottom: calc(constant(safe-area-inset-bottom) + 20px);
+    }
+  }
+
+  @media (min-width: 640px) {
+    .chat-composer-shell {
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+    }
+
+    @supports (padding-bottom: constant(safe-area-inset-bottom)) {
+      .chat-composer-shell {
+        padding-bottom: calc(constant(safe-area-inset-bottom) + 1rem);
+      }
+    }
+  }
+
+  @media (min-width: 768px) {
+    .chat-composer-shell {
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
+    }
+
+    @supports (padding-bottom: constant(safe-area-inset-bottom)) {
+      .chat-composer-shell {
+        padding-bottom: calc(constant(safe-area-inset-bottom) + 1.5rem);
+      }
+    }
   }
 
   .chat-activity-enter {
