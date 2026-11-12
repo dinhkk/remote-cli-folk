@@ -443,7 +443,7 @@ export default function ChatComposer({
               className="pr-11"
             />
 
-            <div className="absolute bottom-1.5 right-2 z-10 flex items-center">
+            <div className="absolute right-2 top-1/2 z-10 flex -translate-y-1/2 items-center">
               <PromptInputSubmit
                 onClick={
                   canQueueDraft
