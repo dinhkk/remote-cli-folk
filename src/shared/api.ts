@@ -671,6 +671,7 @@ export const api = {
 
   system: {
     update: () => post('/api/system/update'),
+    version: (force = false) => get(`/api/system/version${force ? '?force=true' : ''}`),
   },
 
   // Management of Remote work, Controller and Host side (contracts.md section 2).

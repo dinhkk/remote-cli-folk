@@ -17,9 +17,10 @@ export function createSystemRouter(
     }
   });
 
-  router.get('/version', async (_request, response, next) => {
+  router.get('/version', async (request, response, next) => {
     try {
-      const versionInfo = await systemUpdateService.checkSystemVersion();
+      const force = request.query.force === 'true' || request.query.force === '1';
+      const versionInfo = await systemUpdateService.checkSystemVersion(force);
       response.json(versionInfo);
     } catch (error) {
       next(error);

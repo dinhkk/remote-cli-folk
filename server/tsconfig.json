@@ -28,7 +28,7 @@
     // both finished. Never emit into the live dist-server: an interrupted build
     // must not be able to destroy the build the server is running from.
     "outDir": "../dist-server.next",
-    "sourceMap": true,
+    "sourceMap": false,
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

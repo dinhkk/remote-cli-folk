@@ -81,7 +81,10 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
   const cacheTtl = dependencies.cacheTtlMs ?? 60 * 60 * 1000; // 1 hour
   const getCurrentTime = dependencies.getCurrentTime ?? (() => Date.now());
 
-  const getLatestVersion = async (): Promise<string | null> => {
+  const getLatestVersion = async (force = false): Promise<string | null> => {
+    if (force) {
+      cachedVersion = null;
+    }
     const now = getCurrentTime();
     if (cachedVersion && now - cachedVersion.timestamp < cacheTtl) {
       return cachedVersion.version;
@@ -114,10 +117,10 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
   };
 
   return {
-    async checkSystemVersion(): Promise<VersionCheckResult> {
+    async checkSystemVersion(forceRefresh = false): Promise<VersionCheckResult> {
       const currentVersion = dependencies.currentVersion || '1.0.0';
       try {
-        const latestVersion = await getLatestVersion();
+        const latestVersion = await getLatestVersion(forceRefresh);
         const updateAvailable = Boolean(latestVersion && isNewerVersion(latestVersion, currentVersion));
         return {
           currentVersion,

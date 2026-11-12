@@ -18,9 +18,34 @@ export const useVersionCheck = () => {
   const [restartRequired, setRestartRequired] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   // A Remote tab does not ask its Host for /health: it is not on the Host's allow-list.
   const disabled = isTargetMode();
+
+  const checkForUpdates = async (force = true) => {
+    if (disabled) return;
+    setIsChecking(true);
+    setCheckError(null);
+    try {
+      const response = await fetch(`/api/system/version${force ? '?force=true' : ''}`);
+      if (!response.ok) {
+        throw new Error(`Failed to check version: ${response.status}`);
+      }
+      const data = await response.json();
+      if (typeof data.latestVersion === 'string') {
+        setLatestVersion(data.latestVersion);
+      }
+      if (typeof data.updateAvailable === 'boolean') {
+        setUpdateAvailable(data.updateAvailable);
+      }
+    } catch (error) {
+      setCheckError(error instanceof Error ? error.message : 'Failed to check version');
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   useEffect(() => {
     if (disabled) return;
@@ -54,13 +79,17 @@ export const useVersionCheck = () => {
   }, [disabled]);
 
   const releaseInfo = null as ReleaseInfo | null;
+  const currentVersion = runningVersion || APP_VERSION || '1.0.0';
   return {
     updateAvailable,
     latestVersion,
-    currentVersion: APP_VERSION,
+    currentVersion,
     releaseInfo,
     installMode,
     runningVersion,
     restartRequired,
+    isChecking,
+    checkError,
+    checkForUpdates,
   };
 };

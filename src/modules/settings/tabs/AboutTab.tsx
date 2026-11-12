@@ -1,8 +1,17 @@
-import { ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import {
+  ExternalLink,
+  RefreshCw,
+  CheckCircle,
+  ArrowUpCircle,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { BRAND, BRAND_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
+import { api } from '@/shared/api';
 import RemoteCliLogo from '@/shared/ui/RemoteCliLogo';
 
 function GitHubIcon({ className }: { className?: string }) {
@@ -13,10 +22,60 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-/** Rendered by Settings for the "about" tab: the app's name and version, who made it, and one line crediting the original project. */
+/** Rendered by Settings for the "about" tab: the app's name and version, check update, and credentials. */
 export default function AboutTab() {
   const { t } = useTranslation('settings');
-  const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck();
+  const {
+    updateAvailable,
+    latestVersion,
+    currentVersion,
+    releaseInfo,
+    isChecking,
+    checkError,
+    checkForUpdates,
+  } = useVersionCheck();
+
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<{
+    success?: boolean;
+    message?: string;
+    error?: string;
+  } | null>(null);
+
+  const handleUpdate = async () => {
+    setIsUpdating(true);
+    setUpdateStatus(null);
+    try {
+      const response = await api.system.update();
+      const rawText = await response.text();
+      let data: { success?: boolean; message?: string; error?: string } = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { success: response.ok, message: rawText };
+      }
+
+      if (data.success || response.ok) {
+        setUpdateStatus({
+          success: true,
+          message: data.message || 'Cập nhật thành công! Vui lòng khởi động lại server.',
+        });
+      } else {
+        setUpdateStatus({
+          success: false,
+          error: data.error || 'Cập nhật thất bại. Vui lòng kiểm tra quyền hạn.',
+        });
+      }
+    } catch (err: unknown) {
+      setUpdateStatus({
+        success: false,
+        error: err instanceof Error ? err.message : 'Không thể thực hiện cập nhật',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const releasesUrl = releaseInfo?.htmlUrl || BRAND.githubUrl;
 
   return (
@@ -53,6 +112,83 @@ export default function AboutTab() {
             {t('about.tagline')}
           </p>
         </div>
+      </div>
+
+      {/* Version Management & Updates */}
+      <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">
+              Phiên bản & Cập nhật
+            </h4>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Phiên bản đang chạy: <span className="font-semibold text-foreground">v{currentVersion}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isChecking || isUpdating}
+            onClick={() => checkForUpdates(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+            {isChecking ? 'Đang kiểm tra...' : 'Kiểm tra cập nhật'}
+          </button>
+        </div>
+
+        {checkError && (
+          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-2.5 text-xs text-destructive">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>{checkError}</span>
+          </div>
+        )}
+
+        {updateAvailable && latestVersion ? (
+          <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-medium text-green-700 dark:text-green-300">
+                <ArrowUpCircle className="h-4 w-4" />
+                <span>Có phiên bản mới: <strong>v{latestVersion}</strong></span>
+              </div>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleUpdate}
+                className="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Đang cập nhật...</span>
+                  </>
+                ) : (
+                  <span>Cập nhật lên v{latestVersion}</span>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : !isChecking && !checkError ? (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+            <span>RemoteCLI đang ở phiên bản mới nhất.</span>
+          </div>
+        ) : null}
+
+        {updateStatus && (
+          <div
+            className={`rounded-lg p-2.5 text-xs ${
+              updateStatus.success
+                ? 'bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/20'
+                : 'bg-destructive/10 text-destructive'
+            }`}
+          >
+            {updateStatus.success ? (
+              <p className="font-medium">✅ {updateStatus.message}</p>
+            ) : (
+              <p className="font-medium">❌ {updateStatus.error}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Author */}
