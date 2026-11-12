@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
+import { PaperclipIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
@@ -506,7 +506,9 @@ export default function ChatComposer({
               onClick={onToggleCommandMenu}
               className="relative"
             >
-              <MessageSquareIcon />
+              <span className="flex items-center justify-center font-mono text-sm font-semibold leading-none select-none">
+                /
+              </span>
               {slashCommandsCount > 0 && (
                 <span
                   className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground"
