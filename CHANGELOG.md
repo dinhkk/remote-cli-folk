@@ -3,6 +3,12 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.5](https://github.com/tunghuynh/remote-cli/compare/v1.0.4...v1.0.5) (2026-11-13)
+
+### Documentation
+
+* add remote work and cloudflare relay setup guide to README ([096a400](https://github.com/tunghuynh/remote-cli/commit/096a400c89153d4b19896898966d0783dd5b194c))
+
 ## [1.0.4](https://github.com/tunghuynh/remote-cli/compare/v1.0.3...v1.0.4) (2026-11-13)
 
 ## [1.0.3](https://github.com/tunghuynh/remote-cli/compare/v1.0.2...v1.0.3) (2026-11-13)
