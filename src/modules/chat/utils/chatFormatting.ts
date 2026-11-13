@@ -64,3 +64,59 @@ export function formatUsageLimitText(text: string) {
     return text;
   }
 }
+
+/**
+ * Formats a message timestamp for chat transcript display:
+ * - Same day: 'HH:mm' (e.g. '14:30')
+ * - Different day: 'DD/MM/YYYY HH:mm' (e.g. '12/11/2026 14:30')
+ */
+export function formatMessageTimestamp(
+  timestamp: string | number | Date | null | undefined,
+  now: Date = new Date()
+): string {
+  if (timestamp === null || timestamp === undefined || timestamp === '') return '';
+  const parsed = typeof timestamp === 'string' && /^\d+$/.test(timestamp) ? Number(timestamp) : timestamp;
+  const date = typeof parsed === 'object' && parsed instanceof Date ? parsed : new Date(parsed);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const isSameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const timeStr = `${hours}:${minutes}`;
+
+  if (isSameDay) {
+    return timeStr;
+  }
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+
+  return `${day}/${month}/${year} ${timeStr}`;
+}
+
+/**
+ * Detailed full date and time tooltip for chat messages: 'DD/MM/YYYY HH:mm:ss'
+ */
+export function formatFullTimestampTooltip(
+  timestamp: string | number | Date | null | undefined
+): string {
+  if (timestamp === null || timestamp === undefined || timestamp === '') return '';
+  const parsed = typeof timestamp === 'string' && /^\d+$/.test(timestamp) ? Number(timestamp) : timestamp;
+  const date = typeof parsed === 'object' && parsed instanceof Date ? parsed : new Date(parsed);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+}
+

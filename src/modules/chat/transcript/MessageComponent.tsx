@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
-import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
+import {
+  formatFullTimestampTooltip,
+  formatMessageTimestamp,
+  formatUsageLimitText,
+  stripProposedPlanEnvelope,
+} from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, WorkflowPanel, shouldHideToolResult } from '@/modules/chat/tools';
 import { LLMProviderLogo } from '@/shared/ui';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/modules/chat/transcript/Reasoning';
@@ -84,7 +89,14 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     !message.isThinking;
 
 
-  const formattedTime = useMemo(() => new Date(message.timestamp).toLocaleTimeString(), [message.timestamp]);
+  const formattedTime = useMemo(
+    () => formatMessageTimestamp(message.timestamp),
+    [message.timestamp]
+  );
+  const timeTooltip = useMemo(
+    () => formatFullTimestampTooltip(message.timestamp),
+    [message.timestamp]
+  );
   const shouldHideThinkingMessage = Boolean(message.isThinking && !showThinking);
 
   if (shouldHideThinkingMessage) {
@@ -146,13 +158,23 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   {shouldShowUserCopyControl && (
                     <MessageCopyControl content={userCopyContent} messageType="user" />
                   )}
-                  <span>{formattedTime}</span>
+                  <span
+                    className="select-none text-[10px] text-muted-foreground/70"
+                    title={timeTooltip}
+                  >
+                    {formattedTime}
+                  </span>
                 </div>
               </div>
             ) : (
               /* Attachment-only turn: no text bubble, but the timestamp still shows */
               <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                <span>{formattedTime}</span>
+                <span
+                  className="select-none text-[10px] text-muted-foreground/70"
+                  title={timeTooltip}
+                >
+                  {formattedTime}
+                </span>
               </div>
             )}
           </div>
@@ -422,7 +444,14 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                     copy and speak it is not gated on the copy control, and an
                     exported transcript keeps it wherever the footer renders. */}
                 <MessageModelLabel model={message.model} />
-                {!isGrouped && <span>{formattedTime}</span>}
+                {!isGrouped && (
+                  <span
+                    className="select-none text-[10px] text-gray-400/80 dark:text-gray-500/80"
+                    title={timeTooltip}
+                  >
+                    {formattedTime}
+                  </span>
+                )}
               </div>
             )}
           </div>
