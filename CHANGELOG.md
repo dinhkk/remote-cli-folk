@@ -3,6 +3,12 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.6](https://github.com/tunghuynh/remote-cli/compare/v1.0.5...v1.0.6) (2026-11-13)
+
+### Bug Fixes
+
+* **docs:** use jsdelivr cdn for screenshots to render reliably on npm ([2e8cc14](https://github.com/tunghuynh/remote-cli/commit/2e8cc14f26087beff2162992b8d1f150d2a943c6))
+
 ## [1.0.5](https://github.com/tunghuynh/remote-cli/compare/v1.0.4...v1.0.5) (2026-11-13)
 
 ### Documentation
