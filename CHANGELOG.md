@@ -1,5 +1,20 @@
 # Changelog
 
+All notable changes to RemoteCLI will be documented in this file.
+
+
+## [1.0.3](https://github.com/tunghuynh/remote-cli/compare/v1.0.2...v1.0.3) (2026-11-13)
+
+### Styling
+
+* **chat:** set fixed 20px bottom padding for mobile composer ([77d257d](https://github.com/tunghuynh/remote-cli/commit/77d257d167ff727a69811b808d94d362cf36b6e2))
+
+### Maintenance
+
+* update branding to RemoteCLI, author metadata and docs ([ff8e649](https://github.com/tunghuynh/remote-cli/commit/ff8e6498258def9507d7aa2ab98b81dc18a73de4))
+
+# Changelog
+
 All notable changes to CloudCLI UI will be documented in this file.
 
 
