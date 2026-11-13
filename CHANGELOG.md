@@ -3,6 +3,16 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.7](https://github.com/tunghuynh/remote-cli/compare/v1.0.6...v1.0.7) (2026-11-13)
+
+### Bug Fixes
+
+* **system:** support Windows shell during update to fix spawn sh ENOENT ([a2a4ad1](https://github.com/tunghuynh/remote-cli/commit/a2a4ad14b35bbcfaf9c58f9b09456d99e88a28fb))
+
+### Maintenance
+
+* make release.sh executable ([4cf1cb1](https://github.com/tunghuynh/remote-cli/commit/4cf1cb177462a6c0b0831c004a67bf70c7d14e2a))
+
 ## [1.0.6](https://github.com/tunghuynh/remote-cli/compare/v1.0.5...v1.0.6) (2026-11-13)
 
 ### Bug Fixes
