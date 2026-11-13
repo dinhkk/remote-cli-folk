@@ -3,6 +3,16 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.9](https://github.com/tunghuynh/remote-cli/compare/v1.0.8...v1.0.9) (2026-11-13)
+
+### New Features
+
+* **chat:** add compact muted timestamp under chat messages ([a3709c8](https://github.com/tunghuynh/remote-cli/commit/a3709c8ea61be8f44640ce28505b05517da5f64e))
+
+### Documentation
+
+* **journal:** add technical journal for chat timestamp feature ([737f9e6](https://github.com/tunghuynh/remote-cli/commit/737f9e6a3e2550ad7367fbcaf4a32a011bf2fd79))
+
 ## [1.0.7](https://github.com/tunghuynh/remote-cli/compare/v1.0.6...v1.0.7) (2026-11-13)
 
 ### Bug Fixes
