@@ -3,6 +3,13 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.10](https://github.com/tunghuynh/remote-cli/compare/v1.0.9...v1.0.10) (2026-11-13)
+
+### Maintenance
+
+* bump package version for npm registry release
+
+
 ## [1.0.9](https://github.com/tunghuynh/remote-cli/compare/v1.0.8...v1.0.9) (2026-11-13)
 
 ### New Features
