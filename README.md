@@ -145,6 +145,101 @@ To use RemoteCLI from your smartphone, tablet, or another laptop on your local n
 
 ---
 
+## 🌐 Remote Work (End-to-End Encrypted Cloudflare Relay)
+
+RemoteCLI features a built-in **Remote Work** architecture that allows you to access and control your coding agents from anywhere (via smartphone, tablet, or another laptop on 4G/5G or external Wi-Fi) **without** exposing public ports, setting up port-forwarding, configuring dynamic DNS, or running a VPN.
+
+### 🔒 Security & Privacy Architecture
+
+```
+[ Controller (Phone / Laptop) ]
+               │
+               │  wss:// (End-to-End Encrypted binary frames - AES-256-GCM)
+               ▼
+   [ Cloudflare Worker Relay ]  (Dumb pipe: forwards opaque ciphertext, zero access to keys/data)
+               ▲
+               │  wss:// (End-to-End Encrypted binary frames - AES-256-GCM)
+               │
+   [ Host (Your Workstation) ] ──▶ Claude Code / Cursor / Codex CLI
+```
+
+- **Zero-Knowledge & End-to-End Encrypted**: All communication between your Host (workstation) and Controller (remote device) is encrypted end-to-end using **AES-256-GCM**.
+- **Dumb Pipe Relay**: The relay only forwards encrypted binary frames between paired rooms. It never sees encryption keys, authentication tokens, prompts, codebase contents, or credentials.
+- **Cost**: Runs 100% within the Cloudflare Workers **Free tier** (100,000 requests/day, zero maintenance cost).
+
+### 🚀 Deploying Your Own Cloudflare Relay in 2 Minutes
+
+The relay server code is open-source and included in this repository:
+📁 **Relay Source Code**: [`relay/`](https://github.com/tunghuynh/remote-cli/tree/main/relay) (Detailed spec: [`relay/README.md`](https://github.com/tunghuynh/remote-cli/blob/main/relay/README.md))
+
+#### Step 1: Clone the relay source and authenticate with Cloudflare
+
+```bash
+# Clone the repository
+git clone https://github.com/tunghuynh/remote-cli.git
+cd remote-cli/relay
+
+# Install dependencies
+npm ci --ignore-scripts
+
+# Authenticate with Cloudflare (opens browser)
+npx wrangler login
+```
+
+*(On headless VPS servers without a browser, you can alternatively set `export CLOUDFLARE_API_TOKEN=<your-token>`)*
+
+#### Step 2: Deploy the Cloudflare Worker
+
+```bash
+npx wrangler deploy
+```
+
+#### Step 3: Generate and set your `RELAY_SECRET`
+
+The relay requires a strong shared secret (at least 32 characters) to guard against unauthorized access to your worker:
+
+```bash
+# Generate a cryptographically secure 43-character base64url secret
+RELAY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+
+# Store the secret in your Cloudflare Worker
+echo "$RELAY_SECRET" | npx wrangler secret put RELAY_SECRET
+```
+
+> **Save your Relay URL & Secret**:
+> - **Relay URL**: `wss://<your-worker-name>.<your-subdomain>.workers.dev`
+> - **Relay Secret**: The generated `$RELAY_SECRET` string above.
+>
+> *(You can verify that the relay is healthy by visiting `https://<your-worker-name>.<your-subdomain>.workers.dev/healthz`, which will return HTTP 200)*
+
+---
+
+### 📱 Connecting RemoteCLI to Your Relay
+
+#### On Your Host (Your Coding Workstation)
+
+1. Start RemoteCLI:
+   ```bash
+   remotecli
+   ```
+2. Open `http://localhost:3001` and navigate to **Settings** ➔ **Remote work**.
+3. Under the **Relay** section:
+   - Enter your **Relay URL**: `wss://<your-worker-name>.<your-subdomain>.workers.dev`
+   - Enter your **Relay secret**.
+   - Click **Save relay**.
+4. Under **Host settings**:
+   - Toggle on **Accept remote connections**.
+   - Click **Generate pairing code** (a secure, single-use 6-digit or QR pairing code).
+
+#### On Your Controller (Mobile Phone / Tablet / Remote Browser)
+
+1. Open your RemoteCLI web UI or desktop app on your remote device.
+2. In **Settings** ➔ **Remote work**, ensure the same **Relay URL** and **Relay secret** are saved.
+3. In the **Hosts** sidebar/tab, tap **Pair host** and enter the pairing code from your Host machine.
+4. 🎉 **Connected!** Your workstation will appear as an active host tab. You can now chat with Claude Code, approve permissions, inspect diffs, edit files, and run commands from anywhere in the world.
+
+---
+
 ## CLI Commands & Options
 
 ```
