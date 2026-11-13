@@ -18,7 +18,7 @@ export type SystemRouterModule = Router & {
   checkSystemVersion(): Promise<VersionCheckResult>;
 };
 
-function runShellCommand(
+export function runShellCommand(
   command: string,
   workingDirectory: string,
   environment: NodeJS.ProcessEnv,
@@ -26,10 +26,17 @@ function runShellCommand(
   onErrorOutput: (errorOutput: string) => void,
 ): Promise<{ exitCode: number | null; output: string; errorOutput: string }> {
   return new Promise((resolve, reject) => {
-    const childProcess = spawn('sh', ['-c', command], {
-      cwd: workingDirectory,
-      env: environment,
-    });
+    const isWindows = process.platform === 'win32';
+    const childProcess = isWindows
+      ? spawn(command, {
+          cwd: workingDirectory,
+          env: environment,
+          shell: true,
+        })
+      : spawn('sh', ['-c', command], {
+          cwd: workingDirectory,
+          env: environment,
+        });
     let output = '';
     let errorOutput = '';
 
