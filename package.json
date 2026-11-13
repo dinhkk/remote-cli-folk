@@ -17,7 +17,7 @@
   "files": [
     "dist/",
     "dist-server/",
-    "public/api-docs.html",
+    "public/",
     "scripts/fix-node-pty.js",
     "scripts/promote-dist-server.mjs",
     "README.md"

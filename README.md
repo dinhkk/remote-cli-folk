@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/logo.svg" alt="RemoteCLI Logo" width="80" height="80">
+  <img src="https://cdn.jsdelivr.net/npm/@tunghuynh/remotecli/dist/logo.svg" alt="RemoteCLI Logo" width="80" height="80">
   <h1>RemoteCLI</h1>
   <p><b>A modern web-based remote UI for Claude Code, Cursor CLI, and OpenAI Codex.</b><br>
   <i>Customized fork adapted from <a href="https://cloudcli.ai">CloudCLI</a>.</i><br>
@@ -43,13 +43,13 @@ Instead of being tethered to a single terminal window, RemoteCLI lets you monito
 <tr>
 <td align="center">
 <h3>Desktop Interface</h3>
-<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/desktop-main.png" alt="Desktop Interface" width="480">
+<img src="https://cdn.jsdelivr.net/npm/@tunghuynh/remotecli/dist/screenshots/desktop-main.png" alt="Desktop Interface" width="480">
 <br>
 <em>Full workspace with project explorer, active sessions, interactive chat, and tool execution logs</em>
 </td>
 <td align="center">
 <h3>Mobile Experience</h3>
-<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/mobile-chat.png" alt="Mobile Interface" width="280">
+<img src="https://cdn.jsdelivr.net/npm/@tunghuynh/remotecli/dist/screenshots/mobile-chat.png" alt="Mobile Interface" width="280">
 <br>
 <em>Responsive mobile design with touch controls, live diff views, and tool details</em>
 </td>
@@ -57,13 +57,13 @@ Instead of being tethered to a single terminal window, RemoteCLI lets you monito
 <tr>
 <td align="center">
 <h3>CLI & Model Selection</h3>
-<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
+<img src="https://cdn.jsdelivr.net/npm/@tunghuynh/remotecli/dist/screenshots/cli-selection.png" alt="CLI Selection" width="400">
 <br>
 <em>Switch seamlessly between Claude Code, Cursor CLI, and Codex</em>
 </td>
 <td align="center">
 <h3>Safe Tool Permission Controls</h3>
-<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/tools-modal.png" alt="Tools Settings Modal" width="400">
+<img src="https://cdn.jsdelivr.net/npm/@tunghuynh/remotecli/dist/screenshots/tools-modal.png" alt="Tools Settings Modal" width="400">
 <br>
 <em>Fine-grained control over allowed and disallowed agent tools</em>
 </td>
