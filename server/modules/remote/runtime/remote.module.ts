@@ -8,7 +8,7 @@
  * Host byte for byte) and `/api/remote` has its own 4 KB parser, so both are registered ahead of it, and
  * ahead of the static handler and the SPA catch-all (which would answer `/r/x/api/health` with index.html).
  *
- * Modes: `CLOUDCLI_REMOTE_DISABLED` mounts nothing and opens nothing (the server behaves as before Remote
+ * Modes: `REMOTECLI_REMOTE_DISABLED` (or legacy `CLOUDCLI_REMOTE_DISABLED`) mounts nothing and opens nothing (the server behaves as before Remote
  * existed); platform mode and a Controller with `API_KEY` mount `/api/remote` so the UI can say why it is
  * unavailable, answer 409 `REMOTE_UNSUPPORTED_MODE`, and never mount `/r`; a master key that changed or
  * vanished is also a status (409 `MASTER_KEY_MISMATCH`), not a crash.
@@ -69,7 +69,7 @@ export type RemoteModuleOptions = {
 };
 
 export type RemoteModule = {
-  /** False when `CLOUDCLI_REMOTE_DISABLED` is set. */
+  /** False when `REMOTECLI_REMOTE_DISABLED` or legacy `CLOUDCLI_REMOTE_DISABLED` is set. */
   readonly enabled: boolean;
   /** Registers `/api/remote`, `/r` and the `?target=` CSP; call after `cors()` and before the body parsers. */
   mount(app: Express): void;
@@ -87,7 +87,7 @@ export type RemoteModule = {
  */
 export function createRemoteModule(options: RemoteModuleOptions): RemoteModule {
   const env = options.env ?? process.env;
-  const enabled = !isTruthy(env.CLOUDCLI_REMOTE_DISABLED);
+  const enabled = !isTruthy(env.REMOTECLI_REMOTE_DISABLED || env.CLOUDCLI_REMOTE_DISABLED);
   const controllerAvailable = enabled && detectUnsupportedRemoteMode('controller', env) === null;
   const anyRoleAvailable = enabled && (controllerAvailable || detectUnsupportedRemoteMode('host', env) === null);
 

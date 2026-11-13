@@ -81,12 +81,14 @@ async function postRegister(body: unknown): Promise<{ status: number; code?: str
   }
 }
 
-test('CLOUDCLI_SETUP_TOKEN from the environment gates register end to end', async () => {
+test('REMOTECLI_SETUP_TOKEN (and legacy CLOUDCLI_SETUP_TOKEN) from the environment gates register end to end', async () => {
   await withIsolatedAuthDatabase(async () => {
-    const previous = process.env.CLOUDCLI_SETUP_TOKEN;
+    const previousRemote = process.env.REMOTECLI_SETUP_TOKEN;
+    const previousCloud = process.env.CLOUDCLI_SETUP_TOKEN;
     const credentials = { username: 'bob-the-owner', password: 'a-long-enough-password' };
     try {
-      process.env.CLOUDCLI_SETUP_TOKEN = 'setup-secret';
+      delete process.env.CLOUDCLI_SETUP_TOKEN;
+      process.env.REMOTECLI_SETUP_TOKEN = 'setup-secret';
       // The seeded user means a request that passes the token gate ends in "already configured".
       assert.deepEqual(await postRegister(credentials), { status: 403, code: 'AUTH_SETUP_TOKEN_INVALID' });
       assert.deepEqual(await postRegister({ ...credentials, setupToken: 'nope' }), {
@@ -98,13 +100,26 @@ test('CLOUDCLI_SETUP_TOKEN from the environment gates register end to end', asyn
         code: 'AUTH_USER_ALREADY_CONFIGURED',
       });
 
-      process.env.CLOUDCLI_SETUP_TOKEN = '';
+      // Legacy fallback check
+      delete process.env.REMOTECLI_SETUP_TOKEN;
+      process.env.CLOUDCLI_SETUP_TOKEN = 'legacy-secret';
+      assert.deepEqual(await postRegister({ ...credentials, setupToken: 'legacy-secret' }), {
+        status: 403,
+        code: 'AUTH_USER_ALREADY_CONFIGURED',
+      });
+
+      delete process.env.CLOUDCLI_SETUP_TOKEN;
       assert.deepEqual(await postRegister(credentials), { status: 403, code: 'AUTH_USER_ALREADY_CONFIGURED' });
     } finally {
-      if (previous === undefined) {
+      if (previousRemote === undefined) {
+        delete process.env.REMOTECLI_SETUP_TOKEN;
+      } else {
+        process.env.REMOTECLI_SETUP_TOKEN = previousRemote;
+      }
+      if (previousCloud === undefined) {
         delete process.env.CLOUDCLI_SETUP_TOKEN;
       } else {
-        process.env.CLOUDCLI_SETUP_TOKEN = previous;
+        process.env.CLOUDCLI_SETUP_TOKEN = previousCloud;
       }
     }
   });

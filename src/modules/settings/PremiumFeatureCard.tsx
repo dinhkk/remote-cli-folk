@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { ExternalLink, Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-const CLOUDCLI_URL = 'https://cloudcli.ai';
+const REMOTECLI_URL = 'https://remotecli.ai';
 
 type PremiumFeatureCardProps = {
   icon: ReactNode;
@@ -11,7 +11,7 @@ type PremiumFeatureCardProps = {
   ctaText?: string;
 };
 
-/** Rendered by the settings module's about tab to advertise a paid CloudCLI feature. */
+/** Rendered by the settings module's about tab to advertise a paid RemoteCLI feature. */
 export default function PremiumFeatureCard({
   icon,
   title,
@@ -35,7 +35,7 @@ export default function PremiumFeatureCard({
             {description}
           </p>
           <a
-            href={CLOUDCLI_URL}
+            href={REMOTECLI_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline"

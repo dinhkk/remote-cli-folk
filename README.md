@@ -1,12 +1,14 @@
 <div align="center">
-  <img src="public/logo.svg" alt="RemoteCLI Logo" width="80" height="80">
+  <img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/logo.svg" alt="RemoteCLI Logo" width="80" height="80">
   <h1>RemoteCLI</h1>
   <p><b>A modern web-based remote UI for Claude Code, Cursor CLI, and OpenAI Codex.</b><br>
+  <i>Customized fork adapted from <a href="https://cloudcli.ai">CloudCLI</a>.</i><br>
   Access, manage, and collaborate with your coding agents from any device, anywhere.</p>
 
   <p>
     <a href="https://www.npmjs.com/package/@tunghuynh/remotecli"><img src="https://img.shields.io/npm/v/@tunghuynh/remotecli.svg?style=flat-square&color=2563eb" alt="npm version"></a>
     <a href="https://www.npmjs.com/package/@tunghuynh/remotecli"><img src="https://img.shields.io/npm/dm/@tunghuynh/remotecli.svg?style=flat-square&color=blue" alt="npm downloads"></a>
+    <a href="https://github.com/tunghuynh/remote-cli"><img src="https://img.shields.io/github/stars/tunghuynh/remote-cli?style=flat-square&color=yellow" alt="GitHub Stars"></a>
     <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22.5.0-brightgreen.svg?style=flat-square" alt="Node.js Version"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square" alt="License"></a>
     <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg?style=flat-square" alt="Platform">
@@ -18,6 +20,8 @@
 ## Overview
 
 **RemoteCLI** provides an intuitive, responsive web interface for local AI coding CLI tools like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Cursor CLI](https://docs.cursor.com/en/cli/overview), and [OpenAI Codex](https://developers.openai.com/codex).
+
+> **Note:** RemoteCLI is an enhanced and customized fork built upon the foundation of [CloudCLI (cloudcli.ai)](https://cloudcli.ai), adding full zero-C++ build requirements (using pure Node.js `node:sqlite` & `bcryptjs`), deep branding, optimized mobile controls, and customized multi-agent workflows.
 
 Instead of being tethered to a single terminal window, RemoteCLI lets you monitor agent executions, edit files, inspect diffs, approve permissions, and run shell commands from any desktop browser, laptop, tablet, or mobile phone.
 
@@ -39,13 +43,13 @@ Instead of being tethered to a single terminal window, RemoteCLI lets you monito
 <tr>
 <td align="center">
 <h3>Desktop Interface</h3>
-<img src="public/screenshots/desktop-main.png" alt="Desktop Interface" width="480">
+<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/desktop-main.png" alt="Desktop Interface" width="480">
 <br>
 <em>Full workspace with project explorer, active sessions, interactive chat, and tool execution logs</em>
 </td>
 <td align="center">
 <h3>Mobile Experience</h3>
-<img src="public/screenshots/mobile-chat.png" alt="Mobile Interface" width="280">
+<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/mobile-chat.png" alt="Mobile Interface" width="280">
 <br>
 <em>Responsive mobile design with touch controls, live diff views, and tool details</em>
 </td>
@@ -53,13 +57,13 @@ Instead of being tethered to a single terminal window, RemoteCLI lets you monito
 <tr>
 <td align="center">
 <h3>CLI & Model Selection</h3>
-<img src="public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
+<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
 <br>
 <em>Switch seamlessly between Claude Code, Cursor CLI, and Codex</em>
 </td>
 <td align="center">
 <h3>Safe Tool Permission Controls</h3>
-<img src="public/screenshots/tools-modal.png" alt="Tools Settings Modal" width="400">
+<img src="https://raw.githubusercontent.com/tunghuynh/remote-cli/main/public/screenshots/tools-modal.png" alt="Tools Settings Modal" width="400">
 <br>
 <em>Fine-grained control over allowed and disallowed agent tools</em>
 </td>
@@ -72,29 +76,56 @@ Instead of being tethered to a single terminal window, RemoteCLI lets you monito
 
 ## Quick Start
 
-### Run Instantly with npx
+### Prerequisites
 
-No installation required. Requires **Node.js >= 22.5.0**:
+- **Node.js**: `>= 22.5.0` (with built-in `node:sqlite`, zero C++ build tools required)
+- **AI CLI**: At least one supported AI CLI installed and authenticated on your machine:
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code): `npm install -g @anthropic-ai/claude-code`
+  - [Cursor CLI](https://docs.cursor.com/en/cli/overview)
+  - [OpenAI Codex](https://developers.openai.com/codex)
+
+### Method 1: Instant Run with npx (No Installation Needed)
+
+Run RemoteCLI directly from npm with a single command:
 
 ```bash
-npx @tunghuynh/remotecli
+npx @tunghuynh/remotecli@latest
 ```
 
-### Global Installation (Recommended)
+To run on a specific port:
 
-Install globally via npm for regular use:
+```bash
+npx @tunghuynh/remotecli@latest --port 8080
+```
+
+### Method 2: Global Installation via npm (Recommended)
+
+Install RemoteCLI globally on your machine for daily use:
 
 ```bash
 npm install -g @tunghuynh/remotecli
 ```
 
-Then start RemoteCLI anytime with:
+Then start RemoteCLI anytime simply by running:
 
 ```bash
 remotecli
 ```
 
-Open your browser at **`http://localhost:3001`**. All your active projects and existing agent sessions will be ready immediately.
+Or start on a custom port:
+
+```bash
+remotecli --port 8080
+```
+
+### Accessing the Web UI
+
+Once started, open your browser and navigate to:
+
+👉 **`http://localhost:3001`**
+
+- **First Launch**: Create your owner password to secure your local dashboard.
+- **Sync**: RemoteCLI automatically discovers and syncs your local projects, sessions, git status, and MCP tools from `~/.claude`.
 
 ---
 
@@ -106,11 +137,11 @@ To use RemoteCLI from your smartphone, tablet, or another laptop on your local n
    ```bash
    remotecli
    ```
-2. Find your machine's local IP address (e.g. `192.168.1.50`).
+2. Find your host machine's local IP address (e.g., `192.168.1.50`).
 3. Open `http://<YOUR_LOCAL_IP>:3001` in your mobile browser.
 4. *(Optional)* Tap **"Add to Home Screen"** in Safari / Chrome for a standalone full-screen mobile app experience.
 
-> **Tip:** You can also use secure mesh networks like [Tailscale](https://tailscale.com/) or WireGuard to access your coding agents remotely from anywhere outside your local network.
+> **Tip:** You can also use secure mesh networks like [Tailscale](https://tailscale.com/) or WireGuard to access your coding agents securely from anywhere outside your local network.
 
 ---
 
@@ -207,8 +238,16 @@ Add custom tabs with their own frontend components and backend services. Install
 
 ---
 
+## Repository & Community
+
+- 🐙 **GitHub Repository**: [https://github.com/tunghuynh/remote-cli](https://github.com/tunghuynh/remote-cli)
+- 📦 **NPM Package**: [@tunghuynh/remotecli](https://www.npmjs.com/package/@tunghuynh/remotecli)
+- 🐛 **Issue Tracker**: [Report issues or suggest features](https://github.com/tunghuynh/remote-cli/issues)
+
+---
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)](LICENSE).
 
-Author: **Tùng Huỳnh** ([@tunghuynh](https://github.com/tunghuynh))
+Author: **Tùng Huynh** ([@tunghuynh](https://github.com/tunghuynh))

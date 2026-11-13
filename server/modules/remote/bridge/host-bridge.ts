@@ -1,6 +1,6 @@
 /**
  * Host bridge (FR-36/37/38, contracts sections 3, 6, 7): turns mux streams opened by a remote
- * Controller into calls to the local cloudcli server over loopback, and is where the Host decides what
+ * Controller into calls to the local remotecli server over loopback, and is where the Host decides what
  * a Controller may do. The Controller is never trusted: every stream passes the policy here, whatever
  * the Controller's own proxy already checked.
  *

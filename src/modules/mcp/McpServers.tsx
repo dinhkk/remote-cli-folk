@@ -91,7 +91,7 @@ function TeamMcpFeatureCard() {
             {t('mcpTeamCard.description')}
           </p>
           <a
-            href="https://cloudcli.ai"
+            href="https://remotecli.ai"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline"

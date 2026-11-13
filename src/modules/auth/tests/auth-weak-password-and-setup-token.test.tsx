@@ -9,7 +9,7 @@ import SetupForm from '@/modules/auth/SetupForm';
  * Two server behaviours from the hardened login that had no client yet: a
  * login with a password that predates the 12 character rule answers
  * `passwordWeak: true` and the user should be nudged to change it; and when the
- * operator pins registration with CLOUDCLI_SETUP_TOKEN the first registrant has
+ * operator pins registration with REMOTECLI_SETUP_TOKEN the first registrant has
  * to be able to type it.
  */
 

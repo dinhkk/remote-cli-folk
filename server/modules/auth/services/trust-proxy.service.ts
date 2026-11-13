@@ -30,7 +30,7 @@ export function parseTrustProxy(value: string | undefined): boolean | number | s
  *    behind a reverse proxy (and only then — a too-wide setting lets clients forge X-Forwarded-For);
  *  - warns once when X-Forwarded-For arrives while TRUST_PROXY is unset, because then every
  *    client shares the proxy's IP and one attacker can lock out everyone;
- *  - warns when listening beyond loopback without CLOUDCLI_SETUP_TOKEN, since the first visitor
+ *  - warns when listening beyond loopback without REMOTECLI_SETUP_TOKEN, since the first visitor
  *    to a fresh server can otherwise register the owner account.
  */
 export function configureAuthHardening(
@@ -62,9 +62,10 @@ export function configureAuthHardening(
   }
 
   const host = env.HOST || '0.0.0.0';
-  if (!LOOPBACK_HOSTS.has(host) && !env.CLOUDCLI_SETUP_TOKEN) {
+  const setupToken = env.REMOTECLI_SETUP_TOKEN || env.CLOUDCLI_SETUP_TOKEN;
+  if (!LOOPBACK_HOSTS.has(host) && !setupToken) {
     warn(
-      `[auth] Listening on ${host} without CLOUDCLI_SETUP_TOKEN: until the first account exists, anyone who can reach this server can register as its owner. Set CLOUDCLI_SETUP_TOKEN to require a token.`,
+      `[auth] Listening on ${host} without REMOTECLI_SETUP_TOKEN: until the first account exists, anyone who can reach this server can register as its owner. Set REMOTECLI_SETUP_TOKEN to require a token.`,
     );
   }
 }

@@ -85,18 +85,18 @@ test('no forwarded header and no TRUST_PROXY: no warning', async () => {
   assert.deepEqual(warnings, []);
 });
 
-test('binding beyond loopback without CLOUDCLI_SETUP_TOKEN warns at startup', () => {
+test('binding beyond loopback without REMOTECLI_SETUP_TOKEN warns at startup', () => {
   const warnings: string[] = [];
   configureAuthHardening(express(), { env: { HOST: '0.0.0.0' }, warn: (message) => warnings.push(message) });
-  assert.equal(warnings.filter((message) => message.includes('CLOUDCLI_SETUP_TOKEN')).length, 1);
+  assert.equal(warnings.filter((message) => message.includes('REMOTECLI_SETUP_TOKEN')).length, 1);
 
   const lan: string[] = [];
   configureAuthHardening(express(), { env: { HOST: '192.168.1.5' }, warn: (message) => lan.push(message) });
-  assert.equal(lan.filter((message) => message.includes('CLOUDCLI_SETUP_TOKEN')).length, 1);
+  assert.equal(lan.filter((message) => message.includes('REMOTECLI_SETUP_TOKEN')).length, 1);
 
   const unsetHost: string[] = [];
   configureAuthHardening(express(), { env: {}, warn: (message) => unsetHost.push(message) });
-  assert.equal(unsetHost.filter((message) => message.includes('CLOUDCLI_SETUP_TOKEN')).length, 1, 'HOST defaults to 0.0.0.0');
+  assert.equal(unsetHost.filter((message) => message.includes('REMOTECLI_SETUP_TOKEN')).length, 1, 'HOST defaults to 0.0.0.0');
 });
 
 test('no startup warning on loopback or when the setup token is set', () => {
@@ -104,10 +104,11 @@ test('no startup warning on loopback or when the setup token is set', () => {
     { HOST: '127.0.0.1' },
     { HOST: '::1' },
     { HOST: 'localhost' },
+    { HOST: '0.0.0.0', REMOTECLI_SETUP_TOKEN: 'set' },
     { HOST: '0.0.0.0', CLOUDCLI_SETUP_TOKEN: 'set' },
   ]) {
     const warnings: string[] = [];
     configureAuthHardening(express(), { env, warn: (message) => warnings.push(message) });
-    assert.equal(warnings.filter((message) => message.includes('CLOUDCLI_SETUP_TOKEN')).length, 0, JSON.stringify(env));
+    assert.equal(warnings.filter((message) => message.includes('REMOTECLI_SETUP_TOKEN')).length, 0, JSON.stringify(env));
   }
 });

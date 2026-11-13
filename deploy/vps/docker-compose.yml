@@ -1,14 +1,14 @@
-# CloudCLI Remote - Controller on a Linux VPS.
-# Run from the claudecodeui folder:
+# RemoteCLI Remote - Controller on a Linux VPS.
+# Run from the project folder:
 #   cp deploy/vps/vps.env.example deploy/vps/.env   # then edit it (chmod 600)
 #   docker compose -f deploy/vps/docker-compose.yml up -d --build
 services:
-  cloudcli:
+  remotecli:
     build:
-      context: ../..                       # = the claudecodeui folder
+      context: ../..                       # = the project folder
       dockerfile: deploy/vps/Dockerfile
-    image: cloudcli-remote:latest
-    container_name: cloudcli-remote
+    image: remotecli-remote:latest
+    container_name: remotecli-remote
     init: true                             # reaps zombie PTY/shell children, forwards signals
     restart: unless-stopped
     env_file:
@@ -23,6 +23,7 @@ services:
       - "127.0.0.1:3001:3001"
     volumes:
       # Named volume (not a bind mount): no uid/SELinux label problems on CentOS.
+      - remotecli-data:/home/node/.remotecli
       - cloudcli-data:/home/node/.cloudcli
     # Small log footprint on the VPS disk.
     logging:
@@ -32,4 +33,5 @@ services:
         max-file: "5"
 
 volumes:
+  remotecli-data:
   cloudcli-data:

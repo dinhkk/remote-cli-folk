@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 
-const DISMISS_KEY = 'CLOUDCLI_HIDE_GITHUB_STAR';
+const DISMISS_KEY = 'REMOTECLI_HIDE_GITHUB_STAR';
+const LEGACY_DISMISS_KEY = 'CLOUDCLI_HIDE_GITHUB_STAR';
 
 /**
  * State of the "Star" badge in the sidebar header.
@@ -13,7 +14,10 @@ const DISMISS_KEY = 'CLOUDCLI_HIDE_GITHUB_STAR';
 export const useGitHubStars = () => {
   const [isDismissed, setIsDismissed] = useState(() => {
     try {
-      return localStorage.getItem(DISMISS_KEY) === 'true';
+      return (
+        localStorage.getItem(DISMISS_KEY) === 'true' ||
+        localStorage.getItem(LEGACY_DISMISS_KEY) === 'true'
+      );
     } catch {
       return false;
     }

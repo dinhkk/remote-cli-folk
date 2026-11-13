@@ -46,7 +46,7 @@ const authService = createAuthService({
   generateToken,
   loginLimiter,
   dummyPasswordHash: DUMMY_PASSWORD_HASH,
-  getSetupToken: () => process.env.CLOUDCLI_SETUP_TOKEN || undefined,
+  getSetupToken: () => process.env.REMOTECLI_SETUP_TOKEN || process.env.CLOUDCLI_SETUP_TOKEN || undefined,
   rotateJwtSecret,
   bumpAuthEpoch,
 });

@@ -1,17 +1,17 @@
-# Hướng dẫn triển khai CloudCLI Remote lên VPS CentOS (Docker) + relay Cloudflare
+# Hướng dẫn triển khai RemoteCLI Remote lên VPS CentOS (Docker) + relay Cloudflare
 
 Tài liệu này đi kèm gói zip. Gồm 2 phần độc lập:
 
-- **Phần A** – build và chạy cloudcli (vai **Controller**) bằng Docker trên VPS CentOS.
+- **Phần A** – build và chạy remotecli (vai **Controller**) bằng Docker trên VPS CentOS.
 - **Phần B** – deploy **relay** lên Cloudflare bằng `wrangler` (Cloudflare CLI).
 
 Sơ đồ:
 
 ```
-Điện thoại/Trình duyệt ──HTTPS──▶ [VPS: nginx ▶ container cloudcli (Controller)]
+Điện thoại/Trình duyệt ──HTTPS──▶ [VPS: nginx ▶ container remotecli (Controller)]
                                               │ wss (mã hóa đầu-cuối)
                                               ▼
-                                   [Cloudflare Worker relay]  ◀── wss ── [PC Windows: cloudcli (Host)]
+                                   [Cloudflare Worker relay]  ◀── wss ── [PC Windows: remotecli (Host)]
 ```
 
 Relay chỉ chuyển byte đã mã hóa, không đọc được nội dung. PC Windows (Host) dùng bản cài sẵn của bạn, **không cần làm gì trong tài liệu này** ngoài bước nhập URL + secret relay (mục B.7).
@@ -20,11 +20,11 @@ Relay chỉ chuyển byte đã mã hóa, không đọc được nội dung. PC W
 
 ---
 
-# PHẦN A – Build & chạy cloudcli bằng Docker trên CentOS
+# PHẦN A – Build & chạy remotecli bằng Docker trên CentOS
 
 ## A.1 Gói zip chứa gì
 
-`cloudcli-remote-vps.zip` = toàn bộ thư mục `claudecodeui` **trừ**: `node_modules`, `dist`, `dist-server*`, `.out`, `.claude`, `.agents`, mọi file `.env`. Các thư mục đó sẽ được tạo lại trên Linux khi build. Zip chứa sẵn:
+`remotecli-remote-vps.zip` = toàn bộ thư mục `claudecodeui` **trừ**: `node_modules`, `dist`, `dist-server*`, `.out`, `.claude`, `.agents`, mọi file `.env`. Các thư mục đó sẽ được tạo lại trên Linux khi build. Zip chứa sẵn:
 
 | Đường dẫn | Dùng để |
 |---|---|
@@ -74,8 +74,8 @@ Trên máy Windows, gửi file zip (ví dụ bằng `scp`), rồi trên VPS:
 
 ```bash
 sudo dnf -y install unzip
-mkdir -p ~/cloudcli && unzip -q cloudcli-remote-vps.zip -d ~/cloudcli
-cd ~/cloudcli/claudecodeui        # thư mục có package.json; mọi lệnh dưới đây chạy tại đây
+mkdir -p ~/remotecli && unzip -q remotecli-remote-vps.zip -d ~/remotecli
+cd ~/remotecli/claudecodeui        # thư mục có package.json; mọi lệnh dưới đây chạy tại đây
 ls package.json deploy/vps relay
 ```
 
@@ -86,14 +86,14 @@ cp deploy/vps/vps.env.example deploy/vps/.env
 chmod 600 deploy/vps/.env
 
 # điền 3 giá trị bắt buộc:
-echo "CLOUDCLI_SETUP_TOKEN=$(openssl rand -hex 16)"
-echo "CLOUDCLI_REMOTE_MASTER_KEY=$(openssl rand -base64 32)"
+echo "REMOTECLI_SETUP_TOKEN=$(openssl rand -hex 16)"
+echo "REMOTECLI_MASTER_KEY=$(openssl rand -base64 32)"
 # rồi mở deploy/vps/.env và dán vào; TRUST_PROXY xem bảng dưới
 vi deploy/vps/.env
 ```
 
-- **`CLOUDCLI_SETUP_TOKEN`**: cloudcli là đơn người dùng, ai đăng ký trước là chủ. Có token thì phải nhập token mới đăng ký được. Ghi lại giá trị này.
-- **`CLOUDCLI_REMOTE_MASTER_KEY`**: khóa niêm phong bí mật pairing trong database. **Lưu một bản vào password manager.** Mất khóa = phải pair lại mọi thiết bị. Đừng sao lưu khóa cùng chỗ với volume dữ liệu.
+- **`REMOTECLI_SETUP_TOKEN`**: remotecli là đơn người dùng, ai đăng ký trước là chủ. Có token thì phải nhập token mới đăng ký được (tương thích ngược: `CLOUDCLI_SETUP_TOKEN`). Ghi lại giá trị này.
+- **`REMOTECLI_MASTER_KEY`**: khóa niêm phong bí mật pairing trong database (tương thích ngược: `CLOUDCLI_REMOTE_MASTER_KEY`). **Lưu một bản vào password manager.** Mất khóa = phải pair lại mọi thiết bị. Đừng sao lưu khóa cùng chỗ với volume dữ liệu.
 - **`TRUST_PROXY`**: số reverse proxy đứng trước container.
 
 | Kiến trúc | `TRUST_PROXY` |
@@ -116,7 +116,7 @@ curl -s http://127.0.0.1:3001/health                         # phải trả JSON
 Hành vi cố định của cấu hình này:
 
 - Cổng được publish **chỉ trên `127.0.0.1:3001`** của VPS. Không đổi thành `3001:3001`: Docker publish thẳng qua iptables, bỏ qua firewalld, sẽ lộ cổng ra Internet không có HTTPS.
-- Dữ liệu (database, khóa nếu không dùng biến môi trường, file upload) nằm ở volume Docker tên `cloudcli-data` (`/home/node/.cloudcli` trong container). Dùng named volume để khỏi gặp lỗi quyền/SELinux của bind mount. Nếu bắt buộc bind mount, thêm hậu tố `:Z` và `chown 1000:1000` thư mục đó.
+- Dữ liệu (database, khóa nếu không dùng biến môi trường, file upload) nằm ở volume Docker tên `remotecli-data` (`/home/node/.remotecli` trong container; tương thích thêm `cloudcli-data` / `/home/node/.cloudcli`). Dùng named volume để khỏi gặp lỗi quyền/SELinux của bind mount. Nếu bắt buộc bind mount, thêm hậu tố `:Z` và `chown 1000:1000` thư mục đó.
 - Container chạy bằng user `node` (uid 1000), không phải root.
 - Không đặt `NODE_ENV=production`: bản đã test trên Windows chạy không có biến này, nên giữ nguyên để khỏi đổi hành vi chưa kiểm chứng.
 
@@ -132,14 +132,14 @@ sudo dnf -y install certbot python3-certbot-nginx
 sudo setsebool -P httpd_can_network_connect 1      # SELinux: cho nginx kết nối tới 127.0.0.1:3001 (quên bước này = 502)
 ```
 
-`/etc/nginx/conf.d/cloudcli.conf` (thay `cloudcli.example.com`):
+`/etc/nginx/conf.d/remotecli.conf` (thay `remotecli.example.com`):
 
 ```nginx
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 
 server {
     listen 80;
-    server_name cloudcli.example.com;
+    server_name remotecli.example.com;
 
     client_max_body_size 64m;          # upload 25 MB + dư; mặc định 1 MB của nginx sẽ chặn upload
 
@@ -163,7 +163,7 @@ server {
 
 ```bash
 sudo nginx -t && sudo systemctl enable --now nginx
-sudo certbot --nginx -d cloudcli.example.com        # cấp chứng chỉ + tự chuyển 80 → 443
+sudo certbot --nginx -d remotecli.example.com        # cấp chứng chỉ + tự chuyển 80 → 443
 ```
 
 ### Cách 2: Cloudflare Tunnel (VPS đã có `cloudflared`)
@@ -172,7 +172,7 @@ Trỏ hostname của tunnel tới `http://127.0.0.1:3001`; nhớ bật WebSocket
 
 ## A.7 Đăng ký tài khoản đầu tiên
 
-Mở `https://cloudcli.example.com`, đăng ký **ngay** với `CLOUDCLI_SETUP_TOKEN`. Xong thì token không còn tác dụng với ai đã có tài khoản; vẫn nên giữ bí mật hoặc xóa khỏi `.env` rồi `docker compose ... up -d`.
+Mở `https://remotecli.example.com`, đăng ký **ngay** với `REMOTECLI_SETUP_TOKEN` (hoặc `CLOUDCLI_SETUP_TOKEN`). Xong thì token không còn tác dụng với ai đã có tài khoản; vẫn nên giữ bí mật hoặc xóa khỏi `.env` rồi `docker compose ... up -d`.
 
 ## A.8 Vận hành
 
@@ -187,12 +187,12 @@ $C down -v                       # dừng VÀ XÓA dữ liệu (mất tài kho�
 $C up -d --build
 
 # Sao lưu dữ liệu (không kèm khóa master nếu bạn dùng biến môi trường - đúng ý định):
-docker run --rm -v cloudcli_cloudcli-data:/d -v "$PWD":/b busybox tar czf /b/cloudcli-data.tgz -C /d .
+docker run --rm -v remotecli_remotecli-data:/d -v "$PWD":/b busybox tar czf /b/remotecli-data.tgz -C /d .
 ```
 
 Tên volume thực tế có tiền tố thư mục compose; kiểm tra bằng `docker volume ls`.
 
-Công tắc khẩn: đặt `CLOUDCLI_REMOTE_DISABLED=1` trong `.env` rồi `up -d` → app chạy như trước khi có Remote (không mở `/r`, `/api/remote`, không mở link nào). Không cần revert code.
+Công tắc khẩn: đặt `REMOTECLI_REMOTE_DISABLED=1` trong `.env` rồi `up -d` → app chạy như trước khi có Remote (không mở `/r`, `/api/remote`, không mở link nào). Không cần revert code.
 
 ## A.9 Lưu ý khi chuyển từ Windows sang Linux
 
@@ -202,20 +202,20 @@ Công tắc khẩn: đặt `CLOUDCLI_REMOTE_DISABLED=1` trong `.env` rồi `up -
 | 2 | **`dist/` và `dist-server/` bị loại khỏi zip.** | Được build lại trong container (`npm run build`). |
 | 3 | **Kết thúc dòng (CRLF/LF).** Thư mục làm việc trên Windows lẫn cả hai kiểu. | Zip được dựng từ Git (đã chuẩn hóa LF) nên không còn CRLF. Nếu bạn tự sửa file shell/Dockerfile trên Windows, lưu kiểu LF. |
 | 4 | **Phân biệt hoa/thường trong tên file** (Windows không phân biệt, Linux có). Lỗi `import './Foo'` khi file là `foo.ts` chỉ lộ ra khi build trên Linux. | Nếu `npm run build` trong Docker báo `Cannot find module`, đó là nguyên nhân; sửa tên import. |
-| 5 | **Thư mục dữ liệu** `C:\Users\<bạn>\.cloudcli` → `/home/node/.cloudcli` trong container (volume `cloudcli-data`). | Đặt `HOME=/home/node` trong Dockerfile. Database không mang sang từ Windows: VPS bắt đầu sạch, tài khoản đăng ký mới. |
+| 5 | **Thư mục dữ liệu** `C:\Users\<bạn>\.remotecli` (hoặc `.cloudcli`) → `/home/node/.remotecli` trong container (volume `remotecli-data`). | Đặt `HOME=/home/node` trong Dockerfile. Database không mang sang từ Windows: VPS bắt đầu sạch, tài khoản đăng ký mới. |
 | 6 | **Terminal**: trên Windows là ConPTY (PowerShell/cmd); trong container là `bash` thật qua `node-pty`. Terminal của tab Remote trên **Controller** chạy trong container của VPS, **không phải** trên máy chủ CentOS. | Terminal của một Host (PC Windows của bạn) vẫn chạy trên PC đó. `node-pty` trên Linux cần cờ thực thi cho `spawn-helper`; script `postinstall` (`scripts/fix-node-pty.js`) lo việc này. |
 | 7 | **Quyền file**: khóa master dạng file tạo mode `0600`, thư mục dữ liệu thuộc user `node` (uid 1000). | Dùng named volume; nếu bind mount thì `chown 1000:1000` và `:Z`. |
 | 8 | **SELinux (CentOS bật mặc định)**: nginx cần `httpd_can_network_connect`; bind mount cần nhãn `:Z`. | Đã nêu ở A.6 và A.5. |
 | 9 | **Firewalld + Docker**: cổng publish của Docker bỏ qua firewalld. | Publish chỉ trên `127.0.0.1` (compose đã làm). |
-| 10 | **Biến môi trường** `HOST=127.0.0.1` (khuyến nghị trong tài liệu cho chạy trực tiếp) → trong container phải là `0.0.0.0`. | An toàn vì cổng publish chỉ ở loopback của VPS. Server sẽ ghi cảnh báo nếu `HOST` không phải loopback mà thiếu `CLOUDCLI_SETUP_TOKEN` (đã có). |
-| 11 | **Bộ test**: các test của Remote chỉ từng chạy trên Windows. 26 test lỗi nền (symlink EPERM, đường dẫn Windows, biến môi trường) là đặc thù Windows/máy dev; trên Linux kết quả có thể khác. | Không ảnh hưởng chạy thật. Tùy chọn kiểm: `docker build --target build -t cloudcli-build -f deploy/vps/Dockerfile .` rồi `docker run --rm cloudcli-build npm run test:e2e-remote` (chưa thử). |
+| 10 | **Biến môi trường** `HOST=127.0.0.1` (khuyến nghị trong tài liệu cho chạy trực tiếp) → trong container phải là `0.0.0.0`. | An toàn vì cổng publish chỉ ở loopback của VPS. Server sẽ ghi cảnh báo nếu `HOST` không phải loopback mà thiếu `REMOTECLI_SETUP_TOKEN` (đã có). |
+| 11 | **Bộ test**: các test của Remote chỉ từng chạy trên Windows. 26 test lỗi nền (symlink EPERM, đường dẫn Windows, biến môi trường) là đặc thù Windows/máy dev; trên Linux kết quả có thể khác. | Không ảnh hưởng chạy thật. Tùy chọn kiểm: `docker build --target build -t remotecli-build -f deploy/vps/Dockerfile .` rồi `docker run --rm remotecli-build npm run test:e2e-remote` (chưa thử). |
 | 12 | **Đồng bộ giờ**: HTTPS/Let's Encrypt cần giờ đúng. | `sudo timedatectl set-ntp true` (chrony). |
 
 ---
 
 # PHẦN B – Deploy relay lên Cloudflare bằng wrangler
 
-Thư mục dùng: `relay/` trong gói zip (tự đủ, không import gì từ phần còn lại). Relay chạy trên Cloudflare, không chạy trên VPS; VPS chỉ là nơi bạn gõ lệnh deploy. Thao tác từ `~/cloudcli/claudecodeui/relay`.
+Thư mục dùng: `relay/` trong gói zip (tự đủ, không import gì từ phần còn lại). Relay chạy trên Cloudflare, không chạy trên VPS; VPS chỉ là nơi bạn gõ lệnh deploy. Thao tác từ `~/remotecli/claudecodeui/relay`.
 
 Wrangler đã ghim ở **4.157.0** trong `relay/package.json`; dùng bản này qua `npx` thay vì bản cài sẵn trên máy để đúng phiên bản đã test.
 
@@ -239,7 +239,7 @@ Nếu `npx wrangler whoami` đã báo đăng nhập sẵn thì bỏ qua bước 
 
 ```bash
 node -v                                # cần >= 22 (hoặc >= 20)
-cd ~/cloudcli/claudecodeui/relay
+cd ~/remotecli/claudecodeui/relay
 npm ci --ignore-scripts                # đúng phiên bản theo lockfile
 alias WR='npx wrangler'
 ```
@@ -247,7 +247,7 @@ alias WR='npx wrangler'
 **Cách 2 – VPS CentOS không có Node mới: chạy wrangler trong Docker:**
 
 ```bash
-cd ~/cloudcli/claudecodeui/relay
+cd ~/remotecli/claudecodeui/relay
 WR() { docker run --rm -i -u "$(id -u):$(id -g)" -e HOME=/tmp \
         -e CLOUDFLARE_API_TOKEN -e CLOUDFLARE_ACCOUNT_ID \
         -v "$PWD":/work -w /work node:22-bookworm \
@@ -258,7 +258,7 @@ WR() { docker run --rm -i -u "$(id -u):$(id -g)" -e HOME=/tmp \
 
 ## B.3 Deploy với tên worker ngẫu nhiên
 
-`wrangler.jsonc` có tên mẫu `cloudcli-remote-relay-dev` – **không deploy tên này**. Truyền tên ngẫu nhiên bằng `--name`:
+`wrangler.jsonc` có tên mẫu `remotecli-remote-relay-dev` – **không deploy tên này**. Truyền tên ngẫu nhiên bằng `--name`:
 
 ```bash
 NAME=ccr-$(openssl rand -hex 10)
@@ -302,8 +302,8 @@ Smoke tạo một room tạm, nối Host và Controller giả, gửi một frame
 
 ## B.7 Nối Host và Controller
 
-1. Trên **cả hai** cloudcli (Controller trên VPS và Host trên PC Windows): *Settings → Remote work* → nhập **cùng một** relay URL (`wss://<NAME>.<subdomain>.workers.dev` hoặc dạng `https://`) và **cùng một** secret.
-2. **Host (PC):** bật **Accept**. Nếu bạn sẽ duyệt thẻ Allow/Deny từ điện thoại, đặt trước khi chạy cloudcli trên PC: `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS=300000` (và `OPENCODE_TOOL_APPROVAL_TIMEOUT_MS=300000`) – áp dụng cho cả tiến trình.
+1. Trên **cả hai** remotecli (Controller trên VPS và Host trên PC Windows): *Settings → Remote work* → nhập **cùng một** relay URL (`wss://<NAME>.<subdomain>.workers.dev` hoặc dạng `https://`) và **cùng một** secret.
+2. **Host (PC):** bật **Accept**. Nếu bạn sẽ duyệt thẻ Allow/Deny từ điện thoại, đặt trước khi chạy remotecli trên PC: `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS=300000` (và `OPENCODE_TOOL_APPROVAL_TIMEOUT_MS=300000`) – áp dụng cho cả tiến trình.
 3. **Host:** bấm *Pair a Controller* (hỏi mật khẩu tài khoản) → hiện mã 8 ký tự, hiệu lực 5 phút.
 4. **Controller (VPS):** *Pair with a Host* → nhập mã và tên thiết bị.
 5. Controller hiện mã SAS 6 chữ số. **Gõ mã đó vào Host.** Phải khớp; nhập sai 3 lần → hủy và khóa pairing trên Host 15 phút.

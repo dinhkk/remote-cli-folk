@@ -1,6 +1,6 @@
 /**
  * Minimal security headers for the Controller's main page (NFR-12, phase 13). The Controller serves the
- * cloudcli UI to a browser and, in a Remote tab, to a sandboxed iframe, so the page must not be framed by
+ * remotecli UI to a browser and, in a Remote tab, to a sandboxed iframe, so the page must not be framed by
  * another site, must not take over its base URL and must not embed plugins. Nothing else is restricted: a
  * full script/style policy would break the Local UI (inline bootstrap scripts, third-party fonts, plugin
  * UIs) for little gain, and the tab page (`?target=`) already has the strict policy of contracts section 3.
@@ -11,11 +11,11 @@
  *
  * This changes the Local UI for everybody on the server, Remote user or not: the UI can no longer be framed by
  * another origin (a dashboard/portal, an IDE's simple browser, a reverse-proxy portal that frames it) and
- * outbound requests carry no referrer to other sites. `CLOUDCLI_REMOTE_MAIN_PAGE_HEADERS=0` (default on) drops
+ * outbound requests carry no referrer to other sites. `REMOTECLI_REMOTE_MAIN_PAGE_HEADERS=0` (or legacy `CLOUDCLI_REMOTE_MAIN_PAGE_HEADERS=0`) (default on) drops
  * exactly those two changes (`frame-ancestors` and `Referrer-Policy`) and keeps `nosniff`, `base-uri` and
  * `object-src`, without turning Remote off.
  *
- * With `CLOUDCLI_REMOTE_DISABLED=1` the module mounts nothing, so the server answers exactly as before.
+ * With `REMOTECLI_REMOTE_DISABLED=1` (or legacy `CLOUDCLI_REMOTE_DISABLED=1`) the module mounts nothing, so the server answers exactly as before.
  */
 
 import type { NextFunction, Request, Response } from 'express';
@@ -33,9 +33,10 @@ export const buildMainPageCsp = (options: Pick<MainPageHeaderOptions, 'frameAnce
 
 export const MAIN_PAGE_CSP = buildMainPageCsp();
 
-/** `CLOUDCLI_REMOTE_MAIN_PAGE_HEADERS`: on unless it is 0, false, off or no. */
+/** `REMOTECLI_REMOTE_MAIN_PAGE_HEADERS` (or legacy `CLOUDCLI_...`): on unless it is 0, false, off or no. */
 export const resolveMainPageHeaderOptions = (env: NodeJS.ProcessEnv): MainPageHeaderOptions => {
-  const off = ['0', 'false', 'off', 'no'].includes(env.CLOUDCLI_REMOTE_MAIN_PAGE_HEADERS?.trim().toLowerCase() ?? '');
+  const headerEnv = env.REMOTECLI_REMOTE_MAIN_PAGE_HEADERS ?? env.CLOUDCLI_REMOTE_MAIN_PAGE_HEADERS;
+  const off = ['0', 'false', 'off', 'no'].includes(headerEnv?.trim().toLowerCase() ?? '');
   return { frameAncestors: !off, referrerPolicy: !off };
 };
 

@@ -27,8 +27,8 @@ type SandboxOptions = {
 };
 
 const SANDBOX_TEMPLATES: Record<string, string> = {
-  claude: 'docker.io/cloudcliai/sandbox:claude-code',
-  codex: 'docker.io/cloudcliai/sandbox:codex',
+  claude: process.env.REMOTECLI_SANDBOX_CLAUDE_IMAGE || process.env.CLOUDCLI_SANDBOX_CLAUDE_IMAGE || 'docker.io/cloudcliai/sandbox:claude-code',
+  codex: process.env.REMOTECLI_SANDBOX_CODEX_IMAGE || process.env.CLOUDCLI_SANDBOX_CODEX_IMAGE || 'docker.io/cloudcliai/sandbox:codex',
 };
 
 const SANDBOX_SECRETS: Record<string, string> = {

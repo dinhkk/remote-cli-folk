@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 #
-# CloudCLI (with the Remote feature) as a container, for a Linux VPS (Controller role).
+# RemoteCLI (with the Remote feature) as a container, for a Linux VPS (Controller role).
 #
-# Build context = the claudecodeui folder (the folder that contains package.json):
-#   docker build -f deploy/vps/Dockerfile -t cloudcli-remote:latest .
+# Build context = the project folder (the folder that contains package.json):
+#   docker build -f deploy/vps/Dockerfile -t remotecli-remote:latest .
 # or, easier, through compose:
 #   docker compose -f deploy/vps/docker-compose.yml build
 #
@@ -63,8 +63,8 @@ COPY --from=build --chown=node:node /app /app
 
 # The data directory (auth.db, remote-master.key when no env key is used, uploads).
 # Created and owned by the unprivileged user so a fresh named volume inherits it.
-RUN mkdir -p /home/node/.cloudcli && chown -R node:node /home/node/.cloudcli
-VOLUME ["/home/node/.cloudcli"]
+RUN mkdir -p /home/node/.remotecli /home/node/.cloudcli && chown -R node:node /home/node/.remotecli /home/node/.cloudcli
+VOLUME ["/home/node/.remotecli"]
 
 USER node
 ENV HOME=/home/node \

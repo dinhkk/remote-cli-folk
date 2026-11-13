@@ -65,7 +65,7 @@ export type ControllerProxyOptions = {
   receiveLedger?: ReceiveLedger;
   /** HTTP route policy for the early 403; default is the production table. Tests that use synthetic paths inject `createRemoteHttpPolicy`. */
   evaluateHttp?: RemoteHttpPolicy;
-  /** Time / byte / concurrency budgets of the refused-upload drain (defaults 15 s, 128 MiB, 4 per pairing, 16 in total; env `CLOUDCLI_REMOTE_REFUSED_UPLOAD_*`). */
+  /** Time / byte / concurrency budgets of the refused-upload drain (defaults 15 s, 128 MiB, 4 per pairing, 16 in total; env `REMOTECLI_REMOTE_REFUSED_UPLOAD_*`). */
   refusedUpload?: Partial<RefusedUploadBudgets>;
 };
 

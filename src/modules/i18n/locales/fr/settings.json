@@ -557,7 +557,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins officiels",
-      "officialDescription": "Maintenus par l'équipe CloudCLI et prêts à être installés directement.",
+      "officialDescription": "Maintenus par l'équipe RemoteCLI et prêts à être installés directement.",
       "unofficialTitle": "Autres plugins",
       "unofficialDescription": "Plugins non officiels et intégrations d'autres utilisateurs. Examinez le code source avant d'installer."
     },
@@ -579,8 +579,8 @@
       "description": "Planifiez des invites d'espace de travail, consultez l'historique des exécutions et gérez les tâches locales récurrentes.",
       "install": "Installer"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prismRemoteCLI": {
+      "name": "PRISM RemoteCLI",
       "badge": "non officiel",
       "description": "Intelligence de session pour Claude Code, dans RemoteCLI. Voyez pourquoi vos sessions consomment des tokens sans quitter le navigateur.",
       "install": "Installer"

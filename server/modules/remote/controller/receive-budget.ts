@@ -27,9 +27,9 @@ export const DEFAULT_GLOBAL_RECEIVE_BUDGET_BYTES = 128 * MIB;
 export type ReceiveBudgets = { perStream: number; perPairing: number; global: number };
 
 const ENV_KEYS = {
-  perStream: 'CLOUDCLI_REMOTE_RECEIVE_BUDGET_STREAM_MIB',
-  perPairing: 'CLOUDCLI_REMOTE_RECEIVE_BUDGET_PAIRING_MIB',
-  global: 'CLOUDCLI_REMOTE_RECEIVE_BUDGET_GLOBAL_MIB',
+  perStream: ['REMOTECLI_REMOTE_RECEIVE_BUDGET_STREAM_MIB', 'CLOUDCLI_REMOTE_RECEIVE_BUDGET_STREAM_MIB'],
+  perPairing: ['REMOTECLI_REMOTE_RECEIVE_BUDGET_PAIRING_MIB', 'CLOUDCLI_REMOTE_RECEIVE_BUDGET_PAIRING_MIB'],
+  global: ['REMOTECLI_REMOTE_RECEIVE_BUDGET_GLOBAL_MIB', 'CLOUDCLI_REMOTE_RECEIVE_BUDGET_GLOBAL_MIB'],
 } as const;
 
 const DEFAULTS: ReceiveBudgets = {
@@ -39,14 +39,15 @@ const DEFAULTS: ReceiveBudgets = {
 };
 
 /**
- * The budgets in force: the defaults, overridden by `CLOUDCLI_REMOTE_RECEIVE_BUDGET_{STREAM,PAIRING,GLOBAL}_MIB`
- * (positive numbers of MiB; anything else is ignored) and then by explicit `overrides`.
+ * The budgets in force: the defaults, overridden by `REMOTECLI_REMOTE_RECEIVE_BUDGET_{STREAM,PAIRING,GLOBAL}_MIB`
+ * (or legacy `CLOUDCLI_REMOTE_...`) (positive numbers of MiB; anything else is ignored) and then by explicit `overrides`.
  * Consumed by: the Remote module.
  */
 export const resolveReceiveBudgets = (env: NodeJS.ProcessEnv = {}, overrides: Partial<ReceiveBudgets> = {}): ReceiveBudgets => {
   const resolved: ReceiveBudgets = { ...DEFAULTS };
   for (const key of Object.keys(ENV_KEYS) as Array<keyof ReceiveBudgets>) {
-    const mib = Number(env[ENV_KEYS[key]]);
+    const rawVal = env[ENV_KEYS[key][0]] ?? env[ENV_KEYS[key][1]];
+    const mib = Number(rawVal);
     if (Number.isFinite(mib) && mib > 0) resolved[key] = Math.floor(mib * MIB);
     const override = overrides[key];
     if (override !== undefined && Number.isFinite(override) && override > 0) resolved[key] = Math.floor(override);

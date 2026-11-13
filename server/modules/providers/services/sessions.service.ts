@@ -27,7 +27,7 @@ import { AppError, sliceTailPage } from '@/shared/utils.js';
  * abort — a task is stopped by id through `chat.stop-task` instead. `tasks`
  * rides along on both kinds whenever the session has any.
  *
- * A turn driven outside CloudCLI — the Claude CLI in the Shell view, or a
+ * A turn driven outside RemoteCLI — the Claude CLI in the Shell view, or a
  * terminal the user opened themselves — is listed the same way, with
  * `canInterrupt: false` because there is no run here to abort, and a
  * `statusText` saying where the work is happening.
@@ -93,11 +93,11 @@ type SessionDetails = {
   } | null;
 };
 
-const MAX_CLOUDCLI_SESSION_NAME_WORDS = 4;
+const MAX_REMOTECLI_SESSION_NAME_WORDS = 4;
 
-function buildCloudCliSessionName(initialMessage: string): string {
+function buildRemoteCliSessionName(initialMessage: string): string {
   const words = initialMessage.trim().split(/\s+/).filter(Boolean);
-  return words.slice(0, MAX_CLOUDCLI_SESSION_NAME_WORDS).join(' ') || 'Untitled Session';
+  return words.slice(0, MAX_REMOTECLI_SESSION_NAME_WORDS).join(' ') || 'Untitled Session';
 }
 
 /**
@@ -185,9 +185,9 @@ export const sessionsService = {
       }
     }
 
-    // The chat-run registry only knows about turns CloudCLI drives itself, so
+    // The chat-run registry only knows about turns RemoteCLI drives itself, so
     // without this a session working under the Claude CLI — including one
-    // CloudCLI spawned for its own Shell view — looks idle. A session already
+    // RemoteCLI spawned for its own Shell view — looks idle. A session already
     // listed above keeps its richer entry.
     for (const live of await listBusyClaudeCliSessions()) {
       const session = sessionsDb.getSessionByProviderSessionId(live.providerSessionId);
@@ -201,7 +201,7 @@ export const sessionsService = {
         startedAt: live.startedAt,
         lastSeq: chatRunRegistry.getRun(session.session_id)?.lastSeq ?? 0,
         // There is no run here to abort: the turn belongs to a CLI process
-        // CloudCLI does not own, so it can be reported but not interrupted.
+        // RemoteCLI does not own, so it can be reported but not interrupted.
         canInterrupt: false,
         statusText: 'Running in the Claude CLI',
       });
@@ -281,7 +281,7 @@ export const sessionsService = {
    * chat, navigates to the returned id immediately, and the id never changes
    * for the lifetime of the conversation. The provider-native id is mapped to
    * this row later, when the provider runtime announces it mid-run. Its title
-   * comes directly from the first visible CloudCLI message and is limited to
+   * comes directly from the first visible RemoteCLI message and is limited to
    * four whole words before any provider-owned storage exists.
    */
   createAppSession(
@@ -298,7 +298,7 @@ export const sessionsService = {
     }
 
     const sessionId = randomUUID();
-    const sessionName = buildCloudCliSessionName(initialMessage);
+    const sessionName = buildRemoteCliSessionName(initialMessage);
     sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName);
 
     return {

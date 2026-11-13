@@ -13,13 +13,18 @@ const DISPLAY_HOST = 'localhost';
 const HEALTH_TIMEOUT_MS = 1000;
 const SERVER_START_TIMEOUT_MS = 30000;
 const MAX_STARTUP_LOG_LINES = 300;
-const SERVER_MARKER_PATH = path.join(os.homedir(), '.cloudcli', 'local-server.json');
+const SERVER_MARKER_PATH = path.join(os.homedir(), '.remotecli', 'local-server.json');
+const LEGACY_SERVER_MARKER_PATH = path.join(os.homedir(), '.cloudcli', 'local-server.json');
 const LOCAL_SERVER_URL_ENV_KEYS = [
+  'REMOTECLI_DESKTOP_LOCAL_SERVER_URL',
+  'REMOTECLI_LOCAL_SERVER_URL',
   'CLOUDCLI_DESKTOP_LOCAL_SERVER_URL',
   'CLOUDCLI_LOCAL_SERVER_URL',
   'ELECTRON_LOCAL_SERVER_URL',
 ];
 const LOCAL_SERVER_PORT_ENV_KEYS = [
+  'REMOTECLI_DESKTOP_LOCAL_SERVER_PORT',
+  'REMOTECLI_SERVER_PORT',
   'CLOUDCLI_DESKTOP_LOCAL_SERVER_PORT',
   'CLOUDCLI_SERVER_PORT',
   'SERVER_PORT',
@@ -55,12 +60,13 @@ function requestJson(url, timeoutMs = HEALTH_TIMEOUT_MS) {
   });
 }
 
-async function isCloudCliServer(baseUrl) {
+async function isRemoteCliServer(baseUrl) {
   const response = await requestJson(`${baseUrl}/health`);
   return response.ok
     && response.json?.status === 'ok'
     && typeof response.json?.installMode === 'string';
 }
+const isCloudCliServer = isRemoteCliServer;
 
 function isPortAvailable(port, host = HOST) {
   return new Promise((resolve) => {
@@ -206,13 +212,17 @@ function getServerCwd(appRoot, serverEntry) {
 }
 
 async function readServerMarkerUrl() {
-  try {
-    const raw = await fs.readFile(SERVER_MARKER_PATH, 'utf8');
-    const marker = JSON.parse(raw);
-    return marker.url || (marker.port ? `http://${marker.host || HOST}:${marker.port}` : null);
-  } catch {
-    return null;
+  for (const markerPath of [SERVER_MARKER_PATH, LEGACY_SERVER_MARKER_PATH]) {
+    try {
+      const raw = await fs.readFile(markerPath, 'utf8');
+      const marker = JSON.parse(raw);
+      const url = marker.url || (marker.port ? `http://${marker.host || HOST}:${marker.port}` : null);
+      if (url) return url;
+    } catch {
+      // Continue to next candidate marker path
+    }
   }
+  return null;
 }
 
 async function getExistingServerCandidateUrls(defaultUrl) {
@@ -232,11 +242,11 @@ async function getExistingServerCandidateUrls(defaultUrl) {
   return urls;
 }
 
-async function waitForCloudCliServer(baseUrl, timeoutMs) {
+async function waitForRemoteCliServer(baseUrl, timeoutMs) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    if (await isCloudCliServer(baseUrl)) {
+    if (await isRemoteCliServer(baseUrl)) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -244,6 +254,7 @@ async function waitForCloudCliServer(baseUrl, timeoutMs) {
 
   return false;
 }
+const waitForCloudCliServer = waitForRemoteCliServer;
 
 export class LocalServerController {
   constructor({ appRoot, settingsPath, isPackaged = false, appVersion, onChange }) {
@@ -294,7 +305,7 @@ export class LocalServerController {
   getPendingTarget() {
     return {
       kind: 'local',
-      name: 'Local CloudCLI',
+      name: 'Local RemoteCLI',
       url: this.localServerUrl || `http://${DISPLAY_HOST}:${this.localServerPort || DEFAULT_PORT}`,
     };
   }
@@ -378,7 +389,8 @@ export class LocalServerController {
     }
 
     const bundledEntry = path.join(this.appRoot, 'dist-server', 'server', 'index.js');
-    if (process.env.CLOUDCLI_USE_INSTALLED_SERVER !== '1' && await pathExists(bundledEntry)) {
+    const useInstalled = process.env.REMOTECLI_USE_INSTALLED_SERVER === '1' || process.env.CLOUDCLI_USE_INSTALLED_SERVER === '1';
+    if (!useInstalled && await pathExists(bundledEntry)) {
       return bundledEntry;
     }
 
@@ -439,7 +451,7 @@ export class LocalServerController {
     this.ownedServerProcess.once('exit', (code, signal) => {
       this.appendStartupLog(`process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
       if (this.ownedServerProcess) {
-        console.error(`CloudCLI desktop server exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
+        console.error(`RemoteCLI desktop server exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
       }
       this.ownedServerProcess = null;
     });
@@ -452,7 +464,7 @@ export class LocalServerController {
     const forceOwnServer = process.env.ELECTRON_FORCE_OWN_SERVER === '1';
 
     if (devUrl) {
-      const ready = await waitForCloudCliServer(defaultUrl, SERVER_START_TIMEOUT_MS);
+      const ready = await waitForRemoteCliServer(defaultUrl, SERVER_START_TIMEOUT_MS);
       if (!ready) {
         throw new Error(`Development backend did not become ready at ${defaultDisplayUrl}`);
       }
@@ -463,10 +475,10 @@ export class LocalServerController {
     if (!forceOwnServer) {
       const candidateUrls = await getExistingServerCandidateUrls(defaultUrl);
       for (const candidateUrl of candidateUrls) {
-        if (await isCloudCliServer(candidateUrl)) {
+        if (await isRemoteCliServer(candidateUrl)) {
           const displayUrl = getDisplayUrl(candidateUrl);
           this.localServerPort = getPortFromUrl(candidateUrl);
-          this.appendStartupLog(`Using existing Local CloudCLI at ${displayUrl}`);
+          this.appendStartupLog(`Using existing Local RemoteCLI at ${displayUrl}`);
           return displayUrl;
         }
       }
@@ -480,7 +492,7 @@ export class LocalServerController {
     this.localServerPort = port;
     this.startBundledServer(port, serverEntry);
 
-    const ready = await waitForCloudCliServer(serverUrl, SERVER_START_TIMEOUT_MS);
+    const ready = await waitForRemoteCliServer(serverUrl, SERVER_START_TIMEOUT_MS);
     if (!ready) {
       const recentLogs = this.getStartupLogs().slice(-20).join('\n');
       await this.shutdownOwnedServer();
@@ -491,7 +503,7 @@ export class LocalServerController {
       ].join('\n\n'));
     }
 
-    this.appendStartupLog(`Local CloudCLI ready at ${displayUrl}`);
+    this.appendStartupLog(`Local RemoteCLI ready at ${displayUrl}`);
     this.localServerUrl = displayUrl;
     return displayUrl;
   }
@@ -507,7 +519,7 @@ export class LocalServerController {
     await this.ensureLocalServer();
     return {
       kind: 'local',
-      name: 'Local CloudCLI',
+      name: 'Local RemoteCLI',
       url: this.localServerUrl,
     };
   }

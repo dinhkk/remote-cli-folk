@@ -293,7 +293,7 @@ function matchesToolPermission(entry: string, toolName: string, input: unknown) 
 export function buildClaudeSdkEnv(hostEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return {
     CLAUDE_CODE_ARTIFACT: '1',
-    CLAUDE_CODE_ENTRYPOINT: 'claudecodeui',
+    CLAUDE_CODE_ENTRYPOINT: 'remotecli',
     ...hostEnv,
     CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(BG_WAIT_CEILING_MS),
   };

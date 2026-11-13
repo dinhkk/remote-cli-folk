@@ -16,8 +16,8 @@
  * they do NOT keep secrets away from one. A paired Controller is a FULL-TRUST grant: it already has a shell
  * as the Host OS user (`/shell`), and the file read routes accept any absolute path under `WORKSPACES_ROOT`
  * (default: the home directory). So a single `GET /api/file-tree/projects/<any project id>/file?filePath=<absolute>`
- * (or `/files/content?path=`), with an id from `GET /api/projects`, returns `~/.cloudcli/auth.db` (JWT secret,
- * API keys, GitHub tokens), `~/.cloudcli/remote-master.key`, `~/.ssh/*` and `~/.aws/*`: no `create-project`
+ * (or `/files/content?path=`), with an id from `GET /api/projects`, returns `~/.remotecli/auth.db` (JWT secret,
+ * API keys, GitHub tokens), `~/.remotecli/remote-master.key`, `~/.ssh/*` and `~/.aws/*`: no `create-project`
  * is needed first. On a Host paired with several Controllers each of them can therefore read the others'
  * sealed pairing data. What the tables do give: the honest UI never offers the denied routes in Remote, a
  * buggy or modified Controller cannot trip them by accident, and Host-only administration (accounts, API keys,

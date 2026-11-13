@@ -12,7 +12,7 @@ type SetupFormState = {
   username: string;
   password: string;
   confirmPassword: string;
-  // Only needed when the server operator pinned registration with CLOUDCLI_SETUP_TOKEN.
+  // Only needed when the server operator pinned registration with REMOTECLI_SETUP_TOKEN.
   setupToken: string;
 };
 
@@ -156,7 +156,7 @@ export default function SetupForm() {
             isNotACredential
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            {t('register.setupTokenHint', { defaultValue: 'Needed only when the server operator set CLOUDCLI_SETUP_TOKEN.' })}
+            {t('register.setupTokenHint', { defaultValue: 'Needed only when the server operator set REMOTECLI_SETUP_TOKEN.' })}
           </p>
         </div>
 

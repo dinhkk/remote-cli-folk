@@ -35,10 +35,10 @@ export type RefusedUploadBudgets = {
 export const DEFAULT_REFUSED_UPLOAD_BUDGETS: RefusedUploadBudgets = { graceMs: 15_000, maxBytes: 128 * MIB, perPairing: 4, global: 16 };
 
 const ENV_KEYS = {
-  graceMs: 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_GRACE_MS',
-  maxBytes: 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_MAX_MIB',
-  perPairing: 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_PER_PAIRING',
-  global: 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_GLOBAL',
+  graceMs: ['REMOTECLI_REMOTE_REFUSED_UPLOAD_GRACE_MS', 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_GRACE_MS'],
+  maxBytes: ['REMOTECLI_REMOTE_REFUSED_UPLOAD_MAX_MIB', 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_MAX_MIB'],
+  perPairing: ['REMOTECLI_REMOTE_REFUSED_UPLOAD_PER_PAIRING', 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_PER_PAIRING'],
+  global: ['REMOTECLI_REMOTE_REFUSED_UPLOAD_GLOBAL', 'CLOUDCLI_REMOTE_REFUSED_UPLOAD_GLOBAL'],
 } as const;
 
 const positive = (value: unknown): number | null => {
@@ -47,14 +47,15 @@ const positive = (value: unknown): number | null => {
 };
 
 /**
- * The budgets in force: the defaults, overridden by `CLOUDCLI_REMOTE_REFUSED_UPLOAD_{GRACE_MS,MAX_MIB,PER_PAIRING,GLOBAL}`
- * (positive numbers; anything else is ignored) and then by explicit `overrides` (positive numbers, raw units).
+ * The budgets in force: the defaults, overridden by `REMOTECLI_REMOTE_REFUSED_UPLOAD_{GRACE_MS,MAX_MIB,PER_PAIRING,GLOBAL}`
+ * (or legacy `CLOUDCLI_REMOTE_...`) (positive numbers; anything else is ignored) and then by explicit `overrides` (positive numbers, raw units).
  * Consumed by: the Controller HTTP proxy.
  */
 export const resolveRefusedUploadBudgets = (env: NodeJS.ProcessEnv = {}, overrides: Partial<RefusedUploadBudgets> = {}): RefusedUploadBudgets => {
   const resolved: RefusedUploadBudgets = { ...DEFAULT_REFUSED_UPLOAD_BUDGETS };
   for (const key of Object.keys(ENV_KEYS) as Array<keyof RefusedUploadBudgets>) {
-    const fromEnv = positive(env[ENV_KEYS[key]]);
+    const rawVal = env[ENV_KEYS[key][0]] ?? env[ENV_KEYS[key][1]];
+    const fromEnv = positive(rawVal);
     if (fromEnv !== null) resolved[key] = Math.max(1, Math.floor(key === 'maxBytes' ? fromEnv * MIB : fromEnv));
     const override = positive(overrides[key]);
     if (override !== null) resolved[key] = Math.max(1, Math.floor(override));

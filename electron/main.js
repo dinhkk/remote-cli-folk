@@ -11,11 +11,13 @@ import { TabsController } from './tabs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const APP_NAME = 'CloudCLI';
-const APP_USER_MODEL_ID = 'ai.cloudcli.desktop';
-const CALLBACK_PROTOCOL = 'cloudcli';
+const APP_NAME = 'RemoteCLI';
+const APP_USER_MODEL_ID = 'ai.remotecli.desktop';
+const CALLBACK_PROTOCOL = 'remotecli';
+const LEGACY_CALLBACK_PROTOCOL = 'cloudcli';
 const CALLBACK_URL = `${CALLBACK_PROTOCOL}://auth/callback`;
-const CLOUDCLI_CONTROL_PLANE_URL = process.env.CLOUDCLI_CONTROL_PLANE_URL || 'https://cloudcli.ai';
+const REMOTECLI_CONTROL_PLANE_URL = process.env.REMOTECLI_CONTROL_PLANE_URL || process.env.CLOUDCLI_CONTROL_PLANE_URL || 'https://remotecli.ai';
+const CLOUDCLI_CONTROL_PLANE_URL = REMOTECLI_CONTROL_PLANE_URL;
 const REMOTE_START_TIMEOUT_MS = 30000;
 const AUTH_CALLBACK_TTL_MS = 10 * 60 * 1000;
 
@@ -196,7 +198,7 @@ async function hasCloudWebSession() {
   const cookies = await session.defaultSession.cookies.get({});
   return cookies.some((cookie) => {
     const cookieDomain = String(cookie.domain || '');
-    return cookieDomain.includes('cloudcli.ai')
+    return (cookieDomain.includes('remotecli.ai') || cookieDomain.includes('cloudcli.ai'))
       && /-auth-token(?:\.\d+)?$/.test(cookie.name)
       && Boolean(cookie.value);
   });
@@ -247,7 +249,7 @@ async function copyDiagnostics() {
   await dialog.showMessageBox(desktopWindow?.getMainWindow() || undefined, {
     type: 'info',
     title: 'Diagnostics copied',
-    message: 'CloudCLI desktop diagnostics were copied to the clipboard.',
+    message: 'RemoteCLI desktop diagnostics were copied to the clipboard.',
   });
 }
 
@@ -259,15 +261,15 @@ async function refreshCloudEnvironments({ showErrors = false } = {}) {
   } catch (error) {
     const authState = cloud.getAuthState();
     if (authState === 'expired') {
-      const expiredError = new Error('Your CloudCLI session expired. Reconnect your account.');
+      const expiredError = new Error('Your RemoteCLI session expired. Reconnect your account.');
       if (showErrors) {
-        await showError('CloudCLI login required', expiredError);
+        await showError('RemoteCLI login required', expiredError);
         return [];
       }
       throw expiredError;
     }
     if (showErrors) {
-      await showError('Could not load CloudCLI environments', error);
+      await showError('Could not load RemoteCLI environments', error);
       return [];
     }
     throw error;
@@ -294,18 +296,18 @@ async function handleDeepLink(url) {
     return;
   }
 
-  if (parsed.protocol !== `${CALLBACK_PROTOCOL}:` || parsed.hostname !== 'auth') {
+  if ((parsed.protocol !== `${CALLBACK_PROTOCOL}:` && parsed.protocol !== `${LEGACY_CALLBACK_PROTOCOL}:`) || parsed.hostname !== 'auth') {
     return;
   }
 
   if (!pendingCloudConnectStartedAt || Date.now() - pendingCloudConnectStartedAt > AUTH_CALLBACK_TTL_MS) {
-    await showError('CloudCLI account connection failed', new Error('No recent CloudCLI account connection was started from this app.'));
+    await showError('RemoteCLI account connection failed', new Error('No recent RemoteCLI account connection was started from this app.'));
     return;
   }
 
   const apiKey = parsed.searchParams.get('api_key');
   if (!apiKey) {
-    await showError('CloudCLI account connection failed', new Error('The callback did not include an API key.'));
+    await showError('RemoteCLI account connection failed', new Error('The callback did not include an API key.'));
     return;
   }
 
@@ -318,8 +320,8 @@ async function handleDeepLink(url) {
 
   dialog.showMessageBox(desktopWindow?.getMainWindow() || undefined, {
     type: 'info',
-    title: 'CloudCLI account connected',
-    message: cloud.getAccount()?.email ? `Connected as ${cloud.getAccount().email}.` : 'CloudCLI account connected.',
+    title: 'RemoteCLI account connected',
+    message: cloud.getAccount()?.email ? `Connected as ${cloud.getAccount().email}.` : 'RemoteCLI account connected.',
   }).catch(() => {});
 }
 
@@ -329,7 +331,7 @@ async function copyLocalWebUrl() {
   const localUrl = localServer.getLocalServerUrl();
 
   if (!shareableUrl) {
-    throw new Error('Local CloudCLI URL is not available yet.');
+    throw new Error('Local RemoteCLI URL is not available yet.');
   }
 
   clipboard.writeText(shareableUrl);
@@ -340,7 +342,7 @@ async function copyLocalWebUrl() {
     message: isLanUrl ? 'LAN web URL copied.' : 'Local web URL copied.',
     detail: isLanUrl
       ? `${shareableUrl}\n\nUse this URL from another device on the same network.`
-      : `${shareableUrl}\n\nThis URL works on this computer. Enable LAN access before starting Local CloudCLI to copy a phone-accessible URL.`,
+      : `${shareableUrl}\n\nThis URL works on this computer. Enable LAN access before starting Local RemoteCLI to copy a phone-accessible URL.`,
   });
 
   return getDesktopState();
@@ -350,7 +352,7 @@ async function openLocalWebUi() {
   await localServer.ensureLocalServer();
   const url = localServer.getShareableWebUrl() || localServer.getLocalServerUrl();
   if (!url) {
-    throw new Error('Local CloudCLI URL is not available yet.');
+    throw new Error('Local RemoteCLI URL is not available yet.');
   }
 
   await openExternalUrl(url);
@@ -366,7 +368,7 @@ async function updateDesktopSetting(key, value) {
       type: 'info',
       title: 'Restart local server to apply',
       message: 'LAN access changes apply the next time the local server starts.',
-      detail: 'Quit CloudCLI and stop the local server, then open Local CloudCLI again.',
+      detail: 'Quit RemoteCLI and stop the local server, then open Local RemoteCLI again.',
     });
   }
 
@@ -386,7 +388,7 @@ async function showEnvironmentPicker() {
     }
   }
 
-  const choices = ['Local CloudCLI', ...environments.map((environment) => {
+  const choices = ['Local RemoteCLI', ...environments.map((environment) => {
     const status = environment.status === 'running' ? '' : ` (${environment.status})`;
     return `${environment.name || environment.subdomain}${status}`;
   })];
@@ -396,7 +398,7 @@ async function showEnvironmentPicker() {
     buttons: [...choices, 'Cancel'],
     defaultId: 0,
     cancelId: choices.length,
-    title: 'Switch CloudCLI Environment',
+    title: 'Switch RemoteCLI Environment',
     message: 'Choose where this desktop window should connect.',
     detail: refreshError ? `Cloud environments could not be refreshed. Showing cached environments.\n\n${refreshError.message || refreshError}` : undefined,
   });
@@ -432,13 +434,13 @@ function getSshTarget(credentials) {
     const parts = String(credentials.ssh_command).split(/\s+/);
     if (parts.length >= 2) return parts[1];
   }
-  return `${credentials.username}@ssh.cloudcli.ai`;
+  return `${credentials.username}@ssh.remotecli.ai`;
 }
 
 function getSshHost(credentials) {
   const target = getSshTarget(credentials);
   const atIndex = target.indexOf('@');
-  return atIndex >= 0 ? target.slice(atIndex + 1) : 'ssh.cloudcli.ai';
+  return atIndex >= 0 ? target.slice(atIndex + 1) : 'ssh.remotecli.ai';
 }
 
 function getSafeSshUsername(credentials) {
@@ -588,7 +590,7 @@ async function openEnvironmentInDesktop(environment) {
       cancelId: 1,
       title: 'Start environment?',
       message: `${pendingTarget.name} is ${environment.status}.`,
-      detail: 'CloudCLI can start it before opening the remote app.',
+      detail: 'RemoteCLI can start it before opening the remote app.',
     });
 
     if (response.response !== 0) {
@@ -696,7 +698,7 @@ function getRemoteEnvironmentMenuItems() {
   const environments = cloud.getEnvironments();
 
   if (!cloudAccount?.apiKey) {
-    return [{ label: 'Connect CloudCLI Account...', click: () => void connectCloudAccount() }];
+    return [{ label: 'Connect RemoteCLI Account...', click: () => void connectCloudAccount() }];
   }
 
   if (!environments.length) {
@@ -712,63 +714,70 @@ function getRemoteEnvironmentMenuItems() {
 
 function registerProtocolHandler() {
   const appEntry = path.join(getAppRoot(), 'electron', 'main.js');
-  if (process.defaultApp && process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient(CALLBACK_PROTOCOL, process.execPath, [appEntry]);
-  } else {
-    app.setAsDefaultProtocolClient(CALLBACK_PROTOCOL);
+  for (const protocol of [CALLBACK_PROTOCOL, LEGACY_CALLBACK_PROTOCOL]) {
+    if (process.defaultApp && process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(protocol, process.execPath, [appEntry]);
+    } else {
+      app.setAsDefaultProtocolClient(protocol);
+    }
   }
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle('cloudcli-desktop:connect-cloud', async () => ({
+  const register = (action, handler) => {
+    ipcMain.handle(`remotecli-desktop:${action}`, handler);
+    ipcMain.handle(`cloudcli-desktop:${action}`, handler);
+  };
+
+  register('connect-cloud', async () => ({
     ...getDesktopState(),
     connectUrl: await connectCloudAccount(),
   }));
 
-  ipcMain.handle('cloudcli-desktop:copy-diagnostics', async () => {
+  register('copy-diagnostics', async () => {
     await copyDiagnostics();
     return getDesktopState();
   });
 
-  ipcMain.handle('cloudcli-desktop:copy-local-web-url', async () => copyLocalWebUrl());
-  ipcMain.handle('cloudcli-desktop:get-state', () => getDesktopState());
-  ipcMain.handle('cloudcli-desktop:open-cloud-dashboard', async () => openCloudDashboard());
-  ipcMain.handle('cloudcli-desktop:run-active-environment-action', async (_event, action) => runActiveEnvironmentAction(action));
-  ipcMain.handle('cloudcli-desktop:open-environment', async (_event, environmentId) => {
+  register('copy-local-web-url', async () => copyLocalWebUrl());
+  register('get-state', () => getDesktopState());
+  register('open-cloud-dashboard', async () => openCloudDashboard());
+  register('run-active-environment-action', async (_event, action) => runActiveEnvironmentAction(action));
+  register('open-environment', async (_event, environmentId) => {
     const environment = cloud.findEnvironment(environmentId);
     if (!environment) {
       throw new Error('Environment not found. Refresh and try again.');
     }
     return openEnvironmentInDesktop(environment);
   });
-  ipcMain.handle('cloudcli-desktop:open-local', async () => openLocalInDesktop());
-  ipcMain.handle('cloudcli-desktop:open-local-web-ui', async () => openLocalWebUi());
-  ipcMain.handle('cloudcli-desktop:refresh-environments', async () => {
+  register('open-local', async () => openLocalInDesktop());
+  register('open-local-web-ui', async () => openLocalWebUi());
+  register('refresh-environments', async () => {
     await refreshCloudEnvironments({ showErrors: true });
     return getDesktopState();
   });
-  ipcMain.handle('cloudcli-desktop:disconnect-cloud', async () => clearCloudAccount());
-  ipcMain.handle('cloudcli-desktop:reload-active-tab', async () => desktopWindow.reloadActiveTab());
-  ipcMain.handle('cloudcli-desktop:show-environment-picker', async () => showEnvironmentPicker());
-  ipcMain.handle('cloudcli-desktop:show-launcher', async () => {
+  register('disconnect-cloud', async () => clearCloudAccount());
+  register('reload-active-tab', async () => desktopWindow.reloadActiveTab());
+  register('show-environment-picker', async () => showEnvironmentPicker());
+  register('show-launcher', async () => {
     await desktopWindow.showLauncher();
     return getDesktopState();
   });
-  ipcMain.handle('cloudcli-desktop:update-desktop-notifications', async (_event, settings) => {
+  register('update-desktop-notifications', async (_event, settings) => {
     await desktopNotifications?.saveSettings(settings);
     return getDesktopState();
   });
-  ipcMain.handle('cloudcli-desktop:show-desktop-settings', async () => desktopWindow.showDesktopSettings());
-  ipcMain.handle('cloudcli-desktop:show-local-settings', async () => desktopWindow.showLocalSettings());
-  ipcMain.handle('cloudcli-desktop:close-settings-window', async () => {
+  register('show-desktop-settings', async () => desktopWindow.showDesktopSettings());
+  register('show-local-settings', async () => desktopWindow.showLocalSettings());
+  register('close-settings-window', async () => {
     desktopWindow.closeSettingsWindow();
     return getDesktopState();
   });
-  ipcMain.handle('cloudcli-desktop:show-active-environment-actions-menu', async () => desktopWindow.showActiveEnvironmentActionsMenu());
-  ipcMain.handle('cloudcli-desktop:show-environment-actions-menu', async (_event, environmentId) => desktopWindow.showEnvironmentActionsMenu(environmentId));
-  ipcMain.handle('cloudcli-desktop:switch-tab', async (_event, tabId) => desktopWindow.switchDesktopTab(tabId));
-  ipcMain.handle('cloudcli-desktop:close-tab', async (_event, tabId) => desktopWindow.closeDesktopTab(tabId));
-  ipcMain.handle('cloudcli-desktop:update-setting', async (_event, key, value) => updateDesktopSetting(key, value));
+  register('show-active-environment-actions-menu', async () => desktopWindow.showActiveEnvironmentActionsMenu());
+  register('show-environment-actions-menu', async (_event, environmentId) => desktopWindow.showEnvironmentActionsMenu(environmentId));
+  register('switch-tab', async (_event, tabId) => desktopWindow.switchDesktopTab(tabId));
+  register('close-tab', async (_event, tabId) => desktopWindow.closeDesktopTab(tabId));
+  register('update-setting', async (_event, key, value) => updateDesktopSetting(key, value));
 }
 
 function registerAppEvents() {
@@ -869,7 +878,7 @@ function registerSingleInstance() {
   }
 
   app.on('second-instance', (_event, argv) => {
-    const deepLink = argv.find((arg) => arg.startsWith(`${CALLBACK_PROTOCOL}://`));
+    const deepLink = argv.find((arg) => arg.startsWith(`${CALLBACK_PROTOCOL}://`) || arg.startsWith(`${LEGACY_CALLBACK_PROTOCOL}://`));
     if (deepLink) {
       void handleDeepLink(deepLink);
     }
@@ -895,7 +904,7 @@ async function bootstrap() {
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
     applicationVersion: app.getVersion(),
-    copyright: 'CloudCLI',
+    copyright: 'RemoteCLI',
   });
 
   localServer = new LocalServerController({
@@ -938,7 +947,7 @@ async function bootstrap() {
 
 if (registerSingleInstance()) {
   bootstrap().catch(async (error) => {
-    await showError('CloudCLI failed to start', error);
+    await showError('RemoteCLI failed to start', error);
     app.quit();
   });
 }

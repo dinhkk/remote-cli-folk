@@ -3,8 +3,8 @@
  * into the websocket gateway through `RemoteWebSocketGateway` (the gateway never imports this module).
  *
  * Authentication happens at the upgrade, with the tab token carried in `Sec-WebSocket-Protocol` as
- * `['cloudcli-tab', <token>]`: a URL would end up in proxy logs. The gateway echoes the marker
- * `cloudcli-tab` and never the token; the main JWT, a token in the query string and a token for another
+ * `['remotecli-tab', <token>]` (or legacy `['cloudcli-tab', <token>]`): a URL would end up in proxy logs. The gateway echoes the marker
+ * `remotecli-tab` (or `cloudcli-tab`) and never the token; the main JWT, a token in the query string and a token for another
  * peer are all refused. While the link is not online the upgrade is refused with 503 so the browser
  * retries. `/shell` upgrades of one pairing are spaced out by delaying the verdict (the stock shell
  * client reconnects at once with no back-off): the upgrade is postponed, never refused, unless more than

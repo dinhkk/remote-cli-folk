@@ -80,6 +80,7 @@ const toResponse = async (response: Response): Promise<ApiResponse> => {
 export async function startE2eServer({ name, env = {}, register = true }: StartServerOptions): Promise<E2eServer> {
   const root = await mkdtemp(path.join(os.tmpdir(), `e2e-remote-${name}-`));
   const home = path.join(root, 'home');
+  await mkdir(path.join(home, '.remotecli'), { recursive: true });
   await mkdir(path.join(home, '.cloudcli'), { recursive: true });
   await mkdir(path.join(root, 'appdata'), { recursive: true });
   const logFile = path.join(root, 'provider-log.jsonl');
@@ -90,13 +91,15 @@ export async function startE2eServer({ name, env = {}, register = true }: StartS
     const childEnv: NodeJS.ProcessEnv = { ...process.env };
     // Ambient configuration of the developer's machine must not leak into the server under test.
     for (const key of Object.keys(childEnv)) {
-      if (/^(API_KEY|IS_PLATFORM|VITE_IS_PLATFORM|JWT_SECRET|CLOUDCLI_|ANTHROPIC_|CLAUDE_|NODE_OPTIONS)/i.test(key)) delete childEnv[key];
+      if (/^(API_KEY|IS_PLATFORM|VITE_IS_PLATFORM|JWT_SECRET|REMOTECLI_|CLOUDCLI_|ANTHROPIC_|CLAUDE_|NODE_OPTIONS)/i.test(key)) delete childEnv[key];
     }
     return Object.assign(childEnv, {
       NODE_ENV: 'test',
       SERVER_PORT: String(port),
       HOST: '127.0.0.1',
       DATABASE_PATH: path.join(root, 'auth.db'),
+      REMOTECLI_REMOTE_MASTER_KEY_FILE: path.join(root, 'remote-master.key'),
+      REMOTECLI_TEST_CLAUDE_QUERY_MODULE: FAKE_QUERY_MODULE,
       CLOUDCLI_REMOTE_MASTER_KEY_FILE: path.join(root, 'remote-master.key'),
       CLOUDCLI_TEST_CLAUDE_QUERY_MODULE: FAKE_QUERY_MODULE,
       E2E_FAKE_PROVIDER_LOG: logFile,

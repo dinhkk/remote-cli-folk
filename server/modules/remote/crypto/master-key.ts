@@ -1,7 +1,7 @@
 /**
  * Master key resolution for Remote's at-rest encryption (contracts section 8).
  *
- * Source order: `CLOUDCLI_REMOTE_MASTER_KEY` (base64, 32 bytes) wins over the key file. The id of
+ * Source order: `REMOTECLI_MASTER_KEY` (or legacy `CLOUDCLI_REMOTE_MASTER_KEY`) (base64, 32 bytes) wins over the key file. The id of
  * the active key is recorded as `remote.master_key_id`. Once any sealed value exists, a key whose
  * id does not match is a hard error: a new key is never generated while sealed data remains,
  * because that data would become unreadable without anyone noticing.

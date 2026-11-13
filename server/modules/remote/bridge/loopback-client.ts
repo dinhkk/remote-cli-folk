@@ -1,5 +1,5 @@
 /**
- * The Host bridge's only way into the local cloudcli server: HTTP requests and WebSocket upgrades to
+ * The Host bridge's only way into the local remotecli server: HTTP requests and WebSocket upgrades to
  * `127.0.0.1:<SERVER_PORT>` (the same port the server listens on). Everything about the request is
  * decided here, not by the Controller (contracts section 3):
  *

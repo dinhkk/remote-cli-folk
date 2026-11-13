@@ -139,7 +139,15 @@
     "ui",
     "mobile IDE"
   ],
-  "author": "Tùng Huỳnh",
+  "author": "Tùng Huynh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tunghuynh/remote-cli.git"
+  },
+  "homepage": "https://github.com/tunghuynh/remote-cli#readme",
+  "bugs": {
+    "url": "https://github.com/tunghuynh/remote-cli/issues"
+  },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.165",

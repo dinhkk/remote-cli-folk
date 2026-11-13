@@ -7,14 +7,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 /**
- * Installs the versioned local server runtime used by CloudCLI Desktop.
+ * Installs the versioned local server runtime used by RemoteCLI Desktop.
  *
  * Server bundles are cached under:
- *   ~/.cloudcli/server/<version>/dist-server/server/index.js
+ *   ~/.remotecli/server/<version>/dist-server/server/index.js
  */
 
-const DEFAULT_INSTALL_ROOT = path.join(os.homedir(), '.cloudcli', 'server');
-const DEFAULT_BUNDLE_BASE_URL = 'https://github.com/siteboon/claudecodeui/releases/download';
+const DEFAULT_INSTALL_ROOT = path.join(os.homedir(), '.remotecli', 'server');
+const LEGACY_INSTALL_ROOT = path.join(os.homedir(), '.cloudcli', 'server');
+const DEFAULT_BUNDLE_BASE_URL = 'https://github.com/tunghuynh/remote-cli/releases/download';
 const MAX_REDIRECTS = 5;
 const LOCAL_DOWNLOAD_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
@@ -33,9 +34,9 @@ export class ServerInstaller {
     version,
     platform = process.platform,
     arch = process.arch,
-    installRoot = process.env.CLOUDCLI_SERVER_DIR || DEFAULT_INSTALL_ROOT,
-    bundleBaseUrl = process.env.CLOUDCLI_SERVER_BUNDLE_URL || DEFAULT_BUNDLE_BASE_URL,
-    bundleReleaseTag = process.env.CLOUDCLI_SERVER_BUNDLE_RELEASE_TAG || '',
+    installRoot = process.env.REMOTECLI_SERVER_DIR || process.env.CLOUDCLI_SERVER_DIR || DEFAULT_INSTALL_ROOT,
+    bundleBaseUrl = process.env.REMOTECLI_SERVER_BUNDLE_URL || process.env.CLOUDCLI_SERVER_BUNDLE_URL || DEFAULT_BUNDLE_BASE_URL,
+    bundleReleaseTag = process.env.REMOTECLI_SERVER_BUNDLE_RELEASE_TAG || process.env.CLOUDCLI_SERVER_BUNDLE_RELEASE_TAG || '',
     onLog,
   } = {}) {
     if (!version) throw new Error('ServerInstaller requires the app version');
@@ -59,7 +60,7 @@ export class ServerInstaller {
   }
 
   getBundleName() {
-    return `cloudcli-local-server-${this.version}-${this.platform}-${this.arch}.tar.gz`;
+    return `remotecli-local-server-${this.version}-${this.platform}-${this.arch}.tar.gz`;
   }
 
   getBundleUrl() {
@@ -75,16 +76,22 @@ export class ServerInstaller {
   }
 
   async isInstalled() {
-    try {
-      const marker = JSON.parse(
-        await fs.readFile(path.join(this.getVersionDir(), '.installed.json'), 'utf8'),
-      );
-      if (marker.version !== this.version) return false;
-      await fs.access(this.getServerEntry());
-      return true;
-    } catch {
-      return false;
+    for (const root of [this.installRoot, ...(this.installRoot === DEFAULT_INSTALL_ROOT ? [LEGACY_INSTALL_ROOT] : [])]) {
+      try {
+        const vDir = path.join(root, this.version);
+        const marker = JSON.parse(
+          await fs.readFile(path.join(vDir, '.installed.json'), 'utf8'),
+        );
+        if (marker.version !== this.version) continue;
+        const entry = path.join(vDir, 'dist-server', 'server', 'index.js');
+        await fs.access(entry);
+        this.installedEntry = entry;
+        return true;
+      } catch {
+        // try next
+      }
     }
+    return false;
   }
 
   /**
@@ -94,7 +101,7 @@ export class ServerInstaller {
   async ensureInstalled() {
     if (await this.isInstalled()) {
       this.log(`Local server ${this.version} already installed.`);
-      return this.getServerEntry();
+      return this.installedEntry || this.getServerEntry();
     }
 
     const versionDir = this.getVersionDir();

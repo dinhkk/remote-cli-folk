@@ -64,7 +64,7 @@
     "unsupported": "Remote work cannot be turned on in this server mode."
   },
   "warnings": {
-    "masterKeyFile": "The master key was generated into a file on this machine. Set CLOUDCLI_REMOTE_MASTER_KEY so pairing secrets are encrypted with a key kept outside the data directory.",
+    "masterKeyFile": "The master key was generated into a file on this machine. Set REMOTECLI_MASTER_KEY so pairing secrets are encrypted with a key kept outside the data directory.",
     "masterKeyMismatch": "The master key changed or is missing. Remote work is turned off and existing pairings cannot be read. Restore the original key; a new one is never generated while pairings exist.",
     "approvalTimeout": "Tool approvals on this Host time out after {{duration}}. If you answer from a Controller, set CLAUDE_TOOL_APPROVAL_TIMEOUT_MS=300000 (5 minutes) so requests do not expire first. This also applies to Local use of this Host.",
     "unsupportedMode": "Remote work is not supported in this server mode (platform mode, or API_KEY set on a Controller).",

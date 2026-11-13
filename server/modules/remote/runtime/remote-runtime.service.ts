@@ -112,7 +112,7 @@ export function createRemoteRuntime(options: RemoteRuntimeOptions) {
   const expiry = createPairingExpiryService({
     store: pairings,
     clock,
-    idleDays: resolveIdleDays(env.CLOUDCLI_REMOTE_PAIRING_IDLE_DAYS),
+    idleDays: resolveIdleDays(env.REMOTECLI_REMOTE_PAIRING_IDLE_DAYS ?? env.CLOUDCLI_REMOTE_PAIRING_IDLE_DAYS),
     onControllerExpired: (record) => registry.dropExpired(record.id),
     expireHostPairings: () => hostAccept.expireIdlePairings(),
   });

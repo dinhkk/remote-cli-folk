@@ -33,7 +33,7 @@ test('a master key that only lives in a file is flagged and points at the enviro
 
   const alert = screen.getByRole('alert');
   assert.match(alert.textContent ?? '', /generated into a file/);
-  assert.match(alert.textContent ?? '', /CLOUDCLI_REMOTE_MASTER_KEY/);
+  assert.match(alert.textContent ?? '', /REMOTECLI_MASTER_KEY/);
 });
 
 test('a master key that changed or went missing is its own, stronger warning', () => {

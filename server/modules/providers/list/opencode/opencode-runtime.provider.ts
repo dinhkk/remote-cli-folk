@@ -117,7 +117,8 @@ const EVENT_STREAM_CONNECT_TIMEOUT_MS = SERVER_START_TIMEOUT_MS;
  * it, so a later RemoteCLI can tell the servers of a process that died without
  * stopping them.
  */
-const OWNER_PID_ENV = 'CLOUDCLI_OPENCODE_OWNER_PID';
+const OWNER_PID_ENV = 'REMOTECLI_OPENCODE_OWNER_PID';
+const LEGACY_OWNER_PID_ENV = 'CLOUDCLI_OPENCODE_OWNER_PID';
 
 /** How long stopping a turn waits for OpenCode's session abort before stopping the server anyway. */
 const SESSION_ABORT_TIMEOUT_MS = 5_000;
@@ -590,8 +591,10 @@ export async function reapOrphanedOpenCodeServers(procRoot = '/proc'): Promise<n
       readFile(path.join(procRoot, entry, 'cmdline'), 'utf8').catch(() => ''),
       readlink(path.join(procRoot, entry, 'ns', 'pid')).catch(() => null),
     ]);
-    const owner = environ.split('\0').find((variable) => variable.startsWith(`${OWNER_PID_ENV}=`));
-    const ownerPid = Number(owner?.slice(OWNER_PID_ENV.length + 1));
+    const owner = environ.split('\0').find(
+      (variable) => variable.startsWith(`${OWNER_PID_ENV}=`) || variable.startsWith(`${LEGACY_OWNER_PID_ENV}=`),
+    );
+    const ownerPid = owner ? Number(owner.split('=')[1]) : NaN;
     const args = cmdline.split('\0');
     const isTurnServer = args.includes('serve')
       && args.includes('--hostname=127.0.0.1')
@@ -655,6 +658,7 @@ async function startOpenCodeServer(signal: AbortSignal): Promise<{ server: OpenC
     OPENCODE_SERVER_PASSWORD: password,
     OPENCODE_SERVER_USERNAME: 'opencode',
     [OWNER_PID_ENV]: String(process.pid),
+    [LEGACY_OWNER_PID_ENV]: String(process.pid),
   };
   if (process.env.OPENCODE_ENABLE_QUESTION_TOOL === undefined) {
     childEnv.OPENCODE_ENABLE_QUESTION_TOOL = 'true';

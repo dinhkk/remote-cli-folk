@@ -80,7 +80,7 @@ test('a file-based master key is warned about next to the settings (FR-41)', asy
   api.set(`GET ${RELAY}`, reply({ ...relay, masterKeySource: 'file' }));
   await open();
 
-  assert.match(screen.getByRole('alert').textContent ?? '', /CLOUDCLI_REMOTE_MASTER_KEY/);
+  assert.match(screen.getByRole('alert').textContent ?? '', /REMOTECLI_MASTER_KEY/);
 });
 
 test('a master key mismatch reported by the server is shown as a warning', async () => {

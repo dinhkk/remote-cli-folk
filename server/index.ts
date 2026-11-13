@@ -91,7 +91,7 @@ console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 const app = express();
 configureAuthHardening(app);
 const server = http.createServer(app);
-// Remote work (Controller proxy, management API, Host accept). `CLOUDCLI_REMOTE_DISABLED=1` makes it inert.
+// Remote work (Controller proxy, management API, Host accept). `REMOTECLI_REMOTE_DISABLED=1` (or legacy `CLOUDCLI_REMOTE_DISABLED=1`) makes it inert.
 // The Host bridge calls this server back on the address it listens on (loopback unless HOST is one IP).
 const remote = createRemoteModule({
     appVersion: RUNNING_VERSION ?? 'unknown',
@@ -395,7 +395,7 @@ async function startServer() {
             console.log('');
             console.log(`${terminalTextStyles.info('[INFO]')} Server URL:  ${terminalTextStyles.bright('http://' + DISPLAY_HOST + ':' + SERVER_PORT)}`);
             console.log(`${terminalTextStyles.info('[INFO]')} Installed at: ${terminalTextStyles.dim(appInstallPath)}`);
-            console.log(`${terminalTextStyles.tip('[TIP]')}  Run "cloudcli status" for full configuration details`);
+            console.log(`${terminalTextStyles.tip('[TIP]')}  Run "remotecli status" for full configuration details`);
             console.log('');
 
             // OpenCode turn servers a killed RemoteCLI process left behind keep

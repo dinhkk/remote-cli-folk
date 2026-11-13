@@ -122,7 +122,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
 
       // On a fresh VPS the first registrant becomes the owner; the operator can pin that to
-      // whoever knows CLOUDCLI_SETUP_TOKEN.
+      // whoever knows REMOTECLI_SETUP_TOKEN (or legacy CLOUDCLI_SETUP_TOKEN).
       // Guessing the token is rate limited per client (shared bucket, not per username).
       const setupToken = dependencies.getSetupToken();
       if (setupToken) {

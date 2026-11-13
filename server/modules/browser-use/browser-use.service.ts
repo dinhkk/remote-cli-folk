@@ -15,8 +15,18 @@ import { getBrowserUseRuntime } from './browser-use-runtime.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = getModuleDirectory(import.meta.url);
-const MAX_SESSIONS_PER_OWNER = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER || '3', 10);
-const SESSION_TTL_MS = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_SESSION_TTL_MS || String(30 * 60 * 1000), 10);
+const MAX_SESSIONS_PER_OWNER = Number.parseInt(
+  process.env.REMOTECLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER ||
+  process.env.CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER ||
+  '3',
+  10,
+);
+const SESSION_TTL_MS = Number.parseInt(
+  process.env.REMOTECLI_BROWSER_USE_SESSION_TTL_MS ||
+  process.env.CLOUDCLI_BROWSER_USE_SESSION_TTL_MS ||
+  String(30 * 60 * 1000),
+  10,
+);
 const BROWSER_USE_SETTINGS_KEY = 'browser_use_settings';
 const BROWSER_USE_MCP_TOKEN_KEY = 'browser_use_mcp_token';
 

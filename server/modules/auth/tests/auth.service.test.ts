@@ -241,7 +241,7 @@ test('a successful login resets the failure counter for that pair', async () => 
   assert.equal(result.success, true);
 });
 
-test('register requires CLOUDCLI_SETUP_TOKEN when one is configured', async () => {
+test('register requires REMOTECLI_SETUP_TOKEN when one is configured', async () => {
   const service = createAuthService(createDependencies({ getSetupToken: () => 'setup-secret' }));
 
   await assertAppError(service.register('alice', 'secret-pass-12'), 'AUTH_SETUP_TOKEN_INVALID', 403);

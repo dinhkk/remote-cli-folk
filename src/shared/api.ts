@@ -246,7 +246,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     }),
-    // `setupToken` is only needed when the operator pinned registration with CLOUDCLI_SETUP_TOKEN.
+    // `setupToken` is only needed when the operator pinned registration with REMOTECLI_SETUP_TOKEN (or legacy CLOUDCLI_SETUP_TOKEN).
     register: (username: string, password: string, setupToken?: string) => fetch(httpUrl('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -538,7 +538,7 @@ export const api = {
     execute: (payload: unknown) => post('/api/commands/execute', payload),
   },
 
-  // Chat attachments, stored globally under ~/.cloudcli/assets
+  // Chat attachments, stored globally under ~/.remotecli/assets (migrated from ~/.cloudcli/assets)
   assets: {
     uploadFiles: (formData: FormData) =>
       authenticatedFetch('/api/assets/files', {

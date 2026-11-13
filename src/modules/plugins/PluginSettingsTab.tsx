@@ -76,7 +76,7 @@ const UNOFFICIAL_PLUGIN_RECOMMENDATIONS: PluginRecommendation[] = [
   },
   {
     id: 'prism',
-    translationKey: 'prismCloudCLI',
+    translationKey: 'prismRemoteCLI',
     repoUrl: PRISM_CLOUDCLI_PLUGIN_URL,
     installedNames: ['prism'],
     icon: Activity,
@@ -688,7 +688,7 @@ export default function PluginSettingsTab() {
         </a>
         <span className="text-muted-foreground/20">·</span>
         <a
-          href="https://cloudcli.ai/docs/plugin-overview"
+          href="https://remotecli.ai/docs/plugin-overview"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"

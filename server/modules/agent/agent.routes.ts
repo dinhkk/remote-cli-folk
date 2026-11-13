@@ -414,7 +414,8 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
           GIT_CONFIG_KEY_0: 'credential.helper',
           GIT_CONFIG_VALUE_0: '',
           GIT_CONFIG_KEY_1: 'credential.https://github.com.helper',
-          GIT_CONFIG_VALUE_1: '!f() { echo username=x-access-token; echo "password=$CLOUDCLI_GITHUB_TOKEN"; }; f',
+          GIT_CONFIG_VALUE_1: '!f() { echo username=x-access-token; echo "password=${REMOTECLI_GITHUB_TOKEN:-$CLOUDCLI_GITHUB_TOKEN}"; }; f',
+          REMOTECLI_GITHUB_TOKEN: githubToken,
           CLOUDCLI_GITHUB_TOKEN: githubToken,
           GIT_TERMINAL_PROMPT: '0'
         } : process.env;
@@ -1230,7 +1231,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
             } else {
               prBody += `Agent task: ${message}`;
             }
-            prBody += '\n\n---\n*This pull request was automatically created by CloudCLI.ai Agent.*';
+            prBody += '\n\n---\n*This pull request was automatically created by RemoteCLI.ai Agent.*';
 
             console.log(`📝 PR Title: ${prTitle}`);
 
