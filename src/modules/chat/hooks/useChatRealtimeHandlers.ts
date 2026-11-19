@@ -126,6 +126,10 @@ export function useChatRealtimeHandlers({
       }
 
       switch (msg.kind) {
+        case 'websocket_connected':
+          // Transport lifecycle events have no transcript id. Storing this
+          // first-connect event poisons history reconciliation after reload.
+          return;
         case 'websocket_reconnected':
           onWebSocketReconnect?.();
           return;

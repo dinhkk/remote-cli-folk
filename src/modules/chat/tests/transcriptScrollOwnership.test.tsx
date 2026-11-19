@@ -88,7 +88,9 @@ function createStore(messagesBySession: Map<string, NormalizedMessage[]>) {
     isStale: vi.fn(() => false),
     updateStreaming: vi.fn(),
     finalizeStreaming: vi.fn(),
-    getMessages: vi.fn((sessionId: string) => messagesBySession.get(sessionId) ?? []),
+    subscribe: vi.fn(() => () => {}),
+  getRevision: vi.fn(() => 0),
+  getMessages: vi.fn((sessionId: string) => messagesBySession.get(sessionId) ?? []),
     getSessionSlot: vi.fn((sessionId: string) => slotFor(sessionId)),
   };
 }

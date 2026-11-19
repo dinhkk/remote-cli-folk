@@ -5,7 +5,7 @@ import type { TFunction } from 'i18next';
 import { Button, LLMProviderLogo, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { ProjectSession, RecentConversationListItem, SessionRowActions } from '@/shared/types';
-import { formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
+import { formatCompactAge, PROVIDER_LABELS } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
 
 type SidebarRecentConversationsProps = {
@@ -102,11 +102,12 @@ export default function SidebarRecentConversations({
         <span className="text-[11px] font-medium text-muted-foreground">
           {t('recent.title', 'Recent conversations')}
         </span>
-        <span className="text-[10px] tabular-nums text-muted-foreground/70">{total}</span>
+        <span data-testid="recent-conversations-total" className="text-[10px] tabular-nums text-muted-foreground/70">{total}</span>
       </div>
 
       <div className="space-y-0.5">
         {conversations.map((conversation) => {
+          const providerLabel = PROVIDER_LABELS[conversation.provider] || conversation.provider;
           const isSelected = String(selectedSession?.id ?? '') === conversation.sessionId;
           const age = formatCompactAge(conversation.lastActivity, currentTime);
           const hasBackgroundWork = sessionActions.backgroundSessionIds.has(conversation.sessionId);
@@ -156,6 +157,7 @@ export default function SidebarRecentConversations({
                 href={`/session/${conversation.sessionId}`}
                 onClick={handleClick}
                 data-testid="recent-conversation-row"
+                data-provider={conversation.provider}
                 className={cn(
                   'flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 md:py-2 pr-11 text-left transition-colors',
                   isSelected
@@ -163,7 +165,7 @@ export default function SidebarRecentConversations({
                     : 'text-foreground hover:bg-accent/60',
                 )}
               >
-                <span className={cn(
+                <span title={providerLabel} className={cn(
                   'flex h-6 w-6 md:h-7 md:w-7 flex-shrink-0 items-center justify-center rounded-md',
                   isSelected ? 'bg-primary/10' : 'bg-muted/60',
                 )}>
@@ -175,6 +177,8 @@ export default function SidebarRecentConversations({
                     {conversation.sessionTitle}
                   </span>
                   <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] leading-3 text-muted-foreground">
+                    <span data-testid="conversation-provider-label" className="flex-shrink-0 font-medium">{providerLabel}</span>
+                    <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground/40">·</span>
                     <span className="truncate">{conversation.projectDisplayName}</span>
                     {isProcessing ? (
                       <>

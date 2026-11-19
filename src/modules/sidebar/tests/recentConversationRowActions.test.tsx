@@ -80,6 +80,20 @@ beforeEach(() => {
   recordedOptionsProps.length = 0;
 });
 
+test('each conversation renders the logo of its own provider', () => {
+  const { container } = renderList([
+    conversation('claude-session'),
+    conversation('codex-session', { provider: 'codex' }),
+  ], makeActions());
+  for (const [provider, label] of [['claude', 'Claude'], ['codex', 'Codex']]) {
+    const row = container.querySelector(`[data-provider="${provider}"]`);
+    assert(row);
+    assert.equal(row.querySelector('svg[role="img"]')?.getAttribute('aria-label'), label);
+    assert.equal(row.querySelector('[data-testid="conversation-provider-label"]')?.textContent, label);
+    assert.equal(row.querySelectorAll('svg[role="img"]').length, 1);
+  }
+});
+
 test('every conversation row gets the shared session controls', () => {
   renderList([conversation('s1'), conversation('s2')], makeActions());
 

@@ -1,3 +1,5 @@
+Hướng dẫn bổ sung: [Cài và kết nối Host Linux mới](docs/connect-new-host.vi.md) · [Các thay đổi của fork](docs/fork-changes.vi.md).
+
 <div align="center">
   <img src="https://cdn.jsdelivr.net/npm/@tunghuynh/remotecli/dist/logo.svg" alt="RemoteCLI Logo" width="80" height="80">
   <h1>RemoteCLI</h1>

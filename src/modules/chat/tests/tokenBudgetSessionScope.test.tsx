@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { renderHook } from '@testing-library/react';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
 import type { ServerEvent, ProjectSession } from '@/shared/types';
@@ -18,6 +18,7 @@ import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 const renderHandlers = () => {
   let listener: ((event: ServerEvent) => void) | null = null;
   const budgets: Array<Record<string, unknown> | null> = [];
+  const appendRealtime = vi.fn();
 
   renderHook(() => useChatRealtimeHandlers({
     isActive: true,
@@ -36,11 +37,11 @@ const renderHandlers = () => {
     lastSeqRef: { current: new Map() },
     statusCheckSentAtRef: { current: new Map() },
     requestLatestMessages: async () => {},
-    sessionStore: {} as SessionStore,
+    sessionStore: { appendRealtime } as unknown as SessionStore,
   }));
 
   const dispatch = (event: ServerEvent) => listener?.(event);
-  return { budgets, dispatch };
+  return { budgets, dispatch, appendRealtime };
 };
 
 const budgetEvent = (sessionId: string): ServerEvent => ({
@@ -65,4 +66,14 @@ test('ignores token budgets from other running sessions', () => {
   dispatch(budgetEvent('some-other-session'));
 
   assert.equal(budgets.length, 0);
+});
+
+test('opening a socket for a restored session never inserts a transport event into its history', () => {
+  const { dispatch, appendRealtime } = renderHandlers();
+  dispatch({ kind: 'websocket_connected', timestamp: Date.now() });
+  dispatch({ kind: 'websocket_reconnected', timestamp: Date.now() });
+  assert.equal(appendRealtime.mock.calls.length, 0);
+  const reply = { kind: 'text', id: 'reply-after-reload', sessionId: 'viewed-session', content: 'continued', role: 'assistant' } as ServerEvent;
+  dispatch(reply);
+  assert.deepEqual(appendRealtime.mock.calls, [['viewed-session', reply]]);
 });

@@ -8,6 +8,7 @@ import { onOpenRemoteTabRequest } from '@/modules/remote/utils/open-remote-tab-r
 import { peerDisplayName } from '@/modules/remote/utils/peer-display-name';
 import { PEER_STATE_DOT_CLASS } from '@/modules/remote/utils/peer-state-dot-class';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
+import { readSelectedRemoteTab, writeSelectedRemoteTab } from '@/shared/transport/navigation-storage';
 import type { RemotePeer, RemotePeerState } from '@/shared/types';
 
 const LOCAL_TAB = 'local';
@@ -42,12 +43,12 @@ export function RemoteTabsShell({
   indicator?: (placement: 'tabbar' | 'overlay') => ReactNode;
 }) {
   const { t } = useTranslation('remote');
-  const { peers, requestTabToken } = useRemoteTabs();
+  const { peers, requestTabToken, isLoading, hasError } = useRemoteTabs();
 
   // Which tab is in front; falls back to Local when its pairing disappears.
-  const [selected, setSelected] = useState<string>(LOCAL_TAB);
+  const [selected, setSelected] = useState<string>(readSelectedRemoteTab);
   // Pairings whose frame was opened at least once, so frames load lazily.
-  const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set(selected === LOCAL_TAB ? [] : [selected]));
   // Permission cards waiting in each Remote tab, as the tab's frame reports them.
   const [pending, setPending] = useState<Readonly<Record<string, number>>>({});
 
@@ -56,10 +57,19 @@ export function RemoteTabsShell({
 
   const select = useCallback((id: string) => {
     setSelected(id);
+    writeSelectedRemoteTab(id);
     if (id !== LOCAL_TAB) {
       setVisited((previous) => (previous.has(id) ? previous : new Set(previous).add(id)));
     }
   }, []);
+
+  // An empty list while loading/offline is not proof that a pairing is gone.
+  // Only a successful, definitive list may discard the saved Host selection.
+  useEffect(() => {
+    if (!isLoading && !hasError && selected !== LOCAL_TAB && !peers.some(peer => peer.peerId === selected)) {
+      select(LOCAL_TAB);
+    }
+  }, [hasError, isLoading, peers, select, selected]);
 
   // Settings' "Open tab" button asks for a Host's tab by id; a Host that is not paired (any more) is ignored.
   const peersRef = useRef(peers);

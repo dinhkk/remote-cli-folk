@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 
+import { collectProviderConversations, filterConversationSearch, type ConversationProviderFilter, type RecentPage } from '@/modules/sidebar/utils/sidebarOrganization';
 import { api } from '@/shared/api';
 import { openEventSource } from '@/shared/transport/event-source';
 import type { EventSourceLike } from '@/shared/transport/event-source';
@@ -165,6 +166,8 @@ export function useSidebarController({
   const sessionIdsBeingDeletedRef = useRef<Set<string>>(new Set());
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [searchMode, setSearchMode] = useState<SidebarSearchMode>('projects');
+  const [conversationProvider, setConversationProviderState] = useState<ConversationProviderFilter>('all');
+  const filteredRecentSnapshot = useRef<RecentConversationListItem[]>([]);
   const [conversationResults, setConversationResults] = useState<ConversationSearchResults | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
@@ -306,6 +309,16 @@ export function useSidebarController({
     }
   }, []);
 
+  const setConversationProvider = useCallback((provider: ConversationProviderFilter) => {
+    ++recentConversationsSeqRef.current;
+    setConversationProviderState(provider);
+    setRecentConversations([]);
+    setRecentConversationsTotal(0);
+    setRecentConversationsHasMore(false);
+    setIsLoadingMoreRecentConversations(false);
+    setRecentConversationsError(false);
+  }, []);
+
   const fetchRecentConversationsPage = useCallback(async (offset: number, append: boolean) => {
     const requestSequence = ++recentConversationsSeqRef.current;
     if (append) {
@@ -316,15 +329,30 @@ export function useSidebarController({
     setRecentConversationsError(false);
 
     try {
-      const response = await api.recentConversations({ limit: 40, offset });
-      if (!response.ok) {
-        throw new Error(`Failed to load recent conversations: ${response.status}`);
+      const fetchPage = async (pageOffset: number, limit: number): Promise<RecentPage> => {
+        const response = await api.recentConversations({ limit, offset: pageOffset });
+        if (!response.ok) throw new Error(`Failed to load recent conversations: ${response.status}`);
+        const payload = (await response.json()) as RecentConversationsApiPayload;
+        return {
+          conversations: Array.isArray(payload.data?.conversations) ? payload.data.conversations : [],
+          total: Number(payload.data?.total ?? 0),
+          hasMore: Boolean(payload.data?.hasMore),
+        };
+      };
+      let page: RecentPage;
+      if (conversationProvider === 'all') {
+        page = await fetchPage(offset, 40);
+      } else {
+        if (!append) {
+          const snapshot = await collectProviderConversations(conversationProvider, fetchPage,
+            () => requestSequence === recentConversationsSeqRef.current);
+          if (!snapshot) return;
+          filteredRecentSnapshot.current = snapshot;
+        }
+        const snapshot = filteredRecentSnapshot.current;
+        page = { conversations: snapshot.slice(offset, offset + 40), total: snapshot.length, hasMore: offset + 40 < snapshot.length };
       }
-
-      const payload = (await response.json()) as RecentConversationsApiPayload;
-      const conversations = Array.isArray(payload.data?.conversations)
-        ? payload.data.conversations
-        : [];
+      const conversations = page.conversations;
 
       if (requestSequence !== recentConversationsSeqRef.current) {
         return;
@@ -341,8 +369,8 @@ export function useSidebarController({
           ...conversations.filter((conversation) => !existingIds.has(conversation.sessionId)),
         ];
       });
-      setRecentConversationsTotal(Number(payload.data?.total ?? conversations.length));
-      setRecentConversationsHasMore(Boolean(payload.data?.hasMore));
+      setRecentConversationsTotal(page.total);
+      setRecentConversationsHasMore(page.hasMore);
     } catch (error) {
       if (requestSequence !== recentConversationsSeqRef.current) {
         return;
@@ -355,19 +383,20 @@ export function useSidebarController({
         setIsLoadingMoreRecentConversations(false);
       }
     }
-  }, []);
+  }, [conversationProvider]);
 
   const reloadRecentConversations = useCallback(() => {
     void fetchRecentConversationsPage(0, false);
   }, [fetchRecentConversationsPage]);
 
   const loadMoreRecentConversations = useCallback(() => {
-    if (isLoadingMoreRecentConversations || !recentConversationsHasMore) {
+    if (isRecentConversationsLoading || isLoadingMoreRecentConversations || !recentConversationsHasMore) {
       return;
     }
     void fetchRecentConversationsPage(recentConversations.length, true);
   }, [
     fetchRecentConversationsPage,
+    isRecentConversationsLoading,
     isLoadingMoreRecentConversations,
     recentConversations.length,
     recentConversationsHasMore,
@@ -1339,6 +1368,8 @@ export function useSidebarController({
     archivedSessions: filteredArchivedSessions,
     archivedSessionsCount: archivedProjects.length + archivedSessions.length,
     isArchivedSessionsLoading,
+    conversationProvider,
+    setConversationProvider,
     recentConversations: recentConversationsWithCurrentTitles,
     recentConversationsTotal,
     recentConversationsHasMore,
@@ -1380,7 +1411,7 @@ export function useSidebarController({
     setShowNewProject,
     searchMode,
     setSearchMode: changeSearchMode,
-    conversationResults,
+    conversationResults: filterConversationSearch(conversationResults, conversationProvider),
     isSearching,
     searchProgress,
     clearConversationResults: useCallback(() => {

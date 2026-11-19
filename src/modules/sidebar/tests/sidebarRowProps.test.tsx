@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, test, vi } from 'vitest';
 
@@ -304,4 +304,24 @@ test('the sorted session list is the same array until the project itself changes
     getAllSessions(PROJECT_A),
     'a replaced project must not read a stale entry',
   );
+});
+
+test('legacy group is collapsed, expandable, searchable and leaves Running unchanged', () => {
+  const legacy = { ...PROJECT_B, path: '/home/dinhtt/claude-pocket-local-test-jjLF6R/workspace/uuid', fullPath: '/home/dinhtt/claude-pocket-local-test-jjLF6R/workspace/uuid' };
+  const props = { ...listProps(null), projects: [PROJECT_A, legacy], filteredProjects: [PROJECT_A, legacy] };
+  const { getByRole, rerender } = render(React.createElement(SidebarProjectList, { ...props, groupLegacyTests: true }));
+  assert.deepEqual(recordedProjectRowProps.map(row => (row.project as Project).projectId), ['a']);
+  const toggle = getByRole('button', { name: /Workspace test cũ/ });
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  recordedProjectRowProps.length = 0;
+  fireEvent.click(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  assert.deepEqual(recordedProjectRowProps.map(row => (row.project as Project).projectId), ['a', 'b']);
+  fireEvent.click(toggle);
+  recordedProjectRowProps.length = 0;
+  rerender(React.createElement(SidebarProjectList, { ...props, groupLegacyTests: true, expandLegacyTests: true }));
+  assert.deepEqual(recordedProjectRowProps.map(row => (row.project as Project).projectId), ['a', 'b']);
+  recordedProjectRowProps.length = 0;
+  rerender(React.createElement(SidebarProjectList, props));
+  assert.deepEqual(recordedProjectRowProps.map(row => (row.project as Project).projectId), ['a', 'b']);
 });

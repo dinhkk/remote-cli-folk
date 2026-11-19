@@ -7,7 +7,7 @@
  * No localStorage for messages. Backend JSONL is the source of truth.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { api } from '@/shared/api';
 import type { LLMProvider, NormalizedMessage } from '@/shared/types';
@@ -550,6 +550,8 @@ const MAX_REALTIME_MESSAGES = 500;
 
 export function useSessionStore() {
   const storeRef = useRef(new Map<string, SessionSlot>());
+  const revisionsRef = useRef(new Map<string, number>());
+  const listenersRef = useRef(new Map<string, Set<() => void>>());
   const activeSessionIdRef = useRef<string | null>(null);
   // Bump to force re-render — only when the active session's data changes.
   // Session ids are stable for the whole conversation lifetime (the backend
@@ -557,10 +559,26 @@ export function useSessionStore() {
   // no alias/redirect indirection.
   const [, setTick] = useState(0);
   const notify = useCallback((sessionId: string) => {
+    revisionsRef.current.set(sessionId, (revisionsRef.current.get(sessionId) ?? 0) + 1);
+    listenersRef.current.get(sessionId)?.forEach(listener => listener());
     if (sessionId === activeSessionIdRef.current) {
       setTick(n => n + 1);
     }
   }, []);
+
+  const subscribe = useCallback((sessionId: string, listener: () => void) => {
+    let listeners = listenersRef.current.get(sessionId);
+    if (!listeners) {
+      listeners = new Set();
+      listenersRef.current.set(sessionId, listeners);
+    }
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) listenersRef.current.delete(sessionId);
+    };
+  }, []);
+  const getRevision = useCallback((sessionId: string) => revisionsRef.current.get(sessionId) ?? 0, []);
 
   const setActiveSession = useCallback((sessionId: string | null) => {
     activeSessionIdRef.current = sessionId;
@@ -867,6 +885,8 @@ export function useSessionStore() {
   }, []);
 
   return useMemo(() => ({
+    subscribe,
+    getRevision,
     fetchFromServer,
     fetchMore,
     appendRealtime,
@@ -879,6 +899,7 @@ export function useSessionStore() {
     getMessages,
     getSessionSlot,
   }), [
+    subscribe, getRevision,
     fetchFromServer, fetchMore, appendRealtime, truncateAt, refreshLatestFromServer,
     setActiveSession, isStale, updateStreaming, finalizeStreaming,
     getMessages, getSessionSlot,
@@ -887,3 +908,15 @@ export function useSessionStore() {
 
 /** Full store API returned by useSessionStore; chat hooks take it as a parameter. */
 export type SessionStore = ReturnType<typeof useSessionStore>;
+
+/** The store may belong to a parent. Memoized consumers must subscribe to it
+ * directly: rerendering its owner does not invalidate stable store props.
+ * Hidden chat panes unsubscribe and read the latest snapshot on activation.
+ */
+export function useSessionStoreRevision(store: SessionStore, sessionId: string | null) {
+  const subscribe = useCallback((listener: () => void) => (
+    sessionId ? store.subscribe(sessionId, listener) : () => {}
+  ), [store, sessionId]);
+  const getSnapshot = useCallback(() => sessionId ? store.getRevision(sessionId) : 0, [store, sessionId]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}

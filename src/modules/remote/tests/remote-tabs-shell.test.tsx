@@ -15,12 +15,15 @@ import type { RemotePeer } from '@/shared/types';
 
 const HOOK = vi.hoisted(() => ({
   peers: [] as RemotePeer[],
+  isLoading: false,
+  hasError: false,
   requestTabToken: vi.fn(),
 }));
 vi.mock('@/modules/remote/hooks/useRemoteTabs', () => ({
   useRemoteTabs: () => ({
     peers: HOOK.peers,
-    isLoading: false,
+    isLoading: HOOK.isLoading,
+    hasError: HOOK.hasError,
     refresh: async () => undefined,
     requestTabToken: HOOK.requestTabToken,
   }),
@@ -61,9 +64,57 @@ function LocalApp() {
 const renderShell = () => render(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
 
 beforeEach(() => {
+  sessionStorage.clear();
+  HOOK.isLoading = false;
+  HOOK.hasError = false;
   HOOK.peers = [];
   BRIDGES.created.length = 0;
   mounts = 0;
+});
+
+test('reload restores the selected Host and lazily recreates its frame', () => {
+  HOOK.peers = [peer('peer_one11111', 'Laptop'), peer('peer_two22222', 'Server')];
+  const first = renderShell();
+  fireEvent.click(screen.getByRole('tab', { name: 'Server' }));
+  first.unmount();
+  renderShell();
+  assert.equal(screen.getByRole('tab', { name: 'Server' }).getAttribute('aria-selected'), 'true');
+  assert.equal(document.querySelectorAll('iframe').length, 1);
+  assert.match(document.querySelector('iframe')?.src ?? '', /target=peer_two22222/);
+});
+
+test('an explicit Local selection survives reload', () => {
+  HOOK.peers = [peer('peer_one11111', 'Laptop')];
+  const first = renderShell();
+  fireEvent.click(screen.getByRole('tab', { name: 'Laptop' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
+  first.unmount();
+  renderShell();
+  assert.equal(screen.getByRole('tab', { name: 'Local' }).getAttribute('aria-selected'), 'true');
+  assert.equal(document.querySelectorAll('iframe').length, 0);
+});
+
+test('delayed/failed initial peer requests preserve the saved Host until recovery', () => {
+  sessionStorage.setItem('remotecli:selected-host', 'peer_one11111');
+  HOOK.isLoading = true;
+  const view = renderShell();
+  assert.equal(sessionStorage.getItem('remotecli:selected-host'), 'peer_one11111');
+  HOOK.isLoading = false;
+  HOOK.hasError = true;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(sessionStorage.getItem('remotecli:selected-host'), 'peer_one11111');
+  HOOK.hasError = false;
+  HOOK.peers = [peer('peer_one11111', 'Laptop', 'offline')];
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(screen.getByRole('tab', { name: 'Laptop' }).getAttribute('aria-selected'), 'true');
+});
+
+test('a forgotten Host falls back to Local after the peer list succeeds', () => {
+  sessionStorage.setItem('remotecli:selected-host', 'peer_gone1111');
+  HOOK.peers = [peer('peer_one11111', 'Laptop')];
+  renderShell();
+  assert.equal(screen.getByRole('tab', { name: 'Local' }).getAttribute('aria-selected'), 'true');
+  assert.equal(sessionStorage.getItem('remotecli:selected-host'), 'local');
 });
 afterEach(() => {
   document.title = '';

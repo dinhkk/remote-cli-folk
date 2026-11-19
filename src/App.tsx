@@ -7,7 +7,7 @@ import { AuthProvider, ProtectedRoute } from '@/modules/auth';
 import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
-import { HostControllerIndicator, RemoteTabsShell, TargetStatusOverlay } from '@/modules/remote';
+import { HostControllerIndicator, RemoteTabsShell, RemoteSessionLocation, TargetStatusOverlay } from '@/modules/remote';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
 import { i18n } from '@/modules/i18n';
 import { isTargetMode } from '@/shared/transport/target-context';
@@ -113,10 +113,12 @@ export default function App() {
 
   const workspaceRoutes = (
     <Router basename={routerBasename}>
+      <RemoteSessionLocation>
       <Routes>
         <Route path="/" element={<ProjectWorkspaceRoute />} />
         <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
       </Routes>
+      </RemoteSessionLocation>
     </Router>
   );
 

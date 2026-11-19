@@ -31,6 +31,7 @@ const { RemoteTabsShell } = await import('@/modules/remote/RemoteTabsShell');
 const peer = (peerId: string, name: string): RemotePeer => ({ peerId, name, alias: null, state: 'online', lastConnectedAt: null });
 
 beforeEach(() => {
+  sessionStorage.clear();
   HOOK.peers = [peer('peer_one11111', 'Laptop'), peer('peer_two22222', 'Server')];
 });
 

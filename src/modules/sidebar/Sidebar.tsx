@@ -100,6 +100,8 @@ function Sidebar({
     archivedSessions,
     archivedSessionsCount,
     isArchivedSessionsLoading,
+    conversationProvider,
+    setConversationProvider,
     recentConversations,
     recentConversationsTotal,
     recentConversationsHasMore,
@@ -279,6 +281,8 @@ function Sidebar({
             archivedSessions={archivedSessions}
             archivedSessionsCount={archivedSessionsCount}
             isArchivedSessionsLoading={isArchivedSessionsLoading}
+            conversationProvider={conversationProvider}
+            onConversationProviderChange={setConversationProvider}
             recentConversations={recentConversations}
             recentConversationsTotal={recentConversationsTotal}
             recentConversationsHasMore={recentConversationsHasMore}

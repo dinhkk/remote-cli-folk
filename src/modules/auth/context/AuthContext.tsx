@@ -8,6 +8,7 @@ import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRef
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
+import { writeSelectedRemoteTab } from '@/shared/transport/navigation-storage';
 import { isTargetMode, onTabTokenChange, readTabTokenUser } from '@/shared/transport/target-context';
 /** The signed-in account held by AuthContext - a required `username` plus an optional id and any additional fields the auth API returns - and should be read through `useAuth()` rather than re-derived from raw auth responses. */
 type AuthUser = {
@@ -132,6 +133,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const endRemoteTabData = useCallback(() => {
     if (!isTargetMode()) {
       purgeRemoteTabStorage();
+      writeSelectedRemoteTab(null);
     }
   }, []);
 

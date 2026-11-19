@@ -39,6 +39,8 @@ const store = {
   isStale: vi.fn(() => false),
   updateStreaming: vi.fn(),
   finalizeStreaming: vi.fn(),
+  subscribe: vi.fn(() => () => {}),
+  getRevision: vi.fn(() => 0),
   getMessages: vi.fn(() => []),
   getSessionSlot: vi.fn(() => ({ fetchedAt: 1, status: 'idle' as const, total: 0, hasMore: false, offset: 0 })),
 };

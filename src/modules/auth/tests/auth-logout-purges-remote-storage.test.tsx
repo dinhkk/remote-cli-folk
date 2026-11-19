@@ -45,6 +45,8 @@ test('logout deletes every remote:* entry and leaves the rest of localStorage al
   localStorage.setItem('remote:peer_one11111:local:activeTab', 'git');
   localStorage.setItem('remote:peer_two22222:local:draft', 'hello');
   localStorage.setItem('unrelated-setting', 'keep');
+  sessionStorage.setItem('remotecli:selected-host', 'peer_one11111');
+  localStorage.setItem('remote:peer_one11111:local:remotecli:last-session-path', '/session/old-session');
   let logout: (() => void) | null = null;
   let user: unknown = null;
   function Probe() {
@@ -67,4 +69,6 @@ test('logout deletes every remote:* entry and leaves the rest of localStorage al
   assert.equal(localStorage.getItem('remote:peer_one11111:local:activeTab'), null);
   assert.equal(localStorage.getItem('remote:peer_two22222:local:draft'), null);
   assert.equal(localStorage.getItem('unrelated-setting'), 'keep');
+  assert.equal(sessionStorage.getItem('remotecli:selected-host'), null);
+  assert.equal(localStorage.getItem('remote:peer_one11111:local:remotecli:last-session-path'), null);
 });

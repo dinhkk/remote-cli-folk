@@ -47,6 +47,7 @@ const badgeOf = (name: RegExp) => screen.getByRole('tab', { name }).querySelecto
 const report = (peerId: string, count: number) => act(() => BRIDGES.byPeer.get(peerId)?.(count));
 
 beforeEach(() => {
+  sessionStorage.clear();
   HOOK.peers = peers;
   BRIDGES.byPeer.clear();
   document.title = 'RemoteCLI UI';

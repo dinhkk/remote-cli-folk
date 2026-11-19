@@ -1,3 +1,4 @@
+import type { ConversationProviderFilter } from '@/modules/sidebar/utils/sidebarOrganization';
 import { type ReactNode } from 'react';
 import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
@@ -91,6 +92,8 @@ type SidebarContentProps = {
   archivedSessions: ArchivedSessionListItem[];
   archivedSessionsCount: number;
   isArchivedSessionsLoading: boolean;
+  conversationProvider?: ConversationProviderFilter;
+  onConversationProviderChange?: (provider: ConversationProviderFilter) => void;
   recentConversations: RecentConversationListItem[];
   recentConversationsTotal: number;
   recentConversationsHasMore: boolean;
@@ -140,6 +143,8 @@ export default function SidebarContent({
   archivedSessions,
   archivedSessionsCount,
   isArchivedSessionsLoading,
+  conversationProvider = 'all',
+  onConversationProviderChange,
   recentConversations,
   recentConversationsTotal,
   recentConversationsHasMore,
@@ -209,6 +214,24 @@ export default function SidebarContent({
         onCollapseSidebar={onCollapseSidebar}
         t={t}
       />
+
+      {searchMode === 'conversations' && onConversationProviderChange && (
+        <div className="mx-3 mb-2 flex shrink-0 gap-1 rounded-lg bg-muted/60 p-1" role="group" aria-label="Lọc Conversations">
+          {([['all', 'Tất cả'], ['claude', 'Claude'], ['codex', 'Codex']] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-label={label}
+              aria-pressed={conversationProvider === value}
+              onClick={() => { if (conversationProvider !== value) onConversationProviderChange(value); }}
+              className={`flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors ${conversationProvider === value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-background/60'}`}
+            >
+              {value !== 'all' && <LLMProviderLogo provider={value} className="h-3.5 w-3.5" />}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
         {showConversationSearch ? (
@@ -345,7 +368,7 @@ export default function SidebarContent({
                           )}
                         >
                           <div className="mb-1 flex items-center gap-1.5">
-                            <MessageSquare className="h-3 w-3 flex-shrink-0 text-primary" />
+                            <LLMProviderLogo provider={session.provider || session.matches[0]?.provider || 'claude'} className="h-3.5 w-3.5 flex-shrink-0" />
                             <span className="truncate text-xs font-normal text-foreground">
                               {session.sessionSummary}
                             </span>
@@ -682,7 +705,7 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          <SidebarProjectList {...projectListProps} />
+          <SidebarProjectList {...projectListProps} groupLegacyTests expandLegacyTests={searchFilter.trim().length > 0} />
         )}
       </ScrollArea>
 
