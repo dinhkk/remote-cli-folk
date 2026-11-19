@@ -3,6 +3,12 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.12](https://github.com/tunghuynh/remote-cli/compare/v1.0.11...v1.0.12) (2026-11-19)
+
+### Bug Fixes
+
+* **web:** stop stale builds from pinning missing assets ([d656720](https://github.com/tunghuynh/remote-cli/commit/d6567203f7f8199d14e049e7bc0959c1b3ebcbb9))
+
 ## [1.0.11](https://github.com/tunghuynh/remote-cli/compare/v1.0.10...v1.0.11) (2026-11-19)
 
 ### Bug Fixes
