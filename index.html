@@ -96,16 +96,51 @@
     
     <!-- Prevent zoom on iOS -->
     <meta name="format-detection" content="telephone=no" />
+
+    <!--
+      Asset-failure guard. Vite injects the module script at the end of <head>, so this
+      must live in <head> too: if a hashed /assets/ script fails to load (the server was
+      updated while this page stayed open), no application code is running yet. It shows
+      a notice and reloads once. The guard stops a reload loop when the file is genuinely
+      gone; a Remote tab (storage shim above) never auto-reloads and only offers the button.
+    -->
+    <script>
+      (function () {
+        var KEY = 'remotecli-asset-reload-at';
+        function show() {
+          if (document.getElementById('asset-retry')) return;
+          var box = document.createElement('div');
+          box.id = 'asset-retry';
+          box.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#fff;color:#111;font:14px/1.5 system-ui,sans-serif;text-align:center;padding:24px';
+          box.innerHTML = '<div><p style="margin:0 0 8px;font-size:16px">Loading the latest version…</p>' +
+            '<p style="margin:0;color:#666">The app was updated while this page was open. Reload to continue.</p>' +
+            '<button style="margin-top:16px;padding:8px 18px;border:0;border-radius:6px;background:#111;color:#fff;font:inherit;cursor:pointer">Reload</button></div>';
+          box.querySelector('button').onclick = function () { location.reload(); };
+          (document.body || document.documentElement).appendChild(box);
+          if (window.__REMOTECLI_TARGET__ || window.__CLOUDCLI_TARGET__) return;
+          var last = 0;
+          try { last = Number(sessionStorage.getItem(KEY)) || 0; } catch (e) { return; }
+          if (Date.now() - last < 60000) return;
+          try { sessionStorage.setItem(KEY, String(Date.now())); } catch (e) { return; }
+          setTimeout(function () { location.reload(); }, 1500);
+        }
+        window.addEventListener('error', function (event) {
+          var el = event.target;
+          if (el && el.tagName === 'SCRIPT' && el.src && el.src.indexOf('/assets/') !== -1) show();
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
+
     <script type="module" src="/src/main.tsx"></script>
     
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator && !window.__REMOTECLI_TARGET__ && !window.__CLOUDCLI_TARGET__) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
             .then(registration => {
               console.log('SW registered: ', registration);
             })

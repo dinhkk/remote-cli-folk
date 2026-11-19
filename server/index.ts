@@ -89,6 +89,7 @@ const systemRoutes = createSystemModule({
 console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 
 const app = express();
+app.disable('x-powered-by');
 configureAuthHardening(app);
 const server = http.createServer(app);
 // Remote work (Controller proxy, management API, Host accept). `REMOTECLI_REMOTE_DISABLED=1` (or legacy `CLOUDCLI_REMOTE_DISABLED=1`) makes it inert.
@@ -228,8 +229,18 @@ app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
 
-// Serve public files (like api-docs.html)
-app.use(express.static(path.join(APP_ROOT, 'public')));
+// Serve public files (like api-docs.html). The service worker and the web-app
+// manifest must never be cached: an old worker (or a stale manifest) outlives a
+// deployment and keeps serving the previous build to every new navigation.
+app.use(express.static(path.join(APP_ROOT, 'public'), {
+    setHeaders: (res, filePath) => {
+        if (/(^|[\\/])(sw\.js|manifest\.json)$/.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 // Static files served after API routes
 // Add cache control: HTML files should not be cached, but assets can be cached
@@ -256,8 +267,11 @@ app.use(express.static(path.join(APP_ROOT, 'dist'), {
 
 // Serve React app for all other routes (excluding static files)
 app.get('*', (req, res) => {
-    // Skip requests for static assets (files with extensions)
+    // Skip requests for static assets (files with extensions). A missing hashed
+    // asset must not be cached anywhere: a 404 cached by a browser, a service
+    // worker or a CDN would outlive the deployment that later ships the file.
     if (path.extname(req.path)) {
+        res.setHeader('Cache-Control', 'no-store');
         return res.status(404).send('Not found');
     }
 

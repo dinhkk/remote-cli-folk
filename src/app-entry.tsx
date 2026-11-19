@@ -21,10 +21,40 @@ import { isTargetMode } from '@/shared/transport/target-context'
 // `localStorage.setItem('react-scan', 'on')` and reload.
 scan({ enabled: import.meta.env.DEV && localStorage.getItem('react-scan') === 'on' })
 
+// A page left open across a deployment keeps the old chunk map, so a lazy import can
+// ask for a file the new build no longer ships. Reload once to pick up the new index
+// instead of leaving a broken view. The timestamp stops a reload loop when the chunk is
+// genuinely gone; a Remote tab stores it in the in-memory shim, so it never auto-reloads.
+const CHUNK_RELOAD_KEY = 'remotecli-chunk-reload-at';
+const reloadForNewBuildOnce = (event: Event) => {
+  if (isTargetMode()) {
+    console.warn('A chunk from the previous build is missing; reload the tab to update.');
+    return;
+  }
+  try {
+    const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0);
+    if (Date.now() - last < 30_000) return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+  } catch {
+    return;
+  }
+  event.preventDefault();
+  window.location.reload();
+};
+window.addEventListener('vite:preloadError', reloadForNewBuildOnce);
+window.addEventListener('unhandledrejection', (event) => {
+  const message = String((event.reason as { message?: string } | undefined)?.message ?? event.reason ?? '');
+  if (/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message)) {
+    reloadForNewBuildOnce(event);
+  }
+});
+
 // Register service worker for PWA + Web Push support. A Remote tab is a
 // sandboxed frame where service workers are unavailable, so it never registers.
 if ('serviceWorker' in navigator && !isTargetMode()) {
-  navigator.serviceWorker.register('/sw.js').catch(err => {
+  // `updateViaCache: 'none'` keeps an updated worker from being held back by the
+  // HTTP cache of an older deployment.
+  navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(err => {
     console.warn('Service worker registration failed:', err);
   });
 }
