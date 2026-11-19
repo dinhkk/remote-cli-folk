@@ -7,6 +7,19 @@ import { WebSocket, type RawData } from 'ws';
 
 import { parseIncomingJsonObject, stripAnsiSequences } from '@/shared/utils.js';
 
+/**
+ * Secrets the server needs for itself but no shell or CLI does. A PTY is
+ * user-controlled, so anything exported there is readable with `env`.
+ */
+const PTY_SECRET_ENV_KEYS = new Set(['cloudcli_remote_master_key', 'cloudcli_setup_token']);
+
+/** Copy of the process environment with the app's own secrets removed. */
+export function buildPtyEnv(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(source).filter(([key]) => !PTY_SECRET_ENV_KEYS.has(key.toLowerCase()))
+  );
+}
+
 type ShellIncomingMessage = {
   type?: string;
   data?: string;
@@ -657,7 +670,7 @@ export function handleShellConnection(
           rows: termRows,
           cwd: resolvedProjectPath,
           env: {
-            ...process.env,
+            ...buildPtyEnv(process.env),
             [prioritizedPath.key]: prioritizedPath.value,
             TERM: 'xterm-256color',
             COLORTERM: 'truecolor',

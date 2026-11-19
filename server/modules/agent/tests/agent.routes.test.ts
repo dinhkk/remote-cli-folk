@@ -109,6 +109,31 @@ test('Agent route validates API keys through the injected repository', async () 
   assert.deepEqual(receivedKeys, ['invalid-key']);
 });
 
+test('Agent route ignores an API key in the query string', async () => {
+  const receivedKeys: string[] = [];
+  await withAgentServer(createDependencies({
+    platformMode: false,
+    apiKeys: {
+      validateApiKey: (apiKey) => {
+        receivedKeys.push(apiKey);
+        return undefined;
+      },
+    },
+  }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/agent?apiKey=query-key`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ projectPath: '/workspace/project', message: 'Run' }),
+    });
+    const body = await response.json() as { error: string };
+
+    assert.equal(response.status, 401);
+    assert.equal(body.error, 'API key required');
+  });
+
+  assert.deepEqual(receivedKeys, []);
+});
+
 test('Agent route rejects GitHub lookalike hosts before cloning', async () => {
   await withAgentServer(createDependencies(), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {

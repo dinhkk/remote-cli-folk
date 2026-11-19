@@ -96,8 +96,10 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
       }
     }
 
-    // Self-hosted mode: Validate API key from header or query parameter
-    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    // Self-hosted mode: only the `x-api-key` header is accepted. A key in the
+    // query string ends up in access logs, proxy logs and browser history.
+    const apiKeyHeader = req.headers['x-api-key'];
+    const apiKey = typeof apiKeyHeader === 'string' ? apiKeyHeader : undefined;
 
     if (!apiKey) {
       return res.status(401).json({ error: 'API key required' });
