@@ -215,22 +215,62 @@ Cơ sở: [pam_systemd và runtime của user đăng nhập](https://www.freedes
 
 ## 5. Mở trang Host để onboarding và pair
 
-Trên **laptop**, mở một terminal và giữ kết nối SSH forward:
+### 5.1. Phân biệt các máy và địa chỉ
+
+| Tên trong hướng dẫn | Là máy nào? | Vai trò ở bước này |
+|---|---|---|
+| Laptop/PC của anh | Máy anh đang ngồi thao tác, có trình duyệt; ví dụ máy Windows | Chạy lệnh SSH forward và mở cả hai tab trình duyệt |
+| Host mới (`NEW_SERVER` hoặc `IP_HOST_MOI`) | Server vừa cài RemoteCLI + Claude/Codex, có user `bcis` | Chạy RemoteCLI tại `127.0.0.1:3001` **của server đó** |
+| VPS Controller | VPS phục vụ giao diện Controller; trong hệ thống hiện tại là `https://remotecli.dinhkk.com` | Nhận pairing và hiển thị tab Host mới |
+
+**`developer@NEW_SERVER` trong ví dụ cũ nghĩa là user SSH trên Host mới.** `developer` chỉ là tên ví dụ; máy anh đang dùng `bcis`, hoặc `root` để đăng nhập SSH. `NEW_SERVER` là IP/tên DNS của **Host mới**, không phải IP/domain của VPS Controller. Nếu anh đã SSH root vào Host mới để cài đặt, dùng lại đúng địa chỉ đích của kết nối SSH đó.
+
+### 5.2. Trên laptop/PC: mở đường chuyển tiếp đến Host mới
+
+Mở **một cửa sổ PowerShell/Terminal mới trên laptop/PC**, ngoài phiên SSH đang mở vào server. Không gõ lệnh dưới đây trong shell `root@server` hoặc `bcis@server`. Anh có thể giữ cửa sổ SSH cài đặt hiện tại để xem log.
+
+Vì anh đang dùng SSH root vào Host mới, chạy trên laptop/PC (thay `IP_HOST_MOI` bằng IP/tên DNS thực tế):
 
 ```bash
-ssh -N -L 127.0.0.1:13001:127.0.0.1:3001 bcis@NEW_SERVER
+ssh -o ExitOnForwardFailure=yes -N -L 127.0.0.1:13001:127.0.0.1:3001 root@IP_HOST_MOI
 ```
 
-Mở `http://127.0.0.1:13001` trên laptop. Đây chỉ là forward SSH để cấu hình ban đầu, không phải Cloudflare Tunnel và không cần giữ sau khi pair xong.
+Nếu đã SSH trực tiếp được bằng `bcis`, thay `root@IP_HOST_MOI` bằng `bcis@IP_HOST_MOI`. Nếu SSH dùng port khác 22 hoặc key/SSH config riêng, dùng cùng tùy chọn `-p`, `-i`, `-F` hoặc alias như kết nối SSH Host mới đang hoạt động. Tài khoản SSH mở đường chuyển tiếp không thay đổi user `bcis` đang chạy RemoteCLI.
 
-Nếu server hiện chỉ cho SSH root, dùng `root@NEW_SERVER` trong lệnh forward. Tài khoản SSH mở đường chuyển tiếp không thay đổi user `bcis` đang chạy RemoteCLI.
+Ý nghĩa đường chuyển tiếp:
 
-1. Tạo tài khoản chủ RemoteCLI của Host, hoàn tất onboarding/Git name/email nếu được yêu cầu. Tài khoản này độc lập với tài khoản Controller; không bắt buộc cùng mật khẩu.
-2. Mở **Settings → Remote work → Relay**. Nhập URL relay và đúng relay secret đang dùng trên Controller, bấm **Save relay**. Nhập lại mật khẩu chủ của **Host** nếu được yêu cầu.
-3. Bật **Accept remote connections**, tạo pairing code trên Host. Giữ trang này mở.
-4. Mở URL **Controller** trên một tab khác, đăng nhập tài khoản Controller. Trong **Remote work**, xác nhận Controller dùng cùng relay. Chọn **Pair host**, nhập pairing code và tên phân biệt như `server-dev-02`.
-5. Controller hiển thị mã xác minh **SAS**. Quay lại trang Host, nhập mã SAS đó và xác nhận. Đây là bước riêng sau pairing code; chỉ nhập pairing code chưa hoàn tất ghép nối.
-6. Đợi Host xuất hiện với trạng thái online trên Controller. Mở tab Host mới. Có thể đóng SSH forward sau đó.
+```text
+Trình duyệt trên laptop/PC
+  http://127.0.0.1:13001
+          |
+  SSH từ laptop/PC tới HOST MỚI
+          |
+  127.0.0.1:3001 trên HOST MỚI
+          |
+  RemoteCLI chạy bằng bcis
+```
+
+`127.0.0.1:13001` là cổng trên **laptop/PC**; `127.0.0.1:3001` phía sau là cổng trên **Host mới**. VPS Controller không tham gia đường SSH này. Không cần mở public port 3001 hay 13001 trên server.
+
+Sau khi xác thực SSH thành công, terminal có thể đứng yên, không hiện shell mới vì dùng `-N`; cứ giữ cửa sổ đó mở. `ExitOnForwardFailure` báo lỗi nếu không mở được cổng chuyển tiếp, nhưng không bảo đảm RemoteCLI ở đích đã chạy. Nếu cổng 13001 của laptop đang bận, đổi riêng cổng này thành 13002 rồi dùng cùng cổng mới trong URL trình duyệt.
+
+### 5.3. Trên trình duyệt của cùng laptop/PC: mở hai tab để pair
+
+- **Tab A — Host mới:** mở [http://127.0.0.1:13001](http://127.0.0.1:13001). Anh đang xem RemoteCLI của Host mới qua SSH, không phải Controller. Nếu đã đổi cổng ở bước trước, đổi URL tương ứng.
+- **Tab B — Controller:** mở URL Controller đang dùng; với hệ thống hiện tại là [https://remotecli.dinhkk.com](https://remotecli.dinhkk.com). Đây là giao diện do VPS Controller phục vụ.
+
+Thực hiện theo thứ tự, trên hai tab của cùng trình duyệt:
+
+1. **Tab A:** tạo tài khoản chủ RemoteCLI của Host, hoàn tất onboarding/Git name/email nếu được yêu cầu. Tài khoản này độc lập với tài khoản Controller; không bắt buộc cùng mật khẩu.
+2. **Tab A:** mở **Settings → Remote work → Relay**. Nhập URL relay và đúng relay secret đang dùng trên Controller, bấm **Save relay**. Nhập lại mật khẩu chủ của **Host** nếu được yêu cầu.
+3. **Tab A:** bật **Accept remote connections**, tạo pairing code trên Host. Giữ tab này mở.
+4. **Tab B:** đăng nhập tài khoản Controller. Trong **Remote work**, xác nhận Controller dùng cùng relay. Chọn **Pair host**, nhập pairing code từ Tab A và tên phân biệt như `server-dev-02`.
+5. **Tab B** hiển thị mã xác minh **SAS**. Quay lại **Tab A**, nhập mã SAS đó và xác nhận. Đây là bước riêng sau pairing code; chỉ nhập pairing code chưa hoàn tất ghép nối.
+6. **Tab B:** đợi Host mới xuất hiện với trạng thái online, rồi chọn tab Host đó để thao tác. Sau khi pair thành công, có thể nhấn `Ctrl+C` trong terminal SSH forward trên laptop để đóng đường chuyển tiếp.
+
+SSH forward chỉ phục vụ cấu hình ban đầu, không phải Cloudflare Tunnel. Sau khi pair, Host mới kết nối với Controller qua Worker relay; không cần giữ SSH forward. Từ điện thoại, mở URL **Controller** rồi chọn Host mới. Không mở `127.0.0.1:13001` trên điện thoại: địa chỉ đó lúc này trỏ về chính điện thoại, không phải laptop.
+
+Nếu Tab A không mở được: kiểm tra terminal SSH còn kết nối, địa chỉ đích là Host mới, và RemoteCLI trên Host mới đang lắng nghe `127.0.0.1:3001` theo mục 4. Thông báo `administratively prohibited` từ SSH cần quản trị viên kiểm tra quyền TCP forwarding của SSH server; không giải quyết bằng cách mở public port 3001.
 
 Pairing code dùng một lần, có thời hạn 5 phút theo relay của phiên bản này. Nếu hết hạn, tạo mã mới. Không sao chép auth.db/master key từ WSL sang server mới để “nhân bản Host”; mỗi Host tạo danh tính và pairing riêng.
 
