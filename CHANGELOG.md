@@ -3,6 +3,16 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.0.11](https://github.com/tunghuynh/remote-cli/compare/v1.0.10...v1.0.11) (2026-11-19)
+
+### Bug Fixes
+
+* **web:** stop stale builds from pinning missing assets ([d656720](https://github.com/tunghuynh/remote-cli/commit/d6567203f7f8199d14e049e7bc0959c1b3ebcbb9))
+
+### Tests
+
+* **web:** accept the service worker registration with update options ([53c69f1](https://github.com/tunghuynh/remote-cli/commit/53c69f105f5e70064e13b367657dcf530fc4b3cf))
+
 ## [1.0.10](https://github.com/tunghuynh/remote-cli/compare/v1.0.9...v1.0.10) (2026-11-13)
 
 ### Maintenance
