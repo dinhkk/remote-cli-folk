@@ -29,6 +29,17 @@ Không cần tạo Worker mới hay domain mới khi thêm Host. Host chủ đ�
 - URL Controller, URL relay và **relay secret đang dùng trên Controller** do quản trị viên cấp qua kênh riêng. Relay secret không phải mật khẩu đăng nhập RemoteCLI, GitHub token hay master key.
 - Cho phép server truy cập HTTPS/WSS ra relay và các dịch vụ của provider. Firewall inbound chỉ cần giữ SSH và các dịch vụ vốn có; không thêm rule mở 3001.
 
+Nên SSH trực tiếp bằng user chạy Host. Nếu đăng nhập root rồi dùng `su`/`sudo` chuyển user, shell có thể chưa có môi trường user bus của systemd. Dấu nhắc đang ở `/root` chỉ cho biết thư mục hiện tại, không đủ để xác nhận `$HOME` hoặc user bus đúng. Trước khi cài, kiểm tra:
+
+```bash
+id
+printf 'HOME=%s\nXDG_RUNTIME_DIR=%s\n' "$HOME" "${XDG_RUNTIME_DIR:-}"
+getent passwd "$(id -un)" | cut -d: -f1,3,6
+ps -p 1 -o comm=
+```
+
+User và HOME phải tương ứng với tài khoản chạy Host; PID 1 phải là `systemd` cho cách dùng service dưới đây. Không cài vào `/root` rồi chạy service bằng user thường. Nếu chỉ có quyền SSH root, dùng `sudo -iu bcis` để cài/đăng nhập CLI trong home của `bcis` (thay tên theo máy); thao tác systemd theo mục 4a nếu user bus không hoạt động.
+
 ## 2. Cài và đăng nhập provider trên Host
 
 Cài những provider thực sự cần dùng. Claude có trình cài native chính thức:
@@ -120,12 +131,12 @@ UMask=0077
 WantedBy=default.target
 ```
 
-Kích hoạt bằng user đã đăng nhập CLI:
+Kích hoạt trong phiên SSH trực tiếp của user đã đăng nhập CLI. Mỗi dòng là một lệnh riêng, không thêm dấu `\` cuối dòng:
 
 ```bash
+sudo loginctl enable-linger "$(id -un)"
 systemctl --user daemon-reload
 systemctl --user enable --now remotecli-host
-sudo loginctl enable-linger "$(id -un)"
 systemctl --user status remotecli-host --no-pager
 ss -ltn | grep ':3001'
 ```
@@ -133,6 +144,59 @@ ss -ltn | grep ':3001'
 Kết quả mong đợi: service `active (running)`, listener `127.0.0.1:3001`. `linger` giúp user service chạy sau reboot và sau khi thoát SSH. Nếu port 3001 đã có ứng dụng khác, đổi `SERVER_PORT` và port đích trong bước SSH bên dưới.
 
 Service chạy trực tiếp trên Host để sử dụng đúng credentials và đường dẫn project. Không cần cài Docker cho cách cài Host này.
+
+### 4a. Lỗi user bus khi chuyển từ root sang user khác
+
+Ví dụ: shell `bcis@server:/root` báo `Failed to connect to user scope bus ... Operation not permitted` sau khi dùng `su` từ root. Lỗi nằm ở việc truy cập systemd user manager, chưa phải lỗi khởi động Node/RemoteCLI. `su` không đảm bảo khởi tạo một phiên đăng nhập systemd hoặc môi trường bus mới; cần kiểm tra thay vì kết luận từ dấu nhắc.
+
+Cách xử lý từ tài khoản có sudo hoặc shell root, ví dụ Host chạy bằng **bcis**:
+
+```bash
+sudo loginctl enable-linger bcis
+sudo systemctl start "user@$(id -u bcis).service"
+sudo systemctl --user --machine=bcis@.host daemon-reload
+sudo systemctl --user --machine=bcis@.host enable --now remotecli-host
+sudo systemctl --user --machine=bcis@.host status remotecli-host --no-pager
+ss -ltn | grep ':3001'
+```
+
+Nếu đã ở root có thể bỏ `sudo`. `--machine=bcis@.host` chỉ rõ user manager của **bcis trên chính server này**; không chuyển ứng dụng sang chạy root. `enable-linger` giữ user manager sau logout và khởi động ở boot; `systemctl start user@...` bảo đảm manager chạy ngay. Không dùng `sudo systemctl --user ...` thiếu user đích vì nó có thể chọn manager của root.
+
+Nếu phiên bản/môi trường không hỗ trợ cách kết nối `.host`, sau khi đã start `user@...`, chỉ định runtime/bus đúng cho tiến trình chạy bằng user đích:
+
+```bash
+remotecli_host_user=bcis
+remotecli_host_uid="$(id -u "$remotecli_host_user")"
+remotecli_userctl() {
+  sudo -H -u "$remotecli_host_user" env \
+    XDG_RUNTIME_DIR="/run/user/$remotecli_host_uid" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$remotecli_host_uid/bus" \
+    systemctl --user "$@"
+}
+remotecli_userctl daemon-reload
+remotecli_userctl enable --now remotecli-host
+remotecli_userctl status remotecli-host --no-pager
+```
+
+Ở block hàm này, các dấu `\` nối dòng là có chủ đích. Không đặt các biến bus trên vào `/etc/environment` hoặc cấu hình toàn hệ thống. Không tự tạo/chmod/chown `/run/user`; thư mục này do systemd quản lý.
+
+Nếu vẫn lỗi, thu các thông tin sau (không cần gửi nội dung `host.env` hay credentials):
+
+```bash
+id
+printf 'HOME=%s\nXDG_RUNTIME_DIR=%s\nDBUS_SESSION_BUS_ADDRESS=%s\n' "$HOME" "${XDG_RUNTIME_DIR:-}" "${DBUS_SESSION_BUS_ADDRESS:-}"
+ps -p 1 -o comm=
+sudo systemctl status "user@$(id -u bcis).service" --no-pager
+sudo loginctl show-user bcis -p Linger -p State -p RuntimePath
+sudo stat -c '%U %a %n' "/run/user/$(id -u bcis)" "/run/user/$(id -u bcis)/bus"
+sudo -H -u bcis sh -c 'printf "HOME=%s\n" "$HOME"; ls -l "$HOME/.config/systemd/user/remotecli-host.service"'
+```
+
+- `Unit remotecli-host.service not found` sau khi user bus đã kết nối: kiểm tra file unit trong home thật của `bcis`; có thể các bước cài trước đã chạy dưới root. Đối chiếu cả `WorkingDirectory` và vị trí `host.env`, không sinh lại key hoặc chuyển credentials một cách tự động.
+- `user@...` không start được: xem `sudo journalctl -u "user@$(id -u bcis).service" -n 60 --no-pager`; cần sửa user manager trước. Máy tối giản có thể thiếu thành phần PAM/user D-Bus; xác nhận log và gói cài trước khi thêm gói.
+- PID 1 không phải systemd (ví dụ container thường): cách service này chưa áp dụng; cần supervisor của container hoặc môi trường có systemd. Không thể chữa bằng cách đổi biến bus.
+
+Cơ sở: [pam_systemd và runtime của user đăng nhập](https://www.freedesktop.org/software/systemd/man/latest/pam_systemd.html), [loginctl enable-linger](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html), [systemctl --machine=user@.host](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html).
 
 ## 5. Mở trang Host để onboarding và pair
 
