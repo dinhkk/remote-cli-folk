@@ -193,18 +193,19 @@ const inlineScripts = (html: string): InlineScript[] =>
 const findShim = (html: string) =>
   inlineScripts(html).find((script) => script.tag.includes('data-cloudcli-target-shim'))?.body;
 const findServiceWorkerScript = (html: string) =>
-  inlineScripts(html).find((script) => script.body.includes("register('/sw.js')"))?.body;
+  inlineScripts(html).find((script) => script.body.includes("register('/sw.js'"))?.body;
 
 test('index.html carries an inline shim in <head>, ahead of the service-worker script', () => {
   const html = readIndexHtml();
   const headEnd = html.indexOf('</head>');
   const scripts = inlineScripts(html);
   const shimIndex = html.indexOf('data-cloudcli-target-shim');
-  const swIndex = html.indexOf("navigator.serviceWorker.register('/sw.js')");
+  const swIndex = html.indexOf("navigator.serviceWorker.register('/sw.js'");
 
   assert.ok(shimIndex > -1 && shimIndex < headEnd, 'the shim must sit inside <head>');
   assert.ok(shimIndex < swIndex, 'the shim must run before the inline service-worker script');
   assert.ok(scripts.length >= 2);
+  assert.match(html, /register\('\/sw\.js', \{ updateViaCache: 'none' \}\)/);
 });
 
 const makeSandboxWindow = (search: string, name = '', framed = true) => {
