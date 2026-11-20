@@ -87,9 +87,41 @@ Không dùng `@latest` hoặc lệnh tự cập nhật trong quy trình này; n�
 
 ## 4. Tạo cấu hình riêng và tự khởi động
 
-Trong mục này, `linux-username` là chỗ giữ tên user Linux đã cài RemoteCLI. **Thay mọi `linux-username` bằng tên tài khoản thực tế trước khi chạy lệnh**, kể cả trong `su`, `id`, `loginctl`, `runuser` và `--machine=linux-username@.host`.
+Mở **hai cửa sổ terminal trên laptop/PC**, cùng kết nối SSH tới **Host mới** (server vừa cài ở mục 3, không phải VPS Controller). Giữ hai cửa sổ này mở trong suốt mục 4:
 
-**Tạo thư mục, file môi trường và file service bên dưới bằng user Linux đã cài RemoteCLI ở mục 3.** Bước bật tự khởi động sau đó được tách riêng cho root; thay tên user ví dụ `linux-username` trong lệnh quản trị bằng tài khoản thực tế.
+| Cửa sổ | Đăng nhập bằng | Dùng để làm gì? |
+|---|---|---|
+| **Terminal A** | User Linux đã cài RemoteCLI | Tạo file cấu hình và file service |
+| **Terminal B** | `root` | Bật tự khởi động và kiểm tra service |
+
+Trong các lệnh dưới đây, thay `linux-username` bằng tên user Linux đã dùng ở mục 3 và `IP_HOST_MOI` bằng IP/tên DNS của Host mới. User chạy RemoteCLI **không cần quyền sudo**.
+
+### Bước 1 — Mở hai terminal
+
+**Terminal A:** nếu đang ở đúng user từ mục 3 thì giữ nguyên cửa sổ đó. Nếu mở cửa sổ mới, kết nối bằng:
+
+```bash
+ssh linux-username@IP_HOST_MOI
+```
+
+Nếu server chỉ cho SSH bằng root, thay cách kết nối trên bằng hai lệnh sau: chạy dòng đầu trên laptop, đợi đăng nhập thành công rồi chạy dòng thứ hai trên Host:
+
+```bash
+ssh root@IP_HOST_MOI
+su - linux-username
+```
+
+Trong Terminal A, chạy `id -un` để chắc chắn kết quả là user Linux đã chọn, **không phải `root`**. Giữ nguyên user này cho bước 2 và 3.
+
+**Terminal B:** mở cửa sổ mới trên laptop rồi kết nối:
+
+```bash
+ssh root@IP_HOST_MOI
+```
+
+Trong Terminal B, `id -un` phải trả về `root`. Giữ nguyên phiên root này cho bước 4 và 5; không cần chuyển qua lại giữa các user.
+
+### Bước 2 — Terminal A: tạo file môi trường
 
 Thực hiện phần tạo key **trước lần khởi động đầu tiên**. Key được sinh riêng cho Host mới, không cần giống Controller. Không thay key trên Host đã pair: dữ liệu pairing đang lưu được mã hóa bằng key đó.
 
@@ -119,11 +151,14 @@ console.log('Đã tạo host.env; không thay key sau khi pair.');
 NODE
 ```
 
-PATH ghi lại cả thư mục Node hiện tại, nên dùng được khi Node được cài bằng nvm. Khi đổi/xóa phiên bản Node, cập nhật PATH trong file này rồi restart service.
+Nếu báo `EEXIST`, file đã có sẵn: giữ nguyên file cũ, không xóa để tạo lại key. PATH ghi lại cả thư mục Node hiện tại, nên dùng được khi Node được cài bằng nvm. Khi đổi/xóa phiên bản Node, cập nhật PATH trong file này rồi restart service.
 
-Tạo `~/.config/systemd/user/remotecli-host.service`:
+### Bước 3 — Terminal A: tạo file service
 
-```ini
+Chạy toàn bộ khối sau để tạo `~/.config/systemd/user/remotecli-host.service` cho Host mới. Nếu đã có service tùy chỉnh, đối chiếu nội dung trước khi ghi đè:
+
+```bash
+cat > "$HOME/.config/systemd/user/remotecli-host.service" <<'UNIT'
 [Unit]
 Description=RemoteCLI Host
 After=network.target
@@ -139,45 +174,44 @@ UMask=0077
 
 [Install]
 WantedBy=default.target
+UNIT
 ```
 
-Bật `linger` một lần trong **phiên root**. Nếu đang ở shell con mở bằng `su - linux-username`, chạy `exit` để trở về root, hoặc mở một phiên SSH root khác. Kiểm tra `id -un` trả về `root`, rồi chạy:
+### Bước 4 — Terminal B: bật tự khởi động
+
+Chuyển sang **Terminal B đang đăng nhập root**. Thay `linux-username` ở dòng đầu bằng user của Terminal A, rồi chạy lần lượt cả khối:
 
 ```bash
-loginctl enable-linger linux-username
+remotecli_host_user="linux-username"
+loginctl enable-linger "$remotecli_host_user"
+systemctl start "user@$(id -u "$remotecli_host_user").service"
+systemctl --user --machine="$remotecli_host_user@.host" daemon-reload
+systemctl --user --machine="$remotecli_host_user@.host" enable --now remotecli-host
 ```
 
-Chỉ định tên tài khoản chạy Host thực tế thay cho `linux-username`: `$(id -un)` trong phiên root sẽ chọn nhầm root. User chạy Host không cần tự chạy `sudo loginctl` hoặc được cấp quyền sudo.
+Root chỉ bật service **cho user đã chọn**; RemoteCLI vẫn chạy bằng user Linux đó. `linger` giúp service chạy sau reboot và sau khi thoát SSH. Cách này dùng được cả khi Terminal A vào user bằng `su`, không cần chạy `systemctl --user` trong Terminal A.
 
-Tiếp theo, trong **phiên SSH trực tiếp bằng linux-username**, chạy các lệnh sau. Nếu đang dùng `su` từ root và gặp lỗi user bus, dùng mục 4a thay cho khối này. Mỗi dòng là một lệnh riêng, không thêm dấu `\` cuối dòng:
+### Bước 5 — Terminal B: kiểm tra
+
+Vẫn trong **cùng Terminal B**, chạy:
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now remotecli-host
-systemctl --user status remotecli-host --no-pager
+systemctl --user --machine="$remotecli_host_user@.host" status remotecli-host --no-pager
 ss -ltn | grep ':3001'
 ```
 
-Kết quả mong đợi: service `active (running)`, listener `127.0.0.1:3001`. `linger` giúp user service chạy sau reboot và sau khi thoát SSH. Nếu port 3001 đã có ứng dụng khác, đổi `SERVER_PORT` và port đích trong bước SSH bên dưới.
+Thấy **`active (running)`** và **`127.0.0.1:3001`** là xong mục 4; chuyển sang mục 5 để mở trang Host và pair. Nếu port 3001 đã có ứng dụng khác, đổi `SERVER_PORT` trong file môi trường và port đích trong bước SSH bên dưới.
 
 Service chạy trực tiếp trên Host để sử dụng đúng credentials và đường dẫn project. Không cần cài Docker cho cách cài Host này.
 
 ### 4a. Lỗi user bus khi chuyển từ root sang user khác
 
-Ví dụ: shell `linux-username@server:/root` báo `Failed to connect to user scope bus ... Operation not permitted` sau khi dùng `su` từ root. Lỗi nằm ở việc truy cập systemd user manager, chưa phải lỗi khởi động Node/RemoteCLI. `su` không đảm bảo khởi tạo một phiên đăng nhập systemd hoặc môi trường bus mới; cần kiểm tra thay vì kết luận từ dấu nhắc.
+<details>
+<summary>Chỉ mở phần này nếu gặp lỗi user bus hoặc service không khởi động</summary>
 
-Cách xử lý trong **phiên root**, ví dụ Host chạy bằng **linux-username**. Nếu đang ở shell con mở bằng `su - linux-username`, chạy `exit` một lần để trở về root; kiểm tra bằng `id -un` trước khi thực hiện:
+Nếu Terminal A báo `Failed to connect to user scope bus ... Operation not permitted`, chuyển sang Terminal B và làm bước 4–5 ở trên. Lỗi này nằm ở việc truy cập systemd user manager; chưa phải lỗi Node/RemoteCLI.
 
-```bash
-loginctl enable-linger linux-username
-systemctl start "user@$(id -u linux-username).service"
-systemctl --user --machine=linux-username@.host daemon-reload
-systemctl --user --machine=linux-username@.host enable --now remotecli-host
-systemctl --user --machine=linux-username@.host status remotecli-host --no-pager
-ss -ltn | grep ':3001'
-```
-
-`--machine=linux-username@.host` chỉ rõ user manager của **linux-username trên chính server này**; không chuyển ứng dụng sang chạy root. `enable-linger` giữ user manager sau logout và khởi động ở boot; `systemctl start user@...` bảo đảm manager chạy ngay. Trong phiên root, không bỏ `--machine=linux-username@.host` khỏi các lệnh `systemctl --user` vì sẽ chọn manager của root.
+Trong Terminal B, giữ tùy chọn `--machine="$remotecli_host_user@.host"` để chọn đúng user manager trên Host; bỏ tùy chọn này sẽ chọn manager của root.
 
 Nếu phiên bản/môi trường không hỗ trợ cách kết nối `.host`, sau khi đã start `user@...`, **vẫn trong phiên root**, chỉ định runtime/bus đúng cho tiến trình chạy bằng user đích:
 
@@ -215,6 +249,8 @@ runuser -l linux-username -c 'printf "HOME=%s\n" "$HOME"; ls -l "$HOME/.config/s
 
 Cơ sở: [pam_systemd và runtime của user đăng nhập](https://www.freedesktop.org/software/systemd/man/latest/pam_systemd.html), [loginctl enable-linger](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html), [systemctl --machine=user@.host](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html).
 
+</details>
+
 ## 5. Mở trang Host để onboarding và pair
 
 ### 5.1. Phân biệt các máy và địa chỉ
@@ -223,7 +259,7 @@ Cơ sở: [pam_systemd và runtime của user đăng nhập](https://www.freedes
 |---|---|---|
 | Laptop/PC của anh | Máy anh đang ngồi thao tác, có trình duyệt; ví dụ máy Windows | Chạy lệnh SSH forward và mở cả hai tab trình duyệt |
 | Host mới (`NEW_SERVER` hoặc `IP_HOST_MOI`) | Server vừa cài RemoteCLI + Claude/Codex, có user `bcis` | Chạy RemoteCLI tại `127.0.0.1:3001` **của server đó** |
-| VPS Controller | VPS phục vụ giao diện Controller; trong hệ thống hiện tại là `https://remotecli.dinhkk.com` | Nhận pairing và hiển thị tab Host mới |
+| VPS Controller | VPS phục vụ giao diện Controller; ví dụ `https://domain.com` (thay bằng domain Controller của bạn) | Nhận pairing và hiển thị tab Host mới |
 
 **`developer@NEW_SERVER` trong ví dụ cũ nghĩa là user SSH trên Host mới.** `developer` chỉ là tên ví dụ; máy anh đang dùng `bcis`, hoặc `root` để đăng nhập SSH. `NEW_SERVER` là IP/tên DNS của **Host mới**, không phải IP/domain của VPS Controller. Nếu anh đã SSH root vào Host mới để cài đặt, dùng lại đúng địa chỉ đích của kết nối SSH đó.
 
@@ -259,7 +295,7 @@ Sau khi xác thực SSH thành công, terminal có thể đứng yên, không hi
 ### 5.3. Trên trình duyệt của cùng laptop/PC: mở hai tab để pair
 
 - **Tab A — Host mới:** mở [http://127.0.0.1:13001](http://127.0.0.1:13001). Anh đang xem RemoteCLI của Host mới qua SSH, không phải Controller. Nếu đã đổi cổng ở bước trước, đổi URL tương ứng.
-- **Tab B — Controller:** mở URL Controller đang dùng; với hệ thống hiện tại là [https://remotecli.dinhkk.com](https://remotecli.dinhkk.com). Đây là giao diện do VPS Controller phục vụ.
+- **Tab B — Controller:** mở URL Controller đang dùng, ví dụ `https://domain.com` — thay bằng domain Controller của bạn. Đây là giao diện do VPS Controller phục vụ.
 
 Thực hiện theo thứ tự, trên hai tab của cùng trình duyệt:
 
