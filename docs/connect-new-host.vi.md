@@ -2,7 +2,7 @@
 
 Hướng dẫn cho server Ubuntu/Debian có systemd. Mỗi Host cài **RemoteCLI backend và CLI cần dùng**, đăng nhập CLI bằng tài khoản của chính Host, rồi ghép vào Controller đang có. Điện thoại chỉ mở giao diện Controller bằng trình duyệt.
 
-**User chạy Host không cần quyền sudo.** Ví dụ trong hướng dẫn dùng `bcis`: root làm các bước quản trị được ghi rõ; `bcis` cài và đăng nhập CLI, sở hữu project và chạy RemoteCLI. Nếu dùng tên khác, thay `bcis` bằng user đó trong các lệnh.
+**User cài và chạy Host là tài khoản Linux thường (non-root), không bắt buộc có quyền sudo.** Dùng cùng tài khoản này để cài RemoteCLI, cài/đăng nhập Claude hoặc Codex và thao tác với project. Root thực hiện riêng các bước quản trị hệ thống được ghi rõ. `bcis` trong các ví dụ chỉ là tên user minh họa, không phải tài khoản bắt buộc; hãy thay bằng tên user Linux anh chọn trên Host mới.
 
 ```text
 Điện thoại / laptop (trình duyệt HTTPS)
@@ -44,7 +44,7 @@ User và HOME phải tương ứng với tài khoản chạy Host; PID 1 phải 
 
 ## 2. Cài và đăng nhập provider trên Host
 
-**Chạy toàn bộ mục này bằng bcis, không dùng root hoặc sudo.**
+**Thực hiện trên Host mới bằng user Linux thường dùng để cài và chạy Host. Không dùng root hoặc sudo cho các lệnh trong mục này.**
 
 Cài những provider thực sự cần dùng. Claude có trình cài native chính thức:
 
@@ -72,7 +72,7 @@ Kiểm tra từng CLI trực tiếp trong thư mục project trước khi ghép 
 
 ## 3. Cài Host RemoteCLI
 
-**Chạy bằng bcis.**
+**Thực hiện trên Host mới bằng user Linux thường (non-root) dùng để cài và chạy RemoteCLI.** Dùng cùng tài khoản đã cài và đăng nhập provider ở mục 2. Các đường dẫn `$HOME` dưới đây tự trỏ tới thư mục home của tài khoản đó.
 
 Cách này dùng gói npm **1.0.10**, cùng phiên bản backend với hệ thống đã kiểm thử. Các thay đổi giao diện của fork được triển khai trên Controller; tab Host từ điện thoại nhận frontend của Controller, không cần build frontend tùy chỉnh ở mọi Host.
 
@@ -87,7 +87,7 @@ Không dùng `@latest` hoặc lệnh tự cập nhật trong quy trình này; n�
 
 ## 4. Tạo cấu hình riêng và tự khởi động
 
-**Tạo thư mục, file môi trường và file service bên dưới bằng bcis.** Bước bật tự khởi động sau đó được tách riêng cho root.
+**Tạo thư mục, file môi trường và file service bên dưới bằng user Linux đã cài RemoteCLI ở mục 3.** Bước bật tự khởi động sau đó được tách riêng cho root; thay tên user ví dụ `bcis` trong lệnh quản trị bằng tài khoản thực tế.
 
 Thực hiện phần tạo key **trước lần khởi động đầu tiên**. Key được sinh riêng cho Host mới, không cần giống Controller. Không thay key trên Host đã pair: dữ liệu pairing đang lưu được mã hóa bằng key đó.
 
@@ -292,7 +292,7 @@ Cuối cùng thử reload khi đang trả lời: nhận đủ kết quả ở co
 
 ## 7. Vận hành và xử lý lỗi
 
-**Trong phiên SSH trực tiếp bằng bcis**, các lệnh vận hành không cần sudo:
+**Trong phiên SSH trực tiếp bằng user Linux đang chạy Host**, các lệnh vận hành không cần sudo:
 
 ```bash
 systemctl --user restart remotecli-host
