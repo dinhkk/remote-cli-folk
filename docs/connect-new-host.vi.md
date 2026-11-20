@@ -87,7 +87,9 @@ Không dùng `@latest` hoặc lệnh tự cập nhật trong quy trình này; n�
 
 ## 4. Tạo cấu hình riêng và tự khởi động
 
-**Tạo thư mục, file môi trường và file service bên dưới bằng user Linux đã cài RemoteCLI ở mục 3.** Bước bật tự khởi động sau đó được tách riêng cho root; thay tên user ví dụ `bcis` trong lệnh quản trị bằng tài khoản thực tế.
+Trong mục này, `linux-username` là chỗ giữ tên user Linux đã cài RemoteCLI. **Thay mọi `linux-username` bằng tên tài khoản thực tế trước khi chạy lệnh**, kể cả trong `su`, `id`, `loginctl`, `runuser` và `--machine=linux-username@.host`.
+
+**Tạo thư mục, file môi trường và file service bên dưới bằng user Linux đã cài RemoteCLI ở mục 3.** Bước bật tự khởi động sau đó được tách riêng cho root; thay tên user ví dụ `linux-username` trong lệnh quản trị bằng tài khoản thực tế.
 
 Thực hiện phần tạo key **trước lần khởi động đầu tiên**. Key được sinh riêng cho Host mới, không cần giống Controller. Không thay key trên Host đã pair: dữ liệu pairing đang lưu được mã hóa bằng key đó.
 
@@ -139,15 +141,15 @@ UMask=0077
 WantedBy=default.target
 ```
 
-Bật `linger` một lần trong **phiên root**. Nếu đang ở shell con mở bằng `su - bcis`, chạy `exit` để trở về root, hoặc mở một phiên SSH root khác. Kiểm tra `id -un` trả về `root`, rồi chạy:
+Bật `linger` một lần trong **phiên root**. Nếu đang ở shell con mở bằng `su - linux-username`, chạy `exit` để trở về root, hoặc mở một phiên SSH root khác. Kiểm tra `id -un` trả về `root`, rồi chạy:
 
 ```bash
-loginctl enable-linger bcis
+loginctl enable-linger linux-username
 ```
 
-Dùng tên `bcis` rõ ràng: `$(id -un)` trong phiên root sẽ chọn nhầm root. Không yêu cầu bcis chạy `sudo loginctl` và không cần cấp sudo cho bcis.
+Chỉ định tên tài khoản chạy Host thực tế thay cho `linux-username`: `$(id -un)` trong phiên root sẽ chọn nhầm root. User chạy Host không cần tự chạy `sudo loginctl` hoặc được cấp quyền sudo.
 
-Tiếp theo, trong **phiên SSH trực tiếp bằng bcis**, chạy các lệnh sau. Nếu đang dùng `su` từ root và gặp lỗi user bus, dùng mục 4a thay cho khối này. Mỗi dòng là một lệnh riêng, không thêm dấu `\` cuối dòng:
+Tiếp theo, trong **phiên SSH trực tiếp bằng linux-username**, chạy các lệnh sau. Nếu đang dùng `su` từ root và gặp lỗi user bus, dùng mục 4a thay cho khối này. Mỗi dòng là một lệnh riêng, không thêm dấu `\` cuối dòng:
 
 ```bash
 systemctl --user daemon-reload
@@ -162,25 +164,25 @@ Service chạy trực tiếp trên Host để sử dụng đúng credentials và
 
 ### 4a. Lỗi user bus khi chuyển từ root sang user khác
 
-Ví dụ: shell `bcis@server:/root` báo `Failed to connect to user scope bus ... Operation not permitted` sau khi dùng `su` từ root. Lỗi nằm ở việc truy cập systemd user manager, chưa phải lỗi khởi động Node/RemoteCLI. `su` không đảm bảo khởi tạo một phiên đăng nhập systemd hoặc môi trường bus mới; cần kiểm tra thay vì kết luận từ dấu nhắc.
+Ví dụ: shell `linux-username@server:/root` báo `Failed to connect to user scope bus ... Operation not permitted` sau khi dùng `su` từ root. Lỗi nằm ở việc truy cập systemd user manager, chưa phải lỗi khởi động Node/RemoteCLI. `su` không đảm bảo khởi tạo một phiên đăng nhập systemd hoặc môi trường bus mới; cần kiểm tra thay vì kết luận từ dấu nhắc.
 
-Cách xử lý trong **phiên root**, ví dụ Host chạy bằng **bcis**. Nếu đang ở shell con mở bằng `su - bcis`, chạy `exit` một lần để trở về root; kiểm tra bằng `id -un` trước khi thực hiện:
+Cách xử lý trong **phiên root**, ví dụ Host chạy bằng **linux-username**. Nếu đang ở shell con mở bằng `su - linux-username`, chạy `exit` một lần để trở về root; kiểm tra bằng `id -un` trước khi thực hiện:
 
 ```bash
-loginctl enable-linger bcis
-systemctl start "user@$(id -u bcis).service"
-systemctl --user --machine=bcis@.host daemon-reload
-systemctl --user --machine=bcis@.host enable --now remotecli-host
-systemctl --user --machine=bcis@.host status remotecli-host --no-pager
+loginctl enable-linger linux-username
+systemctl start "user@$(id -u linux-username).service"
+systemctl --user --machine=linux-username@.host daemon-reload
+systemctl --user --machine=linux-username@.host enable --now remotecli-host
+systemctl --user --machine=linux-username@.host status remotecli-host --no-pager
 ss -ltn | grep ':3001'
 ```
 
-`--machine=bcis@.host` chỉ rõ user manager của **bcis trên chính server này**; không chuyển ứng dụng sang chạy root. `enable-linger` giữ user manager sau logout và khởi động ở boot; `systemctl start user@...` bảo đảm manager chạy ngay. Trong phiên root, không bỏ `--machine=bcis@.host` khỏi các lệnh `systemctl --user` vì sẽ chọn manager của root.
+`--machine=linux-username@.host` chỉ rõ user manager của **linux-username trên chính server này**; không chuyển ứng dụng sang chạy root. `enable-linger` giữ user manager sau logout và khởi động ở boot; `systemctl start user@...` bảo đảm manager chạy ngay. Trong phiên root, không bỏ `--machine=linux-username@.host` khỏi các lệnh `systemctl --user` vì sẽ chọn manager của root.
 
 Nếu phiên bản/môi trường không hỗ trợ cách kết nối `.host`, sau khi đã start `user@...`, **vẫn trong phiên root**, chỉ định runtime/bus đúng cho tiến trình chạy bằng user đích:
 
 ```bash
-remotecli_host_user=bcis
+remotecli_host_user=linux-username
 remotecli_host_uid="$(id -u "$remotecli_host_user")"
 remotecli_userctl() {
   runuser -u "$remotecli_host_user" -- env \
@@ -195,20 +197,20 @@ remotecli_userctl status remotecli-host --no-pager
 
 Ở block hàm này, các dấu `\` nối dòng là có chủ đích. Không đặt các biến bus trên vào `/etc/environment` hoặc cấu hình toàn hệ thống. Không tự tạo/chmod/chown `/run/user`; thư mục này do systemd quản lý.
 
-Nếu vẫn lỗi, thu các thông tin sau **trong phiên root** (không cần gửi nội dung `host.env` hay credentials). Các biến môi trường ở đây mô tả shell root; lệnh cuối kiểm tra HOME và file unit trong phiên đăng nhập bcis:
+Nếu vẫn lỗi, thu các thông tin sau **trong phiên root** (không cần gửi nội dung `host.env` hay credentials). Các biến môi trường ở đây mô tả shell root; lệnh cuối kiểm tra HOME và file unit trong phiên đăng nhập linux-username:
 
 ```bash
 id
 printf 'HOME=%s\nXDG_RUNTIME_DIR=%s\nDBUS_SESSION_BUS_ADDRESS=%s\n' "$HOME" "${XDG_RUNTIME_DIR:-}" "${DBUS_SESSION_BUS_ADDRESS:-}"
 ps -p 1 -o comm=
-systemctl status "user@$(id -u bcis).service" --no-pager
-loginctl show-user bcis -p Linger -p State -p RuntimePath
-stat -c '%U %a %n' "/run/user/$(id -u bcis)" "/run/user/$(id -u bcis)/bus"
-runuser -l bcis -c 'printf "HOME=%s\n" "$HOME"; ls -l "$HOME/.config/systemd/user/remotecli-host.service"'
+systemctl status "user@$(id -u linux-username).service" --no-pager
+loginctl show-user linux-username -p Linger -p State -p RuntimePath
+stat -c '%U %a %n' "/run/user/$(id -u linux-username)" "/run/user/$(id -u linux-username)/bus"
+runuser -l linux-username -c 'printf "HOME=%s\n" "$HOME"; ls -l "$HOME/.config/systemd/user/remotecli-host.service"'
 ```
 
-- `Unit remotecli-host.service not found` sau khi user bus đã kết nối: kiểm tra file unit trong home thật của `bcis`; có thể các bước cài trước đã chạy dưới root. Đối chiếu cả `WorkingDirectory` và vị trí `host.env`, không sinh lại key hoặc chuyển credentials một cách tự động.
-- `user@...` không start được: chạy `journalctl -u "user@$(id -u bcis).service" -n 60 --no-pager` trong phiên root; cần sửa user manager trước. Máy tối giản có thể thiếu thành phần PAM/user D-Bus; xác nhận log và gói cài trước khi thêm gói.
+- `Unit remotecli-host.service not found` sau khi user bus đã kết nối: kiểm tra file unit trong home thật của `linux-username`; có thể các bước cài trước đã chạy dưới root. Đối chiếu cả `WorkingDirectory` và vị trí `host.env`, không sinh lại key hoặc chuyển credentials một cách tự động.
+- `user@...` không start được: chạy `journalctl -u "user@$(id -u linux-username).service" -n 60 --no-pager` trong phiên root; cần sửa user manager trước. Máy tối giản có thể thiếu thành phần PAM/user D-Bus; xác nhận log và gói cài trước khi thêm gói.
 - PID 1 không phải systemd (ví dụ container thường): cách service này chưa áp dụng; cần supervisor của container hoặc môi trường có systemd. Không thể chữa bằng cách đổi biến bus.
 
 Cơ sở: [pam_systemd và runtime của user đăng nhập](https://www.freedesktop.org/software/systemd/man/latest/pam_systemd.html), [loginctl enable-linger](https://www.freedesktop.org/software/systemd/man/latest/loginctl.html), [systemctl --machine=user@.host](https://www.freedesktop.org/software/systemd/man/latest/systemctl.html).
