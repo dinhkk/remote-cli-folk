@@ -6,6 +6,8 @@ import { beforeEach, test, vi } from 'vitest';
 import '@/modules/i18n';
 import SessionsSettingsTab from '@/modules/settings/tabs/SessionsSettingsTab';
 
+vi.mock('@/modules/settings/tabs/TotpSettings', () => ({ default: () => null }));
+
 const state = vi.hoisted(() => ({ target: false, sessions: vi.fn(), revoke: vi.fn(), logoutAll: vi.fn(), logout: vi.fn(), expire: vi.fn() }));
 vi.mock('@/modules/auth', () => ({ useAuth: () => ({ logout: state.logout }) }));
 vi.mock('@/shared/authToken', () => ({ expireAuthSession: state.expire }));

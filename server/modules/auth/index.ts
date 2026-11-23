@@ -29,3 +29,5 @@ export { createApiSessionGuard } from './services/api-session-guard.service.js';
 export { isSessionOriginAllowed, readAuthTransportConfig } from './services/session-transport.service.js';
 export { assertAuthModeCompatible } from './services/auth-mode.service.js';
 export { secretsMatch } from './auth.middleware.js';
+
+export { resetTotp } from './services/reset-totp.service.js';

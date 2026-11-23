@@ -1,7 +1,6 @@
-import {
+import { requestMfaReauth,
   expireAuthSession,
-  getStoredAuthToken,
-} from '@/shared/authToken';
+  getStoredAuthToken } from '@/shared/authToken';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { isBlockedInTargetMode } from '@/shared/transport/target-route-policy';
 import { TargetUrlError, httpUrl, isTargetMode } from '@/shared/transport/target-context';
@@ -61,7 +60,7 @@ export const authenticatedFetch = (
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  return fetch(requestUrl ?? url, {
+  const send = () => fetch(requestUrl ?? url, {
     ...options,
     credentials: target ? 'omit' : 'same-origin',
     cache: 'no-store',
@@ -69,10 +68,20 @@ export const authenticatedFetch = (
       ...defaultHeaders,
       ...options.headers,
     },
-  }).then((response) => {
+  });
+  return send().then(async (response) => {
     if (target) {
       handleTargetResponse(response);
       return response;
+    }
+    if (response.status === 403 && !url.startsWith('/api/auth/mfa/reauth')) {
+      const payload = await response.clone().json().catch(() => null);
+      if ((payload?.code ?? payload?.error?.code) === 'MFA_REAUTH_REQUIRED'
+        && !options.signal?.aborted && await requestMfaReauth() && !options.signal?.aborted) {
+        const retried = await send();
+        if (retried.status === 401 && retried.headers.get('X-Auth-Error')) expireAuthSession();
+        return retried;
+      }
     }
     if (response.status === 401 && response.headers.get('X-Auth-Error')) {
       expireAuthSession();
@@ -223,6 +232,14 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
+    mfaStatus: () => get('/api/auth/mfa/status'),
+    mfaVerify: (challenge: string, code: string, recovery = false) => post('/api/auth/mfa/verify', { challenge, code, recovery }),
+    mfaReauth: (code: string) => post('/api/auth/mfa/reauth', { code }),
+    mfaEnroll: (password: string) => post('/api/auth/mfa/enroll', { password }),
+    mfaActivate: (code: string) => post('/api/auth/mfa/activate', { code }),
+    mfaDisable: () => post('/api/auth/mfa/disable'),
+    mfaRecoveryCodes: () => post('/api/auth/mfa/recovery-codes'),
+    changePassword: (password: string, newPassword: string) => post('/api/auth/password', { password, newPassword }),
     status: () => get('/api/auth/status'),
     login: (username: string, password: string) => authenticatedFetch('/api/auth/login', {
       method: 'POST',

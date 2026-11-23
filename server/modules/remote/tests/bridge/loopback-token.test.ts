@@ -39,7 +39,7 @@ const withRealTokens = async (run: (context: { port: number; tokensSeen: () => s
   }
 };
 
-test('G-06: the loopback token is typed, process-local and lives at most 5 minutes', async () => {
+test('H-02/H-04: the loopback token is typed, process-local and lives at most 5 minutes', async () => {
   await withRealTokens(async ({ port, tokensSeen }) => {
     const bridge = createHostBridge({ port, env: {} });
     const loop = createBridgedLoopback((stream, open) => bridge.handleStream(stream, open));
