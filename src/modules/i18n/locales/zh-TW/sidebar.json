@@ -166,5 +166,11 @@
     "archiveSessions_other": "封存 {{count}} 個工作階段",
     "archiveSessionsNotice_one": "封存會將所選工作階段移出使用中清單，但保留其歷史記錄。",
     "archiveSessionsNotice_other": "封存會將所選工作階段移出使用中清單，但保留其歷史記錄。"
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }

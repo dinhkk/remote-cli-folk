@@ -20,6 +20,7 @@ import type { RemotePeer, RemoteTabTokenGrant } from '@/shared/types';
 export const useRemoteTabs = (): {
   peers: RemotePeer[];
   isLoading: boolean;
+  hasLoadError: boolean;
   refresh: () => Promise<void>;
   requestTabToken: (peerId: string) => Promise<RemoteTabTokenGrant>;
 } => {
@@ -38,5 +39,5 @@ export const useRemoteTabs = (): {
     return { tabToken, expiresAt };
   }, []);
 
-  return { peers: snapshot.peers, isLoading: !snapshot.loaded, refresh, requestTabToken };
+  return { peers: snapshot.peers, isLoading: !snapshot.loaded, hasLoadError: snapshot.failure !== null, refresh, requestTabToken };
 };

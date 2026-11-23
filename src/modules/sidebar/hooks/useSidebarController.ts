@@ -17,7 +17,7 @@ import {
   readLegacyStarredProjectIds,
   readProjectSortOrder,
 } from '@/modules/sidebar/utils/sidebarStoredPreferences';
-
+import { collectProviderConversations, filterConversationSearch, type ConversationProviderFilter } from '@/modules/sidebar/utils/providerFilter';
 
 const EXPANDED_PROJECTS_STORAGE_KEY = 'remotecli-expanded-projects';
 const LEGACY_EXPANDED_PROJECTS_STORAGE_KEY = 'cloudcli-expanded-projects';
@@ -164,6 +164,7 @@ export function useSidebarController({
   // same rows (still on screen until the first settles) from sending them again.
   const sessionIdsBeingDeletedRef = useRef<Set<string>>(new Set());
   const [showVersionModal, setShowVersionModal] = useState(false);
+  const [providerFilter, setProviderFilter] = useState<ConversationProviderFilter>('all');
   const [searchMode, setSearchMode] = useState<SidebarSearchMode>('projects');
   const [conversationResults, setConversationResults] = useState<ConversationSearchResults | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -316,6 +317,19 @@ export function useSidebarController({
     setRecentConversationsError(false);
 
     try {
+      if (providerFilter !== 'all') {
+        const rows = await collectProviderConversations(providerFilter, async pageOffset => {
+          const response = await api.recentConversations({ limit: 40, offset: pageOffset });
+          if (!response.ok) throw new Error(`Failed to load conversation metadata: ${response.status}`);
+          const payload = (await response.json()) as RecentConversationsApiPayload;
+          return { conversations: Array.isArray(payload.data?.conversations) ? payload.data.conversations : [], hasMore: Boolean(payload.data?.hasMore) };
+        }, () => requestSequence !== recentConversationsSeqRef.current);
+        if (rows === null) return;
+        setRecentConversations(rows);
+        setRecentConversationsTotal(rows.length);
+        setRecentConversationsHasMore(false);
+        return;
+      }
       const response = await api.recentConversations({ limit: 40, offset });
       if (!response.ok) {
         throw new Error(`Failed to load recent conversations: ${response.status}`);
@@ -355,7 +369,7 @@ export function useSidebarController({
         setIsLoadingMoreRecentConversations(false);
       }
     }
-  }, []);
+  }, [providerFilter]);
 
   const reloadRecentConversations = useCallback(() => {
     void fetchRecentConversationsPage(0, false);
@@ -409,6 +423,7 @@ export function useSidebarController({
     }
 
     reloadRecentConversations();
+    return () => { recentConversationsSeqRef.current += 1; };
   }, [debouncedSearchQuery, reloadRecentConversations, searchMode]);
 
   // The Conversations list is only fetched when its tab opens, while `projects`
@@ -612,7 +627,7 @@ export function useSidebarController({
         eventSourceRef.current = null;
       }
     };
-  }, [debouncedSearchQuery, searchMode]);
+  }, [debouncedSearchQuery, searchMode, providerFilter]);
 
   // All sidebar state keys (expanded, starred, loading, etc.) use the DB
   // `projectId` as their identifier after the migration.
@@ -1316,6 +1331,10 @@ export function useSidebarController({
   // Wrapped rather than reset from an effect: leaving the Projects tab hides the
   // ticked rows, and a selection left behind would come back with the tab.
   const changeSearchMode = useCallback((mode: SidebarSearchMode) => {
+    recentConversationsSeqRef.current += 1;
+    searchSeqRef.current += 1;
+    setIsRecentConversationsLoading(false);
+    setIsLoadingMoreRecentConversations(false);
     setSessionSelection(null);
     setSearchMode(mode);
   }, []);
@@ -1380,7 +1399,18 @@ export function useSidebarController({
     setShowNewProject,
     searchMode,
     setSearchMode: changeSearchMode,
-    conversationResults,
+    providerFilter,
+    setProviderFilter: (value: ConversationProviderFilter) => {
+      if (value === providerFilter) return;
+      recentConversationsSeqRef.current += 1;
+      searchSeqRef.current += 1;
+      setRecentConversations([]);
+      setRecentConversationsTotal(0);
+      setRecentConversationsHasMore(false);
+      setConversationResults(null);
+      setProviderFilter(value);
+    },
+    conversationResults: filterConversationSearch(conversationResults, providerFilter),
     isSearching,
     searchProgress,
     clearConversationResults: useCallback(() => {

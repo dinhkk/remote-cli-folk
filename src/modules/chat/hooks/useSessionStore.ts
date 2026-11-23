@@ -7,7 +7,7 @@
  * No localStorage for messages. Backend JSONL is the source of truth.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { api } from '@/shared/api';
 import type { LLMProvider, NormalizedMessage } from '@/shared/types';
@@ -550,6 +550,18 @@ const MAX_REALTIME_MESSAGES = 500;
 
 export function useSessionStore() {
   const storeRef = useRef(new Map<string, SessionSlot>());
+  const revisions = useRef(new Map<string, number>());
+  const listeners = useRef(new Map<string, Set<() => void>>());
+  const subscribe = useCallback((sessionId: string, listener: () => void) => {
+    const group = listeners.current.get(sessionId) ?? new Set<() => void>();
+    group.add(listener);
+    listeners.current.set(sessionId, group);
+    return () => {
+      group.delete(listener);
+      if (group.size === 0) listeners.current.delete(sessionId);
+    };
+  }, []);
+  const getRevision = useCallback((sessionId: string) => revisions.current.get(sessionId) ?? 0, []);
   const activeSessionIdRef = useRef<string | null>(null);
   // Bump to force re-render — only when the active session's data changes.
   // Session ids are stable for the whole conversation lifetime (the backend
@@ -557,6 +569,8 @@ export function useSessionStore() {
   // no alias/redirect indirection.
   const [, setTick] = useState(0);
   const notify = useCallback((sessionId: string) => {
+    revisions.current.set(sessionId, (revisions.current.get(sessionId) ?? 0) + 1);
+    listeners.current.get(sessionId)?.forEach(listener => listener());
     if (sessionId === activeSessionIdRef.current) {
       setTick(n => n + 1);
     }
@@ -867,6 +881,8 @@ export function useSessionStore() {
   }, []);
 
   return useMemo(() => ({
+    subscribe,
+    getRevision,
     fetchFromServer,
     fetchMore,
     appendRealtime,
@@ -879,6 +895,7 @@ export function useSessionStore() {
     getMessages,
     getSessionSlot,
   }), [
+    subscribe, getRevision,
     fetchFromServer, fetchMore, appendRealtime, truncateAt, refreshLatestFromServer,
     setActiveSession, isStale, updateStreaming, finalizeStreaming,
     getMessages, getSessionSlot,
@@ -887,3 +904,11 @@ export function useSessionStore() {
 
 /** Full store API returned by useSessionStore; chat hooks take it as a parameter. */
 export type SessionStore = ReturnType<typeof useSessionStore>;
+
+/** Subscribe the visible consumer directly, even when the store owner is memoized. */
+export function useSessionStoreRevision(store: SessionStore, sessionId: string | null) {
+  const subscribe = useCallback((listener: () => void) =>
+    sessionId ? store.subscribe(sessionId, listener) : () => {}, [store, sessionId]);
+  const snapshot = useCallback(() => sessionId ? store.getRevision(sessionId) : 0, [store, sessionId]);
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
