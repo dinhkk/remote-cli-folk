@@ -1555,6 +1555,8 @@ export type SessionRowActions = {
 };
 
 export type SidebarProjectListProps = SessionRowActions & {
+  /** Search and Running views must never hide matching projects. */
+  showAllProjects?: boolean;
   projects: Project[];
   filteredProjects: Project[];
   selectedProject: Project | null;
