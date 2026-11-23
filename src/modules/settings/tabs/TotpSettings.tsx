@@ -47,7 +47,7 @@ export default function TotpSettings() {
   };
   return <section className="space-y-4 rounded-xl border border-border p-4" aria-labelledby="totp-title">
     <h2 id="totp-title" className="text-lg font-semibold">Two-factor authentication (TOTP)</h2>
-    <p className="text-sm text-muted-foreground">{enabled === null ? 'LoadingÃ¢â‚¬Â¦' : enabled ? 'Enabled. New sign-ins require your authenticator.' : 'Disabled. Enable it to protect new sign-ins.'}</p>
+    <p className="text-sm text-muted-foreground">{enabled === null ? 'Loading…' : enabled ? 'Enabled. New sign-ins require your authenticator.' : 'Disabled. Enable it to protect new sign-ins.'}</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {codes.length > 0 && <div className="space-y-3">
