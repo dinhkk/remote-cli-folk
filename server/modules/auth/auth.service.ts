@@ -26,6 +26,7 @@ type AuthDependencies = {
   hashPassword(password: string): Promise<string>;
   comparePassword(password: string, passwordHash: string): Promise<boolean>;
   generateToken(user: AuthUser, userAgent?: string): string;
+  beginMfaLogin?(userId: number): { mfaRequired: true; challenge: string; expiresAt: number } | null;
   loginLimiter: LoginRateLimiter;
   /** bcrypt hash compared when a username does not exist, so timing does not reveal it. */
   dummyPasswordHash: string;
@@ -206,6 +207,8 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
 
       attempt.succeeded();
+      const challenge = dependencies.beginMfaLogin?.(numericUserId(user.id));
+      if (challenge) return { success: true, ...challenge };
       dependencies.users.updateLastLogin(numericUserId(user.id));
       return {
         success: true,

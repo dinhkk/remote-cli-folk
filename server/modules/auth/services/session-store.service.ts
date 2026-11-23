@@ -138,22 +138,25 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
       revoke(id, session.userId, 'expired');
       return null;
     }
+    if (session.mfaVerifiedAt === null
+      && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auth_totp'").get()
+      && db.prepare('SELECT 1 FROM auth_totp WHERE user_id=? AND enabled=1').get(session.userId)) return null;
     return session.lockedAt === null ? session : null;
   };
 
   return {
-    create(userId: number, userAgent = ''): { secret: string; session: AuthSession } {
+    create(userId: number, userAgent = '', mfaVerifiedAt: number | null = null): { secret: string; session: AuthSession } {
       const at = now();
       const secret = randomBytes(32).toString('base64url');
       const session: AuthSession = {
         id: randomUUID(), userId, createdAt: at, lastSeenAt: at,
         expiresAt: at + SESSION_MAX_AGE_MS, lockedAt: null, revokedAt: null,
-        mfaVerifiedAt: null, browser: browserFamily(userAgent),
+        mfaVerifiedAt, browser: browserFamily(userAgent),
       };
       db.transaction(() => {
         db.prepare(`INSERT INTO auth_sessions
-          (id, user_id, secret_hash, created_at, last_seen_at, expires_at, browser)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`).run(session.id, userId, digest(secret), at, at, session.expiresAt, session.browser);
+          (id, user_id, secret_hash, created_at, last_seen_at, expires_at, browser, mfa_verified_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(session.id, userId, digest(secret), at, at, session.expiresAt, session.browser, mfaVerifiedAt);
         event(session, 'login', at);
       })();
       return { secret, session };
@@ -164,6 +167,9 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
       return row ? getActive(row.id) : null;
     },
     getActive,
+    markMfa(id: string, at: number | null) {
+      db.prepare('UPDATE auth_sessions SET mfa_verified_at=?, locked_at=NULL WHERE id=? AND revoked_at IS NULL').run(at, id);
+    },
     /** A successful HTTP request records activity; transport pings must not call this. */
     touch(id: string, userAgent = ''): AuthSession | null {
       const session = getActive(id);
@@ -191,12 +197,12 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
         .all(userId, now()).map(rowToSession);
     },
     revoke,
-    revokeAll(userId: number): number {
+    revokeAll(userId: number, exceptId = ''): number {
       const ids = db.transaction(() => {
-        const sessions = db.prepare<SessionRow>('SELECT * FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL')
-          .all(userId).map(rowToSession);
+        const sessions = db.prepare<SessionRow>('SELECT * FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL AND id != ?')
+          .all(userId, exceptId).map(rowToSession);
         const at = now();
-        db.prepare('UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(at, userId);
+        db.prepare('UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL AND id != ?').run(at, userId, exceptId);
         for (const session of sessions) event(session, 'revoked', at);
         return sessions.map((session) => session.id);
       })();

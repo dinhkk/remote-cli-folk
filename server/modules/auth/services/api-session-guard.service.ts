@@ -1,5 +1,7 @@
 import type { RequestHandler } from 'express';
 
+import { requireRecentMfa } from './mfa-runtime.service.js';
+import type { AuthSession } from './session-store.service.js';
 import { getSessionRuntime } from './session-runtime.service.js';
 import { isSessionHttpRequestAllowed, readAuthTransportConfig } from './session-transport.service.js';
 
@@ -42,7 +44,11 @@ export function createApiSessionGuard(authenticate: RequestHandler): RequestHand
         response.status(415).json({ error: 'Unsupported request content type', code: 'AUTH_UNSUPPORTED_MEDIA' });
         return;
       }
-      const session = (request as typeof request & { authSession?: { id: string } }).authSession;
+      const auth = request as typeof request & { authSession?: AuthSession; user?: { id: number } };
+      const session = auth.authSession;
+      if (auth.user && isSensitiveAction(request.method, path)) {
+        try { requireRecentMfa(auth.user.id, session); } catch (error) { return proceed(error); }
+      }
       if (session) getSessionRuntime().store.touch(session.id, request.get('user-agent'));
       proceed();
     };
@@ -52,4 +58,15 @@ export function createApiSessionGuard(authenticate: RequestHandler): RequestHand
       return checkBrowser(req, res, next);
     });
   };
+}
+
+
+/** C-09: explicit management operations, including pairing confirmation and credential creation. */
+export function isSensitiveAction(method: string, path: string): boolean {
+  path = path.toLowerCase();
+  if (method === 'POST' && ['/api/auth/logout-all', '/api/settings/api-keys', '/api/remote/host/pairings/start', '/api/remote/peers/join'].includes(path.replace(/\/$/, ''))) return true;
+  if (method === 'POST' && /^\/api\/remote\/host\/pairings\/[^/]+\/confirm\/?$/.test(path)) return true;
+  if (method === 'DELETE' && /^\/api\/remote\/(host\/pairings|peers)\/[^/]+\/?$/.test(path)) return true;
+  // Updating the relay configuration revokes all pairings as part of that operation.
+  return method === 'PUT' && path.replace(/\/$/, '') === '/api/remote/relay-config';
 }

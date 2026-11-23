@@ -9,6 +9,8 @@ import { AppError } from '@/shared/utils.js';
 
 import { createAuthRouter } from '../auth.routes.js';
 
+import { withIsolatedAuthDatabase } from './with-isolated-auth-database.js';
+
 type Service = Parameters<typeof createAuthRouter>[0];
 
 const allowAll: RequestHandler = (req, _res, next) => {
@@ -20,6 +22,7 @@ async function withRouter(
   service: Partial<Record<keyof Service, unknown>>,
   run: (baseUrl: string) => Promise<void>,
 ) {
+  await withIsolatedAuthDatabase(async () => {
   const app = express();
   app.use(express.json());
   app.use('/api/auth', createAuthRouter(service as Service, allowAll));
@@ -38,6 +41,7 @@ async function withRouter(
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
+  });
 }
 
 const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>

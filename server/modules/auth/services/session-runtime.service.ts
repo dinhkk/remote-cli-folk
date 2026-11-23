@@ -29,6 +29,13 @@ export function createSessionConnections(store: SessionStore) {
         if (group.size === 0) connections.delete(sessionId);
       };
     },
+    sweep() {
+      for (const [id, group] of connections) {
+        if (store.getActive(id)) continue;
+        connections.delete(id);
+        for (const close of group) { try { close(); } catch { /* Close all transports. */ } }
+      }
+    },
     dispose() { unsubscribe(); connections.clear(); },
   };
 }
@@ -50,8 +57,8 @@ export function getSessionRuntime() {
 
 /** One server lifecycle timer. Tests drive store.expire with a fake clock instead. */
 export function startSessionExpiry(): () => void {
-  const { store } = getSessionRuntime();
-  const timer = setInterval(() => store.expire(), 1000);
+  const { store, connections } = getSessionRuntime();
+  const timer = setInterval(() => { store.expire(); connections.sweep(); }, 1000);
   timer.unref();
   return () => clearInterval(timer);
 }

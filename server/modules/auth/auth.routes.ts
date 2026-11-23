@@ -3,6 +3,7 @@ import type { NextFunction, RequestHandler, Response } from 'express';
 
 import { AppError } from '@/shared/utils.js';
 
+import { requireRecentMfa } from './services/mfa-runtime.service.js';
 import { getSessionRuntime } from './services/session-runtime.service.js';
 import { clearSessionCookie, sessionCookie, isLocalSessionRequest, readAuthTransportConfig } from './services/session-transport.service.js';
 import type { AuthSession } from './services/session-store.service.js';
@@ -39,6 +40,8 @@ export function createAuthRouter(
 ): express.Router {
   const router = express.Router();
   const deliverLogin = (req: express.Request, res: Response, result: Awaited<ReturnType<typeof service.login>>) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if ('mfaRequired' in result) { res.json(result); return; }
     const { token, ...publicResult } = result;
     const store = getSessionRuntime().store;
     const session = store.authenticate(token);
@@ -97,7 +100,9 @@ export function createAuthRouter(
   router.post('/logout-all', authenticateToken, async (req, res, next) => {
     try {
       const body = req.body as { password?: unknown };
-      (req as AuthenticatedRequest).releaseAuthConnection?.();
+      const auth = req as AuthenticatedRequest;
+      requireRecentMfa(auth.user!.id, auth.authSession);
+      auth.releaseAuthConnection?.();
       const result = await service.logoutAll((req as AuthenticatedRequest).user, body.password, clientIp(req));
       res.setHeader('Set-Cookie', clearSessionCookie(req));
       res.json(result);

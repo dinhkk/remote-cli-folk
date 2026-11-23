@@ -37,3 +37,8 @@ export type { RemoteUnsupportedMode } from '@/modules/remote/policy/remote-mode-
 // WebSocket gateway (which never imports this module).
 export { createRemoteModule, resolveBridgeHost, TARGET_PAGE_CSP } from '@/modules/remote/runtime/remote.module.js';
 export type { RemoteModule, RemoteModuleOptions } from '@/modules/remote/runtime/remote.module.js';
+
+// Shared at-rest storage for browser MFA and Remote credentials.
+export { getMasterSecret } from './storage/master-secret.service.js';
+export { secretAad, createSecretBox } from './crypto/secret-box.js';
+export type { SecretBox } from './crypto/secret-box.js';
