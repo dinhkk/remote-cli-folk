@@ -1,5 +1,7 @@
 import type express from 'express';
 
+import { readAuthTransportConfig } from './session-transport.service.js';
+
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 
 /**
@@ -40,6 +42,10 @@ export function configureAuthHardening(
   const env = options.env ?? process.env;
   const warn = options.warn ?? ((message: string) => console.warn(message));
 
+  const transport = readAuthTransportConfig(env);
+  if (transport.trustProxyConfigured && transport.origins.length === 0) {
+    warn('[auth] TRUST_PROXY is configured without explicit allowed origins; authentication relies on the forwarded Host.');
+  }
   const trustProxy = parseTrustProxy(env.TRUST_PROXY);
   if (trustProxy !== undefined) {
     app.set('trust proxy', trustProxy);

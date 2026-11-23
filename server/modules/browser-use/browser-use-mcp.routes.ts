@@ -1,5 +1,6 @@
 import express from 'express';
 
+import { secretsMatch } from '@/modules/auth/index.js';
 import { browserUseService } from '@/modules/browser-use/browser-use.service.js';
 
 const router = express.Router();
@@ -15,7 +16,7 @@ function readBearerToken(header: unknown): string | null {
 router.use((req, res, next) => {
   const expected = browserUseService.getMcpToken();
   const token = readBearerToken(req.headers.authorization) || String(req.headers['x-browser-use-mcp-token'] || '');
-  if (!token || token !== expected) {
+  if (!token || !secretsMatch(expected, token)) {
     res.status(401).json({ success: false, error: 'Invalid Browser MCP token.' });
     return;
   }

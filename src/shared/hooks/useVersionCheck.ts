@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 
+import { authenticatedFetch } from '@/shared/api';
 import { APP_VERSION } from '@/shared/constants';
 import { isTargetMode } from '@/shared/transport/target-context';
 import type { InstallMode, ReleaseInfo } from '@/shared/types';
@@ -7,7 +8,7 @@ import type { InstallMode, ReleaseInfo } from '@/shared/types';
 /**
  * What the UI knows about the running install.
  *
- * Checks the local backend `/health` endpoint to obtain the running version,
+ * Checks the local backend `/api/auth/version` endpoint to obtain the running version,
  * installation mode, and any latest available version discovered by the backend's
  * cached NPM registry check. Remote target tabs skip this check as they do not
  * talk directly to local host health routes.
@@ -29,7 +30,7 @@ export const useVersionCheck = () => {
     setIsChecking(true);
     setCheckError(null);
     try {
-      const response = await fetch(`/api/system/version${force ? '?force=true' : ''}`);
+      const response = await authenticatedFetch(`/api/system/version${force ? '?force=true' : ''}`);
       if (!response.ok) {
         throw new Error(`Failed to check version: ${response.status}`);
       }
@@ -51,7 +52,7 @@ export const useVersionCheck = () => {
     if (disabled) return;
     const fetchHealth = async () => {
       try {
-        const response = await fetch('/health');
+        const response = await authenticatedFetch('/api/auth/version');
         const data = await response.json();
         if (data.installMode === 'npm' || data.installMode === 'git') {
           setInstallMode(data.installMode);

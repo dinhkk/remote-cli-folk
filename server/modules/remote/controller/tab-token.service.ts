@@ -30,7 +30,7 @@ export type TabTokenServiceOptions = {
 };
 
 /** Who a tab token speaks for once it checked out. */
-export type TabIdentity = { id: number; username: string };
+export type TabIdentity = { id: number; username: string; sessionId: string };
 
 export type TabAuthentication = { ok: true; user: TabIdentity } | { ok: false; reason: 'expired' | 'invalid' };
 
@@ -49,7 +49,7 @@ export function createTabTokenService({ hasPeer, isExpired, now = Date.now, maxP
 
   return {
     /** Issues a token for `peerId`; throws `AppError` 404 `REMOTE_PEER_NOT_FOUND`, 410 `REMOTE_PEER_EXPIRED` or 429 `REMOTE_QUOTA`. */
-    issue(input: { userId: number; username: string; peerId: string }): { tabToken: string; expiresAt: number } {
+    issue(input: { userId: number; username: string; peerId: string; sessionId: string }): { tabToken: string; expiresAt: number } {
       if (!hasPeer(input.peerId)) {
         throw new AppError('No such paired Host.', { statusCode: 404, code: 'REMOTE_PEER_NOT_FOUND' });
       }
@@ -84,7 +84,7 @@ export function createTabTokenService({ hasPeer, isExpired, now = Date.now, maxP
       if (!verified.ok) return verified;
       const user = userDb.getUserById(verified.claims.userId);
       if (!user) return { ok: false, reason: 'invalid' };
-      return { ok: true, user: { id: user.id, username: user.username } };
+      return { ok: true, user: { id: user.id, username: user.username, sessionId: verified.claims.sid } };
     },
 
     /** Number of (user, peer) buckets in memory; for tests of the bound. */

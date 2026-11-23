@@ -3,7 +3,6 @@ import { BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, session
 import { ViewHost } from './viewHost.js';
 
 const TITLEBAR_HEIGHT = 44;
-const AUTH_TOKEN_STORAGE_KEY = 'auth-token';
 function isAllowedPermissionOrigin(sourceUrl, controlPlaneUrl) {
   try {
     const source = new URL(sourceUrl);
@@ -256,8 +255,8 @@ export class DesktopWindowManager {
     return navigated;
   }
 
-  async readAuthTokenForTarget(url) {
-    return this.viewHost.readLocalStorageValueForOrigin(url, AUTH_TOKEN_STORAGE_KEY);
+  async readAuthCookieForTarget(url) {
+    return this.viewHost.readSessionCookieForOrigin(url);
   }
 
   openActiveTabDevTools() {

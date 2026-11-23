@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
-import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT } from '@/shared/authToken';
+import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
 
 /**
  * The consumer side of the JWT lifecycle that authToken.ts owns.
@@ -64,14 +64,16 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-test('a live token is sent as a bearer credential', async () => {
+test('C-01/C-03: API requests use same-origin cookies and the custom header, never legacy Bearer', async () => {
   const token = liveToken();
   localStorage.setItem('auth-token', token);
   respondWith();
 
   await (await loadFetch(false))('/api/projects');
 
-  assert.equal(sentHeaders().Authorization, `Bearer ${token}`);
+  assert.equal(sentHeaders().Authorization, undefined);
+  assert.equal(lastInit?.credentials, 'same-origin');
+  assert.equal(sentHeaders()['X-RemoteCLI-Request'], '1');
 });
 
 test('platform builds send no bearer token, because the session is a cookie', async () => {
@@ -100,7 +102,7 @@ test('an expired token is never put on the wire', async () => {
   window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, onExpired);
   assert.equal('Authorization' in sentHeaders(), false);
   assert.equal(localStorage.getItem('auth-token'), null);
-  assert.equal(expiries, 1);
+  assert.equal(expiries, 0);
 });
 
 test('no token means no Authorization header at all', async () => {
@@ -141,21 +143,21 @@ test('a caller header wins over the default', async () => {
   assert.equal(sentHeaders()['Content-Type'], 'text/plain');
 });
 
-test('a refreshed token on the response replaces the stored one', async () => {
+test('K-20: a legacy refresh header never creates a browser-readable credential', async () => {
   localStorage.setItem('auth-token', liveToken());
   const rotated = liveToken().replace('signature', 'rotated');
   let announced: string | null = null;
   const onRefresh = (event: Event) => {
     announced = (event as CustomEvent<string>).detail;
   };
-  window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, onRefresh);
+  window.addEventListener('auth-token-refreshed', onRefresh);
   respondWith({ 'X-Refreshed-Token': rotated });
 
   await (await loadFetch(false))('/api/projects');
 
-  window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, onRefresh);
-  assert.equal(localStorage.getItem('auth-token'), rotated);
-  assert.equal(announced, rotated);
+  window.removeEventListener('auth-token-refreshed', onRefresh);
+  assert.equal(localStorage.getItem('auth-token'), null);
+  assert.equal(announced, null);
 });
 
 test('an auth error on the response ends the session', async () => {
@@ -191,7 +193,7 @@ test('an auth error replayed by a cached response does not end the session', asy
 
   window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, onExpired);
   assert.equal(expiries, 0);
-  assert.equal(localStorage.getItem('auth-token'), live);
+  assert.equal(localStorage.getItem('auth-token'), null);
 });
 
 test('an expired refreshed token does not replace the stored one', async () => {
@@ -204,7 +206,7 @@ test('an expired refreshed token does not replace the stored one', async () => {
 
   await (await loadFetch(false))('/api/projects');
 
-  assert.equal(localStorage.getItem('auth-token'), live);
+  assert.equal(localStorage.getItem('auth-token'), null);
 });
 
 test('requests bypass the HTTP cache', async () => {
@@ -217,12 +219,12 @@ test('requests bypass the HTTP cache', async () => {
   assert.equal(lastInit?.cache, 'no-store');
 });
 
-test('an ordinary response leaves the stored token alone', async () => {
+test('K-20: ordinary requests clean up legacy credential storage', async () => {
   const token = liveToken();
   localStorage.setItem('auth-token', token);
   respondWith();
 
   await (await loadFetch(false))('/api/projects');
 
-  assert.equal(localStorage.getItem('auth-token'), token);
+  assert.equal(localStorage.getItem('auth-token'), null);
 });

@@ -6,6 +6,8 @@ import { type E2eRelay, startE2eRelay } from './e2e-relay.js';
 import { sleep, waitUntil } from './e2e-util.js';
 
 export type WorldOptions = {
+  hostSourceRoot?: string;
+  hostLegacyAuth?: boolean;
   /** Environment of the Host child (for example CLAUDE_TOOL_APPROVAL_TIMEOUT_MS). */
   hostEnv?: Record<string, string>;
   controllerEnv?: Record<string, string>;
@@ -119,7 +121,7 @@ export async function startWorld(options: WorldOptions = {}): Promise<RemoteWorl
   let controller: E2eServer | undefined;
   try {
     [host, controller] = await Promise.all([
-      startE2eServer({ name: 'host', env: options.hostEnv }),
+      startE2eServer({ name: 'host', env: options.hostEnv, sourceRoot: options.hostSourceRoot, legacyAuth: options.hostLegacyAuth }),
       startE2eServer({ name: 'controller', env: options.controllerEnv }),
     ]);
     await configureRelay(relay, host, controller);

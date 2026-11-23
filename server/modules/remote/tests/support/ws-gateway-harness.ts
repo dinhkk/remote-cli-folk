@@ -1,11 +1,12 @@
+import { WebSocket, type WebSocketServer } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 /**
  * Test rig for the Remote WebSocket gateway: the REAL `createWebSocketServer` on a loopback HTTP server,
  * the real auth functions and a throwaway database, a scripted link behind a real peer registry, and
- * helpers to open browser-side sockets (regular JWT sockets on `/desktop-notifications`, tab sockets on
+ * helpers to open browser-side sockets (regular cookie sockets on `/desktop-notifications`, tab sockets on
  * `/r/<peerId>/(ws|shell)`).
  */
 
-import { WebSocket, type WebSocketServer } from 'ws';
 
 import { authenticateWebSocket, issueTabToken, onAuthEpochChange } from '@/modules/auth/index.js';
 import { createWebSocketServer } from '@/modules/websocket/index.js';
@@ -37,7 +38,7 @@ export type GatewayHarness = {
   issueFor(peerId: string): string;
   /** Opens a browser socket to `/r/<peerId>/<channel>` offering `['cloudcli-tab', token]` and waits for the verdict. */
   openTab(options?: { channel?: 'ws' | 'shell'; peerId?: string; token?: string; protocols?: string[]; query?: string }): Promise<WebSocket>;
-  /** Opens a regular socket the way the Local UI does (`?token=`). */
+  /** Opens a regular socket the way the Local UI does (session cookie). */
   openRegular(token?: string): Promise<WebSocket>;
   /** Resolves the HTTP status of an upgrade that was refused. */
   refusal(path: string, protocols?: string[]): Promise<number>;
@@ -103,12 +104,12 @@ export const withGatewayHarness = async (options: GatewayHarnessOptions, run: (h
     });
 
     const mainJwt = user.jwt;
-    const issueFor = (peerId: string): string => issueTabToken({ userId: user.id, username: user.username, peerId });
+    const issueFor = (peerId: string): string => issueTabToken({ userId: user.id, username: user.username, peerId, sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id });
     const tabToken = issueFor(peer.id);
 
-    const connect = (url: string, protocols?: string[]): Promise<WebSocket> =>
+    const connect = (url: string, protocols?: string[], headers?: Record<string, string>): Promise<WebSocket> =>
       new Promise((resolve, reject) => {
-        const socket = new WebSocket(url, protocols, { handshakeTimeout: 10_000 });
+        const socket = new WebSocket(url, protocols, { handshakeTimeout: 10_000, headers });
         socket.once('open', () => resolve(socket));
         socket.once('unexpected-response', (_req, res) => {
           res.resume();
@@ -131,7 +132,7 @@ export const withGatewayHarness = async (options: GatewayHarnessOptions, run: (h
       issueFor,
       openTab: ({ channel = 'ws', peerId = peer.id, token = tabToken, protocols, query = '' } = {}) =>
         connect(`ws://127.0.0.1:${server.port}/r/${peerId}/${channel}${query}`, protocols ?? ['remotecli-tab', token]),
-      openRegular: (token = mainJwt) => connect(`ws://127.0.0.1:${server.port}/desktop-notifications?token=${token}`),
+      openRegular: (token = mainJwt) => connect(`ws://127.0.0.1:${server.port}/desktop-notifications`, undefined, { cookie: `remotecli_session=${token}`, origin: `http://127.0.0.1:${server.port}` }),
       async refusal(path, protocols) {
         try {
           const socket = await connect(`ws://127.0.0.1:${server.port}${path}`, protocols);

@@ -1,9 +1,7 @@
 import {
   expireAuthSession,
   getStoredAuthToken,
-  storeAuthToken,
 } from '@/shared/authToken';
-import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { isBlockedInTargetMode } from '@/shared/transport/target-route-policy';
 import { TargetUrlError, httpUrl, isTargetMode } from '@/shared/transport/target-context';
@@ -51,7 +49,7 @@ export const authenticatedFetch = (
 
   const token = getStoredAuthToken();
 
-  const defaultHeaders: Record<string, string> = {};
+  const defaultHeaders: Record<string, string> = { 'X-RemoteCLI-Request': '1' };
 
   // Only set Content-Type for non-FormData requests
   if (!(options.body instanceof FormData)) {
@@ -59,17 +57,13 @@ export const authenticatedFetch = (
   }
 
   // A tab authenticates with its tab token even in a platform build.
-  if ((target || !IS_PLATFORM) && token) {
+  if (target && token) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
   return fetch(requestUrl ?? url, {
     ...options,
-    // Every response here can carry X-Refreshed-Token or X-Auth-Error, and a
-    // served-from-cache response replays the headers it was stored with. Those
-    // headers describe one moment in one session, so they must never be reused:
-    // a stale X-Refreshed-Token overwrote the current token with an expired one
-    // on every start, which then got discarded as expired.
+    credentials: target ? 'omit' : 'same-origin',
     cache: 'no-store',
     headers: {
       ...defaultHeaders,
@@ -80,14 +74,6 @@ export const authenticatedFetch = (
       handleTargetResponse(response);
       return response;
     }
-    const refreshedToken = response.headers.get('X-Refreshed-Token');
-    if (refreshedToken) {
-      storeAuthToken(refreshedToken);
-    }
-    // Belt and braces for any path that still reaches a cached response: only a
-    // real rejection ends the session. Note that a revalidated response surfaces
-    // its stored status (typically 200), not the 304 from the wire, so the
-    // header alone says nothing about the current request.
     if (response.status === 401 && response.headers.get('X-Auth-Error')) {
       expireAuthSession();
     }
@@ -224,9 +210,6 @@ export const sessionMessagesUrl = (
     : `${base}${query({ limit, offset: offset ?? 0 })}`;
 };
 
-// The query-string token of Local mode; a Remote tab has none (its token is a header).
-const queryToken = (): string | null => (isTargetMode() ? null : getStoredAuthToken());
-
 const fileContentPath = (projectId: string, filePath: string) =>
   `/api/file-tree/projects/${projectId}/files/content${query({ path: filePath })}`;
 
@@ -240,19 +223,22 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
-    status: () => fetch(httpUrl('/api/auth/status')),
-    login: (username: string, password: string) => fetch(httpUrl('/api/auth/login'), {
+    status: () => get('/api/auth/status'),
+    login: (username: string, password: string) => authenticatedFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     }),
     // `setupToken` is only needed when the operator pinned registration with REMOTECLI_SETUP_TOKEN (or legacy CLOUDCLI_SETUP_TOKEN).
-    register: (username: string, password: string, setupToken?: string) => fetch(httpUrl('/api/auth/register'), {
+    register: (username: string, password: string, setupToken?: string) => authenticatedFetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(setupToken ? { username, password, setupToken } : { username, password }),
     }),
-    refresh: () => post('/api/auth/refresh'),
+    logout: () => post('/api/auth/logout'),
+    logoutAll: (password: string) => post('/api/auth/logout-all', { password }),
+    sessions: () => get('/api/auth/sessions'),
+    revokeSession: (id: string) => del(`/api/auth/sessions/${encodeURIComponent(id)}`),
     user: () => get('/api/auth/user'),
   },
 
@@ -299,12 +285,11 @@ export const api = {
   // Remote tab never puts its token in a URL: openEventSource streams those
   // endpoints over fetch with a header instead.
   cloneProjectProgressUrl: ({ cloneId }: { cloneId: string }) =>
-    httpUrl(`/api/projects/clone-progress${query({ cloneId, token: queryToken() })}`),
+    httpUrl(`/api/projects/clone-progress${query({ cloneId })}`),
   searchConversationsUrl: (searchQuery: string, limit = 50) =>
     httpUrl(`/api/providers/search/sessions${query({
       q: searchQuery,
       limit,
-      token: queryToken(),
     })}`),
 
   // Session endpoints. Provider/project metadata are resolved by the backend

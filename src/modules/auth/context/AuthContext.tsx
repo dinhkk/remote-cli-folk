@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
 import { api, readApiErrorMessage } from '@/shared/api';
-import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken } from '@/shared/authToken';
+import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
@@ -23,6 +23,7 @@ const AUTH_TOKEN_STORAGE_KEY = 'auth-token';
 // sockets. Consumers only test `token` for presence, so this stable stand-in
 // is what they see; it is never sent anywhere.
 const TARGET_TOKEN_MARKER = 'remote-tab-session';
+const COOKIE_SESSION_MARKER = 'cookie-session'; // UI state only; never sent as a credential.
 
 const AUTH_ERROR_MESSAGES = {
   authStatusCheckFailed: 'errors.authStatusCheckFailed',
@@ -35,7 +36,6 @@ const AUTH_ERROR_MESSAGES = {
 type AuthActionResult = { success: true } | { success: false; error: string };
 
 type AuthSessionPayload = {
-  token?: string;
   user?: AuthUser;
   // Set by the server when a login used a password shorter than today's minimum.
   passwordWeak?: boolean;
@@ -65,7 +65,7 @@ type AuthContextValue = {
   dismissPasswordWeak: () => void;
   login: (username: string, password: string) => Promise<AuthActionResult>;
   register: (username: string, password: string, setupToken?: string) => Promise<AuthActionResult>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshOnboardingStatus: () => Promise<void>;
 };
 
@@ -82,12 +82,6 @@ async function parseJsonSafely<T>(response: Response): Promise<T | null> {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-const readStoredToken = (): string | null => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-
-const persistToken = (token: string) => {
-  storeAuthToken(token);
-};
 
 const clearStoredToken = () => {
   localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
@@ -106,7 +100,7 @@ export function useAuth(): AuthContextValue {
 export function AuthProvider({ children }: AuthProviderProps) {
   const { t } = useTranslation('auth');
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => (isTargetMode() ? TARGET_TOKEN_MARKER : readStoredToken()));
+  const [token, setToken] = useState<string | null>(() => (isTargetMode() ? TARGET_TOKEN_MARKER : null));
   const [isLoading, setIsLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
@@ -167,36 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await checkOnboardingStatus();
   }, [checkOnboardingStatus]);
 
-  const refreshSession = useCallback(async () => {
-    if (IS_PLATFORM || isTargetMode() || !token || !user) {
-      return;
-    }
-
-    try {
-      const response = await api.auth.refresh();
-      if (!response.ok) {
-        return;
-      }
-
-      const payload = await parseJsonSafely<AuthSessionPayload>(response);
-      if (isValidRefreshedToken(payload?.token)) {
-        setToken(payload.token);
-        persistToken(payload.token);
-      }
-    } catch (caughtError) {
-      // A transient network failure must not sign the user out. Focus/visibility
-      // and the next scheduled refresh will retry while the token remains valid.
-      console.warn('[Auth] Session refresh failed:', caughtError);
-    }
-  }, [token, user]);
-
   useEffect(() => {
-    const handleTokenRefreshed = (event: Event) => {
-      const nextToken = (event as CustomEvent<unknown>).detail;
-      if (isValidRefreshedToken(nextToken)) {
-        setToken(nextToken);
-      }
-    };
     const handleSessionExpired = () => {
       // A Remote tab never owns a session: the Controller page does.
       if (isTargetMode()) {
@@ -207,10 +172,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(t(AUTH_ERROR_MESSAGES.sessionExpired));
     };
 
-    window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, handleTokenRefreshed);
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => {
-      window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, handleTokenRefreshed);
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, [clearSession, endRemoteTabData, t]);
@@ -240,14 +203,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setNeedsSetup(false);
 
-      // Read the stored token instead of depending on `token` state: this
-      // bootstrap flips `isLoading`, which swaps the whole app for the loading
-      // screen, so it must run once on mount and not again on every
-      // X-Refreshed-Token rotation (each one remounted the workspace, #1269).
-      if (!readStoredToken()) {
-        return;
-      }
-
+      clearStoredToken();
       const userResponse = await api.auth.user();
       if (!userResponse.ok) {
         clearSession();
@@ -261,6 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       setUser(userPayload.user);
+      setToken(COOKIE_SESSION_MARKER);
       await checkOnboardingStatus();
     } catch (caughtError) {
       console.error('[Auth] Auth status check failed:', caughtError);
@@ -325,50 +282,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     void checkAuthStatus();
   }, [checkAuthStatus, checkOnboardingStatus]);
 
-  useEffect(() => {
-    if (IS_PLATFORM || isTargetMode() || !token || !user) {
-      return undefined;
-    }
-
-    const refreshIfNeeded = () => {
-      const refreshDelay = getAuthTokenRefreshDelay(token);
-      if (refreshDelay !== null && refreshDelay <= 0) {
-        void refreshSession();
-      }
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshIfNeeded();
-      }
-    };
-
-    const refreshDelay = getAuthTokenRefreshDelay(token);
-    const refreshTimer = refreshDelay === null
-      ? null
-      : window.setTimeout(() => void refreshSession(), refreshDelay);
-
-    window.addEventListener('focus', refreshIfNeeded);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (refreshTimer !== null) {
-        window.clearTimeout(refreshTimer);
-      }
-      window.removeEventListener('focus', refreshIfNeeded);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [refreshSession, token, user]);
-
-  // ProtectedRoute shows the workspace as soon as there is a user, so the
-  // onboarding status is settled before the user is published; otherwise a
-  // user who still has to onboard would see the workspace mount for a whole
-  // round trip before Onboarding replaced it. The token is stored first
-  // because that request reads it from storage.
-  const publishSession = useCallback(async (nextUser: AuthUser, nextToken: string) => {
-    persistToken(nextToken);
+  // The cookie is installed by the browser before onboarding requests run.
+  const publishSession = useCallback(async (nextUser: AuthUser) => {
+    clearStoredToken();
     await checkOnboardingStatus();
     setUser(nextUser);
-    setToken(nextToken);
+    setToken(COOKIE_SESSION_MARKER);
     setNeedsSetup(false);
   }, [checkOnboardingStatus]);
 
@@ -379,7 +298,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const response = await api.auth.login(username, password);
         const payload = await parseJsonSafely<AuthSessionPayload>(response);
 
-        if (!response.ok || !payload?.token || !payload.user) {
+        if (!response.ok || !payload?.user) {
           // Most auth failures arrive as the structured AppError envelope; passing its
           // `error` object on would render it as a React child and blank the screen.
           const message = readApiErrorMessage(payload) ?? t(AUTH_ERROR_MESSAGES.loginFailed);
@@ -387,7 +306,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return { success: false, error: message };
         }
 
-        await publishSession(payload.user, payload.token);
+        await publishSession(payload.user);
         setPasswordWeak(payload.passwordWeak === true);
         return { success: true };
       } catch (caughtError) {
@@ -406,13 +325,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const response = await api.auth.register(username, password, setupToken);
         const payload = await parseJsonSafely<AuthSessionPayload>(response);
 
-        if (!response.ok || !payload?.token || !payload.user) {
+        if (!response.ok || !payload?.user) {
           const message = readApiErrorMessage(payload) ?? t(AUTH_ERROR_MESSAGES.registrationFailed);
           setError(message);
           return { success: false, error: message };
         }
 
-        await publishSession(payload.user, payload.token);
+        await publishSession(payload.user);
         return { success: true };
       } catch (caughtError) {
         console.error('Registration error:', caughtError);
@@ -423,12 +342,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [publishSession, t],
   );
 
-  const logout = useCallback(() => {
-    // JWT logout is client-side: the server endpoint does not maintain a
-    // revocation list, so clearing the session is the complete operation.
-    clearSession();
-    endRemoteTabData();
-  }, [clearSession, endRemoteTabData]);
+  const logout = useCallback(async () => {
+    try {
+      const response = await api.auth.logout();
+      if (!response.ok && response.status !== 401) throw new Error('Sign out failed');
+      clearSession();
+      endRemoteTabData();
+    } catch {
+      setError(t(AUTH_ERROR_MESSAGES.networkError));
+    }
+  }, [clearSession, endRemoteTabData, t]);
 
   const contextValue = useMemo<AuthContextValue>(
     () => ({

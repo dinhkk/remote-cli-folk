@@ -2,18 +2,19 @@ import crypto from 'node:crypto';
 
 import jwt from 'jsonwebtoken';
 
-import { userDb } from '../../database/index.js';
+import { getSessionRuntime } from './session-runtime.service.js';
+
+export { issueLoopbackToken } from './loopback-token.service.js';
 import { getJwtSecret } from '../auth.middleware.js';
 
 import { getAuthEpoch } from './auth-epoch.service.js';
 
 export const TAB_TOKEN_MAX_AGE_SECONDS = 900;
-const LOOPBACK_TOKEN_TTL_SECONDS = 300;
 const TAB_TOKEN_KEY_LABEL = 'remotecli/v1/tab-token';
-const LEGACY_TAB_TOKEN_KEY_LABEL = 'cloudcli-remote/v1/tab-token';
 
 export type TabTokenClaims = {
   typ: 'remote-tab';
+  sid: string;
   peerId: string;
   userId: number;
   username: string;
@@ -27,8 +28,8 @@ export type TabTokenVerification =
 
 /**
  * Tab tokens are signed with a key derived from the main secret AND the auth epoch, under a
- * fixed label. A different key is what makes the stock `jwt.verify(token, mainSecret)` in
- * authenticateToken/authenticateWebSocket reject them, and what kills them when the epoch moves.
+ * fixed label. Cookie authentication never accepts these credentials; moving the epoch
+ * invalidates them independently of their parent browser sessions.
  */
 function deriveTabTokenKey(label: string = TAB_TOKEN_KEY_LABEL): Buffer {
   return crypto
@@ -42,12 +43,15 @@ export function issueTabToken(input: {
   userId: number;
   username: string;
   peerId: string;
+  sessionId: string;
   ttlSeconds?: number;
 }): string {
+  const parent = getSessionRuntime().store.getActive(input.sessionId);
+  if (!parent || parent.userId !== input.userId) throw new Error('An active parent session is required');
   const requested = input.ttlSeconds ?? TAB_TOKEN_MAX_AGE_SECONDS;
   const ttl = Math.max(1, Math.min(Math.floor(requested), TAB_TOKEN_MAX_AGE_SECONDS));
   return jwt.sign(
-    { typ: 'remote-tab', peerId: input.peerId, userId: input.userId, username: input.username },
+    { typ: 'remote-tab', sid: input.sessionId, peerId: input.peerId, userId: input.userId, username: input.username },
     deriveTabTokenKey(),
     { algorithm: 'HS256', expiresIn: ttl },
   );
@@ -60,8 +64,12 @@ export function verifyTabToken(token: string, peerId: string): TabTokenVerificat
       const claims = jwt.verify(token, key, { algorithms: ['HS256'] }) as TabTokenClaims;
       if (
         claims.typ !== 'remote-tab'
+        || typeof claims.sid !== 'string'
+        || getSessionRuntime().store.getActive(claims.sid)?.userId !== claims.userId
         || claims.peerId !== peerId
         || typeof claims.userId !== 'number'
+        || typeof claims.exp !== 'number' || typeof claims.iat !== 'number'
+        || claims.exp <= claims.iat
         || claims.exp - claims.iat > TAB_TOKEN_MAX_AGE_SECONDS
       ) {
         return { ok: false, reason: 'invalid' };
@@ -72,26 +80,5 @@ export function verifyTabToken(token: string, peerId: string): TabTokenVerificat
     }
   };
 
-  const primary = tryVerify(deriveTabTokenKey(TAB_TOKEN_KEY_LABEL));
-  if (primary.ok || primary.reason === 'expired') return primary;
-
-  // Fallback to legacy key label for rolling upgrades
-  const fallback = tryVerify(deriveTabTokenKey(LEGACY_TAB_TOKEN_KEY_LABEL));
-  return fallback.ok ? fallback : primary;
-}
-
-/**
- * Ordinary short-lived JWT for the Host bridge's own loopback requests. Issued fresh for every
- * request/WebSocket (never cached) and never leaves this process; the stock middleware accepts
- * it as a normal login token, and `jti` makes each one unique.
- */
-export function issueLoopbackToken(): string {
-  const user = userDb.getFirstUser();
-  if (!user) {
-    throw new Error('Cannot issue a loopback token: no user exists yet');
-  }
-  return jwt.sign({ userId: user.id, username: user.username }, getJwtSecret(), {
-    expiresIn: LOOPBACK_TOKEN_TTL_SECONDS,
-    jwtid: crypto.randomUUID(),
-  });
+  return tryVerify(deriveTabTokenKey());
 }

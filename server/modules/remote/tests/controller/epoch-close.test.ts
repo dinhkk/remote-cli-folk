@@ -1,7 +1,7 @@
 /**
  * "Log out everywhere" (contracts section 3): when the auth epoch changes, every regular WebSocket, every
  * `/r` WebSocket and every proxied HTTP/SSE stream ends within a second and the old tab tokens stop
- * working. With `JWT_SECRET` pinned in the environment the main login survives, so only Remote ends.
+ * working. Revocation also works with a pinned `JWT_SECRET`.
  * Runs on the real module, the real WebSocket gateway and a Host link on the in-process relay.
  */
 
@@ -15,9 +15,9 @@ import { until, withModuleRig, type ModuleRig } from '../support/remote-module-r
 
 const ONE_SECOND = 1000;
 
-const connect = (url: string, protocols?: string[]): Promise<WebSocket> =>
+const connect = (url: string, protocols?: string[], headers?: Record<string, string>): Promise<WebSocket> =>
   new Promise((resolve, reject) => {
-    const socket = new WebSocket(url, protocols, { handshakeTimeout: 10_000 });
+    const socket = new WebSocket(url, protocols, { handshakeTimeout: 10_000, headers });
     socket.once('open', () => resolve(socket));
     socket.once('unexpected-response', (_req, res) => reject(new Error(`refused:${res.statusCode}`)));
     socket.once('error', reject);
@@ -59,7 +59,7 @@ const openEverything = async (rig: ModuleRig): Promise<Live> => {
   // Listing the peers is what opens the Controller link.
   await until(async () => (await rig.api('/peers')).json<Array<{ state: string }>>()[0]?.state === 'online', 'the peer to come online');
 
-  const regular = await connect(`ws://127.0.0.1:${rig.port}/desktop-notifications?token=${rig.jwt}`);
+  const regular = await connect(`ws://127.0.0.1:${rig.port}/desktop-notifications`, undefined, { cookie: `remotecli_session=${rig.jwt}`, origin: `http://127.0.0.1:${rig.port}` });
   const tabSocket = await connect(`ws://127.0.0.1:${rig.port}/r/${record.id}/ws`, ['cloudcli-tab', tabToken]);
   const stream = await open(rig.port, { path: `/r/${record.id}/api/projects`, headers: { authorization: `Bearer ${tabToken}` } });
   assert.equal(stream.status, 200);
@@ -109,12 +109,13 @@ describe('auth epoch change', () => {
     }
   });
 
-  it('with JWT_SECRET pinned only Remote ends: the regular login and its sockets survive', async () => {
+  it('K-11: with JWT_SECRET pinned all browser sessions and Remote transports end', async () => {
     const previous = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'p'.repeat(48);
     try {
       await withModuleRig({}, async (rig) => {
         const live = await openEverything(rig);
+        const regularClosed = closedWithin(live.regular, ONE_SECOND);
         const tabClosed = closedWithin(live.tabSocket, ONE_SECOND);
         const streamClosed = streamEnded(live, ONE_SECOND);
 
@@ -122,10 +123,8 @@ describe('auth epoch change', () => {
 
         assert.equal(await tabClosed, 4401);
         await streamClosed;
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        assert.equal(live.regular.readyState, WebSocket.OPEN, 'the regular socket stays open');
-        assert.equal((await rig.api('/relay-config', {})).status, 200, 'the login still works');
-        live.regular.close();
+        assert.equal(await regularClosed, 4401);
+        assert.equal((await rig.api('/relay-config', {})).status, 401, 'the revoked session cannot call APIs');
       });
     } finally {
       if (previous === undefined) delete process.env.JWT_SECRET;

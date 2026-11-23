@@ -88,7 +88,7 @@ export function createCliApplication() {
       await initializeDatabase();
       userDb.createUser('bootstrap-user', 'password-hash');
 
-      const request: any = { headers: {}, query: {} };
+      const request: any = { headers: {}, query: {}, socket: { remoteAddress: '127.0.0.1' } };
       const response: any = {
         statusCode: 200,
         body: null,
@@ -106,7 +106,8 @@ export function createCliApplication() {
         },
       };
       let authNextCalled = false;
-      await authenticateToken(request, response, () => {
+      await authenticateToken(request, response, (error?: Error) => {
+        if (error) throw error;
         authNextCalled = true;
       });
       const runtime = getBrowserUseRuntime();

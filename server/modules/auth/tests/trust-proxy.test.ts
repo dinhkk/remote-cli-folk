@@ -61,7 +61,8 @@ test('TRUST_PROXY=true warns that every hop is trusted; a hop count does not', (
 
   const counted: string[] = [];
   configureAuthHardening(express(), { env: { TRUST_PROXY: '1', HOST: '127.0.0.1' }, warn: (m) => counted.push(m) });
-  assert.deepEqual(counted, []);
+  assert.equal(counted.length, 1);
+  assert.match(counted[0], /without explicit allowed origins/);
 });
 
 test('without TRUST_PROXY req.ip is the socket address and a forwarded header warns once', async () => {

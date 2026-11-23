@@ -154,7 +154,7 @@ test('a token refresh swaps the socket without ever reading as a lost connection
 
   assert.equal(FakeWebSocket.instances.length, 2, 'the refreshed token opened a new socket');
   assert.equal(socket(0).readyState, FakeWebSocket.CLOSED, 'the old-token socket was closed');
-  assert.match(socket(1).url, /token=token-2/);
+  assert.equal(new URL(socket(1).url).search, '');
   // The new socket is still handshaking: not live yet, but not lost either.
   assert.equal(lastStatus(), 'connecting');
   assert.equal(isConnected, false);

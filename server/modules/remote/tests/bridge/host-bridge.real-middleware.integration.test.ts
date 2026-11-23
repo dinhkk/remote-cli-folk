@@ -14,6 +14,7 @@ import test from 'node:test';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { WebSocket } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { authRoutes, authenticateToken, authenticateWebSocket, issueLoopbackToken, issueTabToken, validateApiKey } from '@/modules/auth/index.js';
 import { userDb } from '@/modules/database/index.js';
@@ -145,7 +146,7 @@ test('the bridge against the real middleware: loopback token, API_KEY, ?token st
     // The default wiring: real token source, live process environment.
     const bridge = createHostBridge({ port: sample.port, evaluateHttp: syntheticPathPolicy });
     const loop = createBridgedLoopback((stream, open) => bridge.handleStream(stream, open));
-    const tabToken = issueTabToken({ userId, username: 'alice', peerId: 'peer-1' });
+    const tabToken = issueTabToken({ userId, username: 'alice', peerId: 'peer-1', sessionId: getSessionRuntime().store.create(userId).session.id });
 
     try {
       await t.test('(a) a request through the bridge authenticates with the loopback token and reaches the protected route', async () => {
@@ -250,12 +251,12 @@ test('the bridge against the real middleware: loopback token, API_KEY, ?token st
         assert.equal(sample.sockets.length, socketsBefore);
       });
 
-      await t.test('/api/auth/* is denied: the real /refresh would turn the loopback token into a 7-day login token', async () => {
-        // Control: with the loopback token a direct call to the real route DOES mint a long-lived token.
+      await t.test('G-06: /api/auth/* remains denied and refresh never mints a browser credential', async () => {
+        // A direct internal refresh can return the user, but cannot issue a browser session.
         const direct = await fetch(`http://127.0.0.1:${sample.port}/api/auth/refresh`, { method: 'POST', headers: { authorization: `Bearer ${issueLoopbackToken()}` } });
         assert.equal(direct.status, 200);
-        const minted = jwt.decode(((await direct.json()) as { token: string }).token) as { exp: number; iat: number; jti?: string };
-        assert.ok(minted.exp - minted.iat > 24 * 3600, 'the minted token is long-lived');
+        assert.equal((await direct.json()).token, undefined);
+        assert.equal(direct.headers.get('set-cookie'), null);
 
         const hitsBefore = sample.hits.count;
         for (const path of ['/api/auth/refresh', '/api/auth/user', '/api/auth/status', '/api/auth/logout-all', '/api/%61uth/refresh', '/API/AUTH/Refresh', '/api/projects/../auth/refresh']) {

@@ -24,14 +24,9 @@ const info = (url: string, headers: Record<string, string | undefined>) => ({
   req: { url, headers },
 });
 
-const acceptAll = {
-  isPlatform: true,
-  authenticateWebSocket: () => ({ id: 1, username: 'tester' }),
-};
-
 test('a same-origin browser socket passes', () => {
   assert.equal(
-    isWebSocketOriginAllowed('https://chat.vibexai.net', 'chat.vibexai.net', '/ws'),
+    isWebSocketOriginAllowed('https://target.example', 'target.example', '/ws', true),
     true
   );
   assert.equal(
@@ -42,68 +37,55 @@ test('a same-origin browser socket passes', () => {
 
 test('a cross-origin browser socket is rejected', () => {
   assert.equal(
-    isWebSocketOriginAllowed('https://evil.example', 'chat.vibexai.net', '/ws'),
+    isWebSocketOriginAllowed('https://evil.example', 'target.example', '/ws'),
     false
   );
   assert.equal(
-    isWebSocketOriginAllowed('null', 'chat.vibexai.net', '/shell'),
+    isWebSocketOriginAllowed('null', 'target.example', '/shell'),
     false
   );
   assert.equal(
-    isWebSocketOriginAllowed('chrome-extension://abcdef', 'chat.vibexai.net', '/ws'),
+    isWebSocketOriginAllowed('chrome-extension://abcdef', 'target.example', '/ws'),
     false
   );
 });
 
-test('a missing origin is left to token authentication (Host bridge, CLI clients)', () => {
-  assert.equal(isWebSocketOriginAllowed(undefined, 'chat.vibexai.net', '/ws'), true);
-  assert.equal(isWebSocketOriginAllowed(undefined, '127.0.0.1:3001', '/shell'), true);
+test('C-06: a missing browser origin is rejected on all paths', () => {
+  assert.equal(isWebSocketOriginAllowed(undefined, 'target.example', '/ws'), false);
+  assert.equal(isWebSocketOriginAllowed(undefined, '127.0.0.1:3001', '/shell'), false);
 });
 
-test('paths outside /ws and /shell keep their existing behaviour (plugin frames)', () => {
+test('C-05: plugin frames do not bypass the origin policy', () => {
   assert.equal(
-    isWebSocketOriginAllowed('null', 'chat.vibexai.net', '/plugin-ws/example'),
-    true
+    isWebSocketOriginAllowed('null', 'target.example', '/plugin-ws/example'),
+    false
   );
 });
 
 test('REMOTECLI_ALLOWED_ORIGINS accepts an explicit split-deployment origin', () => {
   withEnv('https://app.example, https://admin.example', () => {
     assert.equal(
-      isWebSocketOriginAllowed('https://app.example', 'chat.vibexai.net', '/ws'),
+      isWebSocketOriginAllowed('https://app.example', 'target.example', '/ws'),
       true
     );
     assert.equal(
-      isWebSocketOriginAllowed('https://other.example', 'chat.vibexai.net', '/ws'),
+      isWebSocketOriginAllowed('https://other.example', 'target.example', '/ws'),
       false
     );
   });
 });
 
-test('verifyWebSocketClient rejects a cross-origin upgrade before authentication', () => {
-  // verifyClient is called with `isPlatform: false`, so a cross-origin request
-  // must be refused even when the token would be valid.
-  const dependencies = {
+test('the gateway delegates credential classification and origin checks to the auth adapter', () => {
+  const request = info('/ws', { host: 'target.example', origin: 'https://target.example' });
+  let calls = 0;
+  const rejected = verifyWebSocketClient(request as never, {
     isPlatform: false,
-    authenticateWebSocket: () => ({ id: 1, username: 'tester' }),
-  };
-  const rejected = verifyWebSocketClient(
-    info('/ws?token=abc', { host: 'chat.vibexai.net', origin: 'https://evil.example' }) as never,
-    dependencies
-  );
+    authenticateWebSocket: (incoming) => { calls += 1; assert.equal(incoming, request.req); return null; },
+  });
   assert.equal(rejected, false);
-
-  const accepted = verifyWebSocketClient(
-    info('/ws?token=abc', { host: 'chat.vibexai.net', origin: 'https://chat.vibexai.net' }) as never,
-    dependencies
-  );
-  assert.equal(accepted, true);
-});
-
-test('verifyWebSocketClient still accepts the host bridge, which sends no origin', () => {
-  const accepted = verifyWebSocketClient(
-    info('/shell', { host: '127.0.0.1:3001' }) as never,
-    acceptAll
-  );
-  assert.equal(accepted, true);
+  assert.equal(calls, 1);
+  const user = { userId: 1, username: 'tester', authKind: 'loopback' };
+  assert.equal(verifyWebSocketClient(info('/shell', {}) as never, {
+    isPlatform: false, authenticateWebSocket: () => user,
+  }), true);
 });

@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import { AuthProvider, useAuth } from '@/modules/auth/context/AuthContext';
-import { storeAuthToken } from '@/shared/authToken';
 
 /**
  * What a Remote tab kept in this browser (drafts, last project, ...) came from a
@@ -41,7 +40,7 @@ afterEach(() => {
 });
 
 test('logout deletes every remote:* entry and leaves the rest of localStorage alone', async () => {
-  storeAuthToken(makeToken());
+  localStorage.setItem('auth-token', makeToken());
   localStorage.setItem('remote:peer_one11111:local:activeTab', 'git');
   localStorage.setItem('remote:peer_two22222:local:draft', 'hello');
   localStorage.setItem('unrelated-setting', 'keep');
@@ -62,7 +61,7 @@ test('logout deletes every remote:* entry and leaves the rest of localStorage al
   );
   await waitFor(() => assert.notEqual(user, null));
 
-  act(() => logout?.());
+  await act(async () => { await logout?.(); });
 
   assert.equal(localStorage.getItem('remote:peer_one11111:local:activeTab'), null);
   assert.equal(localStorage.getItem('remote:peer_two22222:local:draft'), null);

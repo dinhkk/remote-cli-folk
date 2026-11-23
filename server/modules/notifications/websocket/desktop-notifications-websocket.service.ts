@@ -1,5 +1,6 @@
 import type { WebSocket } from 'ws';
 
+import { getSessionRuntime } from '@/modules/auth/index.js';
 import {
   registerDesktopNotificationClient,
   unregisterDesktopNotificationClient,
@@ -52,6 +53,10 @@ export function handleDesktopNotificationsConnection(
   let registered = false;
 
   ws.on('message', (rawMessage) => {
+    if (typeof request.user?.sessionId === 'string' && !getSessionRuntime().store.getActive(request.user.sessionId)) {
+      ws.close(4401, 'session-ended');
+      return;
+    }
     const data = parseIncomingJsonObject(rawMessage) as DesktopNotificationRegisterMessage | null;
     if (!data) {
       return;

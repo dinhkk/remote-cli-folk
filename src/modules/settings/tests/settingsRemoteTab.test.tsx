@@ -77,6 +77,7 @@ test('the tab list is exactly the known tabs with Remote work just before About'
     'Plugins',
     'Notifications',
     'Remote work',
+    'Sessions',
     'About',
   ]);
 });

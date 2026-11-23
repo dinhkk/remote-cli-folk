@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { useAuth } from '@/modules/auth';
 import { IS_PLATFORM } from '@/shared/utils';
-import { expireAuthSession, isAuthTokenExpired } from '@/shared/authToken';
+import { expireAuthSession } from '@/shared/authToken';
 import { isTargetMode, wsProtocols, wsUrl } from '@/shared/transport/target-context';
 import type { ServerEvent } from '@/shared/types';
 
@@ -68,11 +68,7 @@ const buildWebSocketUrl = (token: string | null): WebSocketTarget | null => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   if (IS_PLATFORM) return { url: `${protocol}//${window.location.host}/ws` }; // Platform mode: Use same domain as the page (goes through proxy)
   if (!token) return null;
-  if (isAuthTokenExpired(token)) {
-    expireAuthSession();
-    return null;
-  }
-  return { url: `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}` }; // OSS mode: Use same host:port that served the page
+  return { url: `${protocol}//${window.location.host}/ws` };
 };
 
 const useWebSocketProviderState = (): WebSocketContextType => {
@@ -150,7 +146,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         }
       };
 
-      websocket.onclose = () => {
+      websocket.onclose = (event) => {
         if (wsRef.current !== websocket) {
           return;
         }
@@ -159,6 +155,8 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         // closing a socket on purpose, so a token refresh never gets here.
         setConnectionStatus('disconnected');
         wsRef.current = null;
+
+        if (event?.code === 4401 && !isTargetMode()) { expireAuthSession(); return; }
 
         // Attempt to reconnect after 3 seconds
         reconnectTimeoutRef.current = setTimeout(() => {
