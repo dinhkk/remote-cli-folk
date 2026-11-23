@@ -8,6 +8,7 @@ import { onOpenRemoteTabRequest } from '@/modules/remote/utils/open-remote-tab-r
 import { peerDisplayName } from '@/modules/remote/utils/peer-display-name';
 import { PEER_STATE_DOT_CLASS } from '@/modules/remote/utils/peer-state-dot-class';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
+import { readSelectedRemoteTab, writeSelectedRemoteTab } from '@/shared/transport/navigation-storage';
 import type { RemotePeer, RemotePeerState } from '@/shared/types';
 
 const LOCAL_TAB = 'local';
@@ -42,20 +43,30 @@ export function RemoteTabsShell({
   indicator?: (placement: 'tabbar' | 'overlay') => ReactNode;
 }) {
   const { t } = useTranslation('remote');
-  const { peers, requestTabToken } = useRemoteTabs();
+  const { peers, requestTabToken, isLoading, hasLoadError } = useRemoteTabs();
 
   // Which tab is in front; falls back to Local when its pairing disappears.
-  const [selected, setSelected] = useState<string>(LOCAL_TAB);
+  const [selected, setSelected] = useState<string>(readSelectedRemoteTab);
   // Pairings whose frame was opened at least once, so frames load lazily.
-  const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => selected === LOCAL_TAB ? new Set() : new Set([selected]));
   // Permission cards waiting in each Remote tab, as the tab's frame reports them.
   const [pending, setPending] = useState<Readonly<Record<string, number>>>({});
 
   const hasPeers = peers.length > 0;
-  const activeId = peers.some((peer) => peer.peerId === selected) ? selected : LOCAL_TAB;
+  const selectionPending = isLoading || hasLoadError;
+  const selectedExists = peers.some((peer) => peer.peerId === selected);
+  const activeId = selectedExists || selectionPending ? selected : LOCAL_TAB;
+
+  useEffect(() => {
+    if (!selectionPending && selected !== LOCAL_TAB && !selectedExists) {
+      setSelected(LOCAL_TAB);
+      writeSelectedRemoteTab(LOCAL_TAB);
+    }
+  }, [selectionPending, selectedExists, selected]);
 
   const select = useCallback((id: string) => {
     setSelected(id);
+    writeSelectedRemoteTab(id);
     if (id !== LOCAL_TAB) {
       setVisited((previous) => (previous.has(id) ? previous : new Set(previous).add(id)));
     }
@@ -170,11 +181,11 @@ export function RemoteTabsShell({
       */}
       <div
         className={
-          !hasPeers
-            ? 'contents'
-            : activeId === LOCAL_TAB
+          activeId !== LOCAL_TAB
+            ? 'hidden'
+            : hasPeers
               ? 'relative min-h-0 flex-1 [contain:layout]'
-              : 'hidden'
+              : 'contents'
         }
       >
         {children}

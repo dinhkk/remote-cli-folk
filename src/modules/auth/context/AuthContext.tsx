@@ -7,6 +7,7 @@ import { api, readApiErrorMessage } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
+import { clearSelectedRemoteTab } from '@/shared/transport/navigation-storage';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
 import { isTargetMode, onTabTokenChange, readTabTokenUser } from '@/shared/transport/target-context';
 /** The signed-in account held by AuthContext - a required `username` plus an optional id and any additional fields the auth API returns - and should be read through `useAuth()` rather than re-derived from raw auth responses. */
@@ -111,6 +112,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const dismissPasswordWeak = useCallback(() => setPasswordWeak(false), []);
 
   const clearSession = useCallback(() => {
+    if (!isTargetMode()) clearSelectedRemoteTab();
     setUser(null);
     setToken(null);
     setPasswordWeak(false);
@@ -284,6 +286,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // The cookie is installed by the browser before onboarding requests run.
   const publishSession = useCallback(async (nextUser: AuthUser) => {
+    if (!isTargetMode()) clearSelectedRemoteTab();
     clearStoredToken();
     await checkOnboardingStatus();
     setUser(nextUser);

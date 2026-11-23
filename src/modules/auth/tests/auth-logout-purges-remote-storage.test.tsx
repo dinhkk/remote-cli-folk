@@ -4,6 +4,8 @@ import { act, render, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
+import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
+import { SELECTED_REMOTE_TAB_KEY } from '@/shared/transport/navigation-storage';
 import { AuthProvider, useAuth } from '@/modules/auth/context/AuthContext';
 
 /**
@@ -19,6 +21,7 @@ const makeToken = () => {
 };
 
 beforeEach(() => {
+  sessionStorage.clear();
   localStorage.clear();
   vi.stubGlobal(
     'fetch',
@@ -36,6 +39,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  sessionStorage.clear();
   localStorage.clear();
 });
 
@@ -66,4 +70,30 @@ test('logout deletes every remote:* entry and leaves the rest of localStorage al
   assert.equal(localStorage.getItem('remote:peer_one11111:local:activeTab'), null);
   assert.equal(localStorage.getItem('remote:peer_two22222:local:draft'), null);
   assert.equal(localStorage.getItem('unrelated-setting'), 'keep');
+});
+
+
+test.each(['logout', 'expired', 'revoked', 'new-account'] as const)('UI-12/KU-09: clears saved Host on %s', async (reason) => {
+  let auth: ReturnType<typeof useAuth> | null = null;
+  function NavigationProbe() {
+    const value = useAuth();
+    useEffect(() => { auth = value; });
+    return null;
+  }
+  render(<AuthProvider><NavigationProbe /></AuthProvider>);
+  await waitFor(() => assert.ok(auth?.user));
+  sessionStorage.setItem(SELECTED_REMOTE_TAB_KEY, 'host-A');
+  sessionStorage.setItem('unrelated-preference', 'keep');
+  await act(async () => {
+    if (reason === 'logout') await auth?.logout();
+    else if (reason === 'new-account') {
+      const previousFetch = globalThis.fetch;
+      vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => url === '/api/auth/login'
+        ? new Response(JSON.stringify({ user: { id: 2, username: 'another-user' } }), { status: 200 })
+        : previousFetch(url, options)));
+      await auth?.login('another-user', 'synthetic-password');
+    } else window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+  });
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), null);
+  assert.equal(sessionStorage.getItem('unrelated-preference'), 'keep');
 });
