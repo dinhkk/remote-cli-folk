@@ -87,6 +87,10 @@ export function createCliApplication(): CliApplication {
       const packageName = packageMetadata.name || '@tunghuynh/remotecli';
       execSync(`npm update -g ${packageName}`, { stdio: 'inherit' });
     },
+    resetTotp: async () => {
+      const { resetTotp } = await import('../auth/index.js');
+      resetTotp(process.env.DATABASE_PATH || path.join(process.env.REMOTECLI_CONFIG_DIR || process.env.CLOUDCLI_CONFIG_DIR || path.join(homeDirectory, '.remotecli'), 'auth.db'));
+    },
     startServer: async () => {
       // The server executable is an entrypoint rather than a feature module,
       // so it has no barrel contract to import through.

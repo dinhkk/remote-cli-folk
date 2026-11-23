@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Lock, User } from 'lucide-react';
 
+import MfaLoginForm from '@/modules/auth/MfaLoginForm';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import AuthErrorAlert from '@/modules/auth/AuthErrorAlert';
 import AuthInputField from '@/modules/auth/AuthInputField';
@@ -26,7 +27,7 @@ const initialState: LoginFormState = {
  */
 export default function LoginForm() {
   const { t } = useTranslation('auth');
-  const { error: sessionError, login } = useAuth();
+  const { error: sessionError, login, mfaChallenge } = useAuth();
 
   const [formState, setFormState] = useState<LoginFormState>(initialState);
   const [errorMessage, setErrorMessage] = useState('');
@@ -49,6 +50,7 @@ export default function LoginForm() {
 
       setIsSubmitting(true);
       const result = await login(formState.username.trim(), formState.password);
+      if (result.success && result.mfaRequired) setFormState(initialState);
       if (!result.success) {
         setErrorMessage(result.error);
       }
@@ -56,6 +58,8 @@ export default function LoginForm() {
     },
     [formState.password, formState.username, login, t],
   );
+
+  if (mfaChallenge) return <MfaLoginForm />;
 
   return (
     <AuthScreenLayout

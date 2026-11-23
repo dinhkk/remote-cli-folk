@@ -7,9 +7,6 @@ import os from 'os';
 import http from 'http';
 
 import express, { type NextFunction, type Request, type Response } from 'express';
-
-import { startSessionExpiry } from './modules/auth/services/session-runtime.service.js';
-import { assertAuthModeCompatible } from './modules/auth/services/auth-mode.service.js';
 import cors from 'cors';
 
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
@@ -23,8 +20,11 @@ import { chatRunRegistry, createWebSocketServer } from '@/modules/websocket/inde
 import { createRemoteModule } from '@/modules/remote/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
-import { createApiSessionGuard } from './modules/auth/services/api-session-guard.service.js';
 
+import { startSessionExpiry } from './modules/auth/services/session-runtime.service.js';
+import { assertAuthModeCompatible } from './modules/auth/services/auth-mode.service.js';
+import { initializeMfa } from './modules/auth/services/mfa-runtime.service.js';
+import { createApiSessionGuard } from './modules/auth/services/api-session-guard.service.js';
 import { createGitModule } from './modules/git/index.js';
 import {
     authenticateToken,
@@ -390,6 +390,7 @@ async function startServer() {
         // Initialize authentication database
         await initializeDatabase();
         assertAuthModeCompatible(getConnection(), IS_PLATFORM);
+        initializeMfa();
         const stopSessionExpiry = startSessionExpiry();
 
         // Remote needs the database (settings, pairings); a Remote problem never stops the server.

@@ -87,7 +87,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Kept as an internal issuance adapter; this value is delivered only in Set-Cookie.
-const generateToken = (user) => getSessionRuntime().store.create(Number(user.id)).secret;
+const generateToken = (user, userAgent = '') => getSessionRuntime().store.create(Number(user.id), userAgent).secret;
 
 /** A browser upgrade uses cookies; only the process-local Host bridge uses a bearer. */
 const authenticateWebSocket = (request, secure = false) => {

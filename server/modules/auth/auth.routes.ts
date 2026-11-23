@@ -3,6 +3,7 @@ import type { NextFunction, RequestHandler, Response } from 'express';
 
 import { AppError } from '@/shared/utils.js';
 
+import { requireRecentMfa } from './services/mfa-runtime.service.js';
 import { getSessionRuntime } from './services/session-runtime.service.js';
 import { clearSessionCookie, sessionCookie, isLocalSessionRequest, readAuthTransportConfig } from './services/session-transport.service.js';
 import type { AuthSession } from './services/session-store.service.js';
@@ -39,11 +40,12 @@ export function createAuthRouter(
 ): express.Router {
   const router = express.Router();
   const deliverLogin = (req: express.Request, res: Response, result: Awaited<ReturnType<typeof service.login>>) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if ('mfaRequired' in result) { res.json(result); return; }
     const { token, ...publicResult } = result;
     const store = getSessionRuntime().store;
     const session = store.authenticate(token);
     if (!session) throw new Error('Session issuance failed');
-    store.touch(session.id, req.get('user-agent'));
     res.setHeader('Set-Cookie', sessionCookie(req, token, session.expiresAt));
     res.setHeader('Cache-Control', 'no-store');
     if (!req.secure && !isLocalSessionRequest(req, readAuthTransportConfig(process.env))) {
@@ -64,7 +66,7 @@ export function createAuthRouter(
     try {
       const body = req.body as { username?: unknown; password?: unknown; setupToken?: unknown };
       const setupToken = body.setupToken ?? req.get('x-setup-token');
-      deliverLogin(req, res, await service.register(body.username, body.password, setupToken, clientIp(req)));
+      deliverLogin(req, res, await service.register(body.username, body.password, setupToken, clientIp(req), req.get('user-agent')));
     } catch (error) {
       forwardError(res, next, error);
     }
@@ -73,7 +75,7 @@ export function createAuthRouter(
   router.post('/login', async (req, res, next) => {
     try {
       const body = req.body as { username?: unknown; password?: unknown };
-      deliverLogin(req, res, await service.login(body.username, body.password, clientIp(req)));
+      deliverLogin(req, res, await service.login(body.username, body.password, clientIp(req), req.get('user-agent')));
     } catch (error) {
       forwardError(res, next, error);
     }
@@ -98,7 +100,9 @@ export function createAuthRouter(
   router.post('/logout-all', authenticateToken, async (req, res, next) => {
     try {
       const body = req.body as { password?: unknown };
-      (req as AuthenticatedRequest).releaseAuthConnection?.();
+      const auth = req as AuthenticatedRequest;
+      requireRecentMfa(auth.user!.id, auth.authSession);
+      auth.releaseAuthConnection?.();
       const result = await service.logoutAll((req as AuthenticatedRequest).user, body.password, clientIp(req));
       res.setHeader('Set-Cookie', clearSessionCookie(req));
       res.json(result);

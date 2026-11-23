@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 
+import MfaReauthDialog from '@/modules/auth/MfaReauthDialog';
 import { IS_PLATFORM } from '@/shared/utils';
 import { api, readApiErrorMessage } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
@@ -34,9 +35,11 @@ const AUTH_ERROR_MESSAGES = {
   sessionExpired: 'errors.sessionExpired',
 } as const;
 
-type AuthActionResult = { success: true } | { success: false; error: string };
+type AuthActionResult = { success: true; mfaRequired?: boolean } | { success: false; error: string };
 
 type AuthSessionPayload = {
+  mfaRequired?: boolean;
+  challenge?: string;
   user?: AuthUser;
   // Set by the server when a login used a password shorter than today's minimum.
   passwordWeak?: boolean;
@@ -64,6 +67,9 @@ type AuthContextValue = {
   /** True after a login with a password below today's minimum length; drives the "choose a longer password" banner. */
   passwordWeak: boolean;
   dismissPasswordWeak: () => void;
+  mfaChallenge: string | null;
+  cancelMfa: () => void;
+  verifyMfa: (code: string, recovery: boolean) => Promise<AuthActionResult>;
   login: (username: string, password: string) => Promise<AuthActionResult>;
   register: (username: string, password: string, setupToken?: string) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
@@ -100,6 +106,8 @@ export function useAuth(): AuthContextValue {
 /** Used by App to expose the session, and its login/logout actions, to every module through useAuth. */
 export function AuthProvider({ children }: AuthProviderProps) {
   const { t } = useTranslation('auth');
+  const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
+  const cancelMfa = useCallback(() => setMfaChallenge(null), []);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(() => (isTargetMode() ? TARGET_TOKEN_MARKER : null));
   const [isLoading, setIsLoading] = useState(true);
@@ -113,6 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const clearSession = useCallback(() => {
     if (!isTargetMode()) clearSelectedRemoteTab();
+    setMfaChallenge(null);
     setUser(null);
     setToken(null);
     setPasswordWeak(false);
@@ -301,6 +310,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const response = await api.auth.login(username, password);
         const payload = await parseJsonSafely<AuthSessionPayload>(response);
 
+        if (response.ok && payload?.mfaRequired && payload.challenge) {
+          setMfaChallenge(payload.challenge);
+          return { success: true, mfaRequired: true };
+        }
+
         if (!response.ok || !payload?.user) {
           // Most auth failures arrive as the structured AppError envelope; passing its
           // `error` object on would render it as a React child and blank the screen.
@@ -320,6 +334,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     },
     [publishSession, t],
   );
+
+  const verifyMfa = useCallback<AuthContextValue['verifyMfa']>(async (code, recovery) => {
+    if (!mfaChallenge) return { success: false, error: 'Please sign in again.' };
+    try {
+      const response = await api.auth.mfaVerify(mfaChallenge, code, recovery);
+      const payload = await parseJsonSafely<AuthSessionPayload>(response);
+      if (!response.ok || !payload?.user) {
+        if (response.status === 401) setMfaChallenge(null);
+        return { success: false, error: readApiErrorMessage(payload) ?? 'Verification failed. Try again later.' };
+      }
+      setMfaChallenge(null);
+      await publishSession(payload.user);
+      return { success: true };
+    } catch { return { success: false, error: 'Unable to verify. Try again.' }; }
+  }, [mfaChallenge, publishSession]);
 
   const register = useCallback<AuthContextValue['register']>(
     async (username, password, setupToken) => {
@@ -367,6 +396,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       passwordWeak,
       dismissPasswordWeak,
       login,
+      mfaChallenge, cancelMfa, verifyMfa,
       register,
       logout,
       refreshOnboardingStatus,
@@ -377,6 +407,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       hasCompletedOnboarding,
       isLoading,
       login,
+      mfaChallenge, cancelMfa, verifyMfa,
       logout,
       needsSetup,
       passwordWeak,
@@ -387,5 +418,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ],
   );
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={contextValue}>{children}{user && !isTargetMode() && <MfaReauthDialog />}</AuthContext.Provider>;
 }

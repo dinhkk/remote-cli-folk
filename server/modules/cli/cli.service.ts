@@ -23,6 +23,7 @@ type CliServiceDependencies = {
   updateGlobalPackage(): void;
   startServer(): Promise<void>;
   startBrowserUseMcp(): Promise<void>;
+  resetTotp?(): Promise<void>;
 };
 
 type ParsedCliArguments = {
@@ -137,6 +138,7 @@ Commands:
   start            Start the RemoteCLI server (default)
   sandbox          Manage Docker sandbox environments
   browser-use-mcp  Run Browser MCP stdio server
+  reset-totp       Disable TOTP locally and revoke all browser sessions
   status           Show configuration and data locations
   update           Update to the latest version
   help             Show this help information
@@ -237,6 +239,11 @@ export function createCliService(dependencies: CliServiceDependencies): CliAppli
           return dependencies.sandboxService.execute(parsedArguments.remainingArguments);
         case 'browser-use-mcp':
           await dependencies.startBrowserUseMcp();
+          return 0;
+        case 'reset-totp':
+          if (!dependencies.resetTotp) throw new Error('TOTP reset is unavailable');
+          await dependencies.resetTotp();
+          dependencies.output.log('TOTP disabled. All browser sessions revoked.');
           return 0;
         case 'status':
         case 'info':

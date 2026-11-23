@@ -8,6 +8,7 @@
  * broken database is never mistaken for "not configured".
  */
 
+
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,9 +16,11 @@ import path from 'node:path';
 import { remoteConfigDb } from '@/modules/database/index.js';
 import type { RemotePairingStore } from '@/shared/types.js';
 
-import { LEGACY_MASTER_KEY_ENV, MASTER_KEY_ENV, createAppConfigMasterKeyStore, resolveMasterKey } from '../crypto/master-key.js';
-import { createSecretBox, secretAad, type SecretBox } from '../crypto/secret-box.js';
+import { LEGACY_MASTER_KEY_ENV, MASTER_KEY_ENV, createAppConfigMasterKeyStore } from '../crypto/master-key.js';
+import { secretAad, type SecretBox } from '../crypto/secret-box.js';
 import { createPairingStore } from '../pairing/pairing-store.service.js';
+
+import { getMasterSecret } from './master-secret.service.js';
 
 const RELAY_URL_KEY = 'remote.relay_url';
 const RELAY_SECRET_KEY = 'remote.relay_secret_sealed';
@@ -161,14 +164,8 @@ export const isRelayConfigured = (): boolean => {
  * Consumed by: server start-up (phase 08).
  */
 export const initializeRemoteStorage = ({ env = process.env, keyFilePath, now }: RemoteStorageOptions = {}) => {
-  const resolved = resolveMasterKey({
-    env,
-    keyFilePath: keyFilePath ?? defaultKeyFilePath(env),
-    store: createAppConfigMasterKeyStore(),
-    scrubEnv: true,
-  });
-  const box = createSecretBox(resolved.key);
-  resolved.key.fill(0); // the box holds its own copy; nothing else keeps the key around
+  const resolved = getMasterSecret({ env, keyFilePath });
+  const { box } = resolved;
 
   return {
     keyId: resolved.keyId,

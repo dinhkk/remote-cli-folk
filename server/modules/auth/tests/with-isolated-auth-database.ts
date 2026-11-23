@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -20,6 +20,7 @@ export async function withIsolatedAuthDatabase(
   try {
     closeConnection();
     process.env.DATABASE_PATH = path.join(tempDirectory, 'auth.db');
+    await writeFile(process.env.DATABASE_PATH, ''); // Do not import a legacy checkout database.
     delete process.env.JWT_SECRET;
     await initializeDatabase();
     invalidateJwtSecretCache();

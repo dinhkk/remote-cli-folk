@@ -74,7 +74,7 @@ for (const pinned of [false, true]) {
   });
 }
 
-test('M-02: migrated auth epoch increments by one and listeners can unsubscribe', async () => {
+test('K-20: migrated auth epoch increments by one and listeners can unsubscribe', async () => {
   await withIsolatedAuthDatabase(() => {
     getSessionRuntime();
     const initial = getAuthEpoch();
