@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 
 import { IS_PLATFORM } from '@/shared/utils.js';
 import { authenticateLoopback } from './services/loopback-token.service.js';
+import { isLockedSessionRouteAllowed } from './services/session-lock-policy.service.js';
 import { getSessionRuntime } from './services/session-runtime.service.js';
 import { isSessionOriginAllowed, readAuthTransportConfig, readSessionCookie } from './services/session-transport.service.js';
 
@@ -68,16 +69,21 @@ const authenticateToken = (req, res, next) => {
     }
     const runtime = getSessionRuntime();
     const secret = readSessionCookie(req);
-    const session = secret ? runtime.store.authenticate(secret) : null;
+    const session = secret ? runtime.store.authenticate(secret, true) : null;
     const user = session && userDb.getUserById(session.userId);
     if (!session || !user) {
       res.setHeader('X-Auth-Error', 'session-expired');
       return res.status(401).json({ error: 'Please log in again', code: 'AUTH_TOKEN_INVALID' });
     }
+    if (session.lockedAt !== null && !isLockedSessionRouteAllowed(req.method, req.originalUrl)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(423).json({ error: 'Unlock this session to continue', code: 'AUTH_SESSION_LOCKED' });
+    }
     req.user = user;
     req.authSession = session;
     req.authKind = 'session';
     res.setHeader('Cache-Control', 'no-store');
+    if (session.lockedAt !== null) return next();
     const release = runtime.connections.track(session.id, () => res.destroy());
     req.releaseAuthConnection = release;
     res.once('finish', release);

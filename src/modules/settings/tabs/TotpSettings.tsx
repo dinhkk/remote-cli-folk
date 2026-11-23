@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 
+import SessionLockSettings from '@/modules/settings/tabs/SessionLockSettings';
 import { api, readApiJson } from '@/shared/api';
 import { Button, Input } from '@/shared/ui';
 import { isTargetMode } from '@/shared/transport/target-context';
@@ -46,7 +47,7 @@ export default function TotpSettings() {
   };
   return <section className="space-y-4 rounded-xl border border-border p-4" aria-labelledby="totp-title">
     <h2 id="totp-title" className="text-lg font-semibold">Two-factor authentication (TOTP)</h2>
-    <p className="text-sm text-muted-foreground">{enabled === null ? 'Loading…' : enabled ? 'Enabled. New sign-ins require your authenticator.' : 'Disabled. Enable it to protect new sign-ins.'}</p>
+    <p className="text-sm text-muted-foreground">{enabled === null ? 'LoadingÃ¢â‚¬Â¦' : enabled ? 'Enabled. New sign-ins require your authenticator.' : 'Disabled. Enable it to protect new sign-ins.'}</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {codes.length > 0 && <div className="space-y-3">
@@ -74,6 +75,7 @@ export default function TotpSettings() {
       <Input id="totp-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
       <Button type="submit" disabled={busy || enabled === null}>{enabled ? 'Replace authenticator' : 'Set up authenticator'}</Button>
     </form>}
+    {enabled && <SessionLockSettings />}
     {enabled && <div className="flex flex-wrap gap-2">
       <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
         const result = await readApiJson<{ recoveryCodes: string[] }>(await api.auth.mfaRecoveryCodes()); setCodes(result.recoveryCodes);

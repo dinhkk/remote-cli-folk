@@ -1,27 +1,27 @@
 import { getConnection } from '../../database/index.js';
 import type { Database } from '../../database/index.js';
 
-import { createSessionStore, migrateAuthSessions } from './session-store.service.js';
+import { createSessionStore, migrateAuthSessions, type ConnectionEndReason } from './session-store.service.js';
 
 type SessionStore = ReturnType<typeof createSessionStore>;
 
 /** Transport ownership is per browser session, independent of peer or provider jobs. */
 export function createSessionConnections(store: SessionStore) {
-  const connections = new Map<string, Set<() => void>>();
-  const unsubscribe = store.onEnd(({ sessionId }) => {
+  const connections = new Map<string, Set<(reason: ConnectionEndReason) => void>>();
+  const unsubscribe = store.onEnd(({ sessionId, reason }) => {
     const pending = connections.get(sessionId);
     connections.delete(sessionId);
     for (const close of pending ?? []) {
-      try { close(); } catch { /* Continue closing the other transports. */ }
+      try { close(reason); } catch { /* Continue closing the other transports. */ }
     }
   });
   return {
-    track(sessionId: string, close: () => void): () => void {
+    track(sessionId: string, close: (reason: ConnectionEndReason) => void): () => void {
       if (!store.getActive(sessionId)) {
-        close();
+        close(store.getCurrent(sessionId)?.lockedAt != null ? 'locked' : 'expired');
         return () => undefined;
       }
-      const group = connections.get(sessionId) ?? new Set<() => void>();
+      const group = connections.get(sessionId) ?? new Set<(reason: ConnectionEndReason) => void>();
       group.add(close);
       connections.set(sessionId, group);
       return () => {
@@ -32,8 +32,11 @@ export function createSessionConnections(store: SessionStore) {
     sweep() {
       for (const [id, group] of connections) {
         if (store.getActive(id)) continue;
+        // getActive may synchronously lock the session and notify all listeners.
+        if (!connections.has(id)) continue;
         connections.delete(id);
-        for (const close of group) { try { close(); } catch { /* Close all transports. */ } }
+        const reason = store.getCurrent(id)?.lockedAt != null ? 'locked' : 'expired';
+        for (const close of group) { try { close(reason); } catch { /* Close all transports. */ } }
       }
     },
     dispose() { unsubscribe(); connections.clear(); },

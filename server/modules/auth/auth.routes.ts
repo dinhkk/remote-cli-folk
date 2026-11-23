@@ -3,7 +3,7 @@ import type { NextFunction, RequestHandler, Response } from 'express';
 
 import { AppError } from '@/shared/utils.js';
 
-import { requireRecentMfa } from './services/mfa-runtime.service.js';
+import { getMfaStore, requireRecentMfa } from './services/mfa-runtime.service.js';
 import { getSessionRuntime } from './services/session-runtime.service.js';
 import { clearSessionCookie, sessionCookie, isLocalSessionRequest, readAuthTransportConfig } from './services/session-transport.service.js';
 import type { AuthSession } from './services/session-store.service.js';
@@ -87,6 +87,47 @@ export function createAuthRouter(
 
   router.post('/refresh', authenticateToken, (req, res) => {
     res.json(service.refreshSession((req as AuthenticatedRequest).user));
+  });
+
+  router.get('/session-status', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    if (!auth.authSession) return res.status(403).json({ code: 'AUTH_BROWSER_SESSION_REQUIRED' });
+    const store = getSessionRuntime().store;
+    const enabled = getMfaStore().enabled(auth.authSession.userId);
+    res.json({ locked: auth.authSession.lockedAt !== null, totpEnabled: enabled,
+      autoLock: enabled ? store.autoLockEnabled(auth.authSession.userId) : null });
+  });
+
+  router.post('/lock', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
+    auth.releaseAuthConnection?.();
+    getSessionRuntime().store.lock(auth.authSession.id);
+    res.json({ locked: true });
+  });
+
+  router.post('/unlock', authenticateToken, (req, res, next) => {
+    try {
+      const auth = req as AuthenticatedRequest;
+      if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
+      if (auth.authSession.lockedAt === null) return res.json({ locked: false });
+      getMfaStore().verifyTotp(auth.authSession.userId, req.body?.code);
+      if (!getSessionRuntime().store.unlock(auth.authSession.id, auth.authSession.userId, Date.now())) {
+        return res.status(401).json({ code: 'AUTH_TOKEN_INVALID' });
+      }
+      res.json({ locked: false });
+    } catch (error) { forwardError(res, next, error); }
+  });
+
+  router.put('/auto-lock', authenticateToken, (req, res, next) => {
+    try {
+      const auth = req as AuthenticatedRequest;
+      if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
+      if (typeof req.body?.enabled !== 'boolean') return res.status(400).json({ code: 'AUTH_INVALID_INPUT' });
+      if (!req.body.enabled) requireRecentMfa(auth.authSession.userId, auth.authSession);
+      getSessionRuntime().store.setAutoLock(auth.authSession.userId, req.body.enabled);
+      res.json({ autoLock: req.body.enabled });
+    } catch (error) { forwardError(res, next, error); }
   });
 
   router.post('/logout', authenticateToken, (req, res) => {
