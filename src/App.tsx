@@ -10,6 +10,7 @@ import { PluginsProvider } from '@/modules/plugins';
 import { HostControllerIndicator, RemoteTabsShell, TargetStatusOverlay } from '@/modules/remote';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
 import { i18n } from '@/modules/i18n';
+import { TargetConversationNavigation } from '@/modules/remote/TargetConversationNavigation';
 import { isTargetMode } from '@/shared/transport/target-context';
 
 const DEPLOYMENT_ASSET_DIRECTORIES = new Set(['assets', 'static', 'icons', 'images']);
@@ -113,6 +114,7 @@ export default function App() {
 
   const workspaceRoutes = (
     <Router basename={routerBasename}>
+      <TargetConversationNavigation />
       <Routes>
         <Route path="/" element={<ProjectWorkspaceRoute />} />
         <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
