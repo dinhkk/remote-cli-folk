@@ -3,6 +3,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Database } from '../../database/index.js';
 
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_IDLE_LOCK_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_SESSION_AUTO_LOCK = true;
 const ACTIVITY_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 const MIGRATION_ID = 'auth-sessions-v1';
 
@@ -31,7 +33,8 @@ type SessionRow = {
 };
 
 type EndReason = 'logout' | 'revoked' | 'expired';
-type SessionEnd = { sessionId: string; reason: EndReason };
+export type ConnectionEndReason = EndReason | 'locked';
+type SessionEnd = { sessionId: string; reason: ConnectionEndReason };
 
 const digest = (secret: string): string => createHash('sha256').update(secret).digest('hex');
 const rowToSession = (row: SessionRow): AuthSession => ({
@@ -78,6 +81,10 @@ export function migrateAuthSessions(db: Database, now = Date.now()): void {
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
       CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions(user_id);
+      CREATE TABLE IF NOT EXISTS auth_session_preferences (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id),
+        auto_lock INTEGER NOT NULL CHECK(auto_lock IN (0, 1))
+      );
       CREATE TABLE IF NOT EXISTS auth_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -105,7 +112,7 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
     db.prepare('INSERT INTO auth_events (user_id, session_id, kind, created_at) VALUES (?, ?, ?, ?)')
       .run(session.userId, session.id, kind, at);
   };
-  const notify = (sessionId: string, reason: EndReason) => {
+  const notify = (sessionId: string, reason: ConnectionEndReason) => {
     activity.delete(sessionId);
     for (const listener of [...ended]) {
       try { listener({ sessionId, reason }); } catch {
@@ -131,17 +138,45 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
     if (changed) notify(id, reason);
     return changed;
   };
-  const getActive = (id: string): AuthSession | null => {
+  const mfaEnabled = (userId: number): boolean => Boolean(
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auth_totp'").get()
+    && db.prepare('SELECT 1 FROM auth_totp WHERE user_id=? AND enabled=1').get(userId));
+  const autoLockEnabled = (userId: number): boolean => {
+    const row = db.prepare<{ auto_lock: number }>('SELECT auto_lock FROM auth_session_preferences WHERE user_id=?').get(userId);
+    return row ? row.auto_lock === 1 : DEFAULT_SESSION_AUTO_LOCK;
+  };
+  const lock = (id: string): boolean => {
+    const changed = db.transaction(() => {
+      const session = read(id);
+      if (!session || session.revokedAt !== null || session.lockedAt !== null || session.expiresAt <= now() || !mfaEnabled(session.userId)) return false;
+      const at = now();
+      const result = db.prepare('UPDATE auth_sessions SET locked_at=? WHERE id=? AND revoked_at IS NULL AND locked_at IS NULL').run(at, id);
+      if (result.changes !== 1) return false;
+      event(session, 'locked', at);
+      return true;
+    })();
+    if (changed) notify(id, 'locked');
+    return changed;
+  };
+  const getCurrent = (id: string): AuthSession | null => {
     const session = read(id);
     if (!session || session.revokedAt !== null) return null;
     if (session.expiresAt <= now()) {
       revoke(id, session.userId, 'expired');
       return null;
     }
-    if (session.mfaVerifiedAt === null
-      && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auth_totp'").get()
-      && db.prepare('SELECT 1 FROM auth_totp WHERE user_id=? AND enabled=1').get(session.userId)) return null;
-    return session.lockedAt === null ? session : null;
+    const enabled = mfaEnabled(session.userId);
+    if (session.mfaVerifiedAt === null && enabled) return null;
+    if (session.lockedAt === null && enabled && autoLockEnabled(session.userId)
+      && now() - (activity.get(id) ?? session.lastSeenAt) >= SESSION_IDLE_LOCK_MS) {
+      lock(id);
+      return read(id);
+    }
+    return session;
+  };
+  const getActive = (id: string): AuthSession | null => {
+    const session = getCurrent(id);
+    return session?.lockedAt === null ? session : null;
   };
 
   return {
@@ -161,12 +196,30 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
       })();
       return { secret, session };
     },
-    authenticate(secret: string): AuthSession | null {
+    authenticate(secret: string, allowLocked = false): AuthSession | null {
       if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) return null;
       const row = db.prepare<{ id: string }>('SELECT id FROM auth_sessions WHERE secret_hash = ?').get(digest(secret));
-      return row ? getActive(row.id) : null;
+      return row ? (allowLocked ? getCurrent(row.id) : getActive(row.id)) : null;
     },
     getActive,
+    getCurrent,
+    lock,
+    autoLockEnabled,
+    setAutoLock(userId: number, enabled: boolean) {
+      db.prepare('INSERT INTO auth_session_preferences (user_id, auto_lock) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET auto_lock=excluded.auto_lock')
+        .run(userId, enabled ? 1 : 0);
+    },
+    unlock(id: string, userId: number, verifiedAt: number): boolean {
+      const session = getCurrent(id);
+      if (!session || session.userId !== userId || session.lockedAt === null || !mfaEnabled(userId)) return false;
+      const at = now();
+      db.transaction(() => {
+        db.prepare('UPDATE auth_sessions SET locked_at=NULL, mfa_verified_at=?, last_seen_at=? WHERE id=?').run(verifiedAt, at, id);
+        event(session, 'unlocked', at);
+      })();
+      activity.set(id, at);
+      return true;
+    },
     markMfa(id: string, at: number | null) {
       db.prepare('UPDATE auth_sessions SET mfa_verified_at=?, locked_at=NULL WHERE id=? AND revoked_at IS NULL').run(at, id);
     },
@@ -214,6 +267,7 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
       const rows = db.prepare<SessionRow>('SELECT * FROM auth_sessions WHERE revoked_at IS NULL AND expires_at <= ?')
         .all(now());
       for (const row of rows) revoke(row.id, row.user_id, 'expired');
+      for (const row of db.prepare<{ id: string }>('SELECT id FROM auth_sessions WHERE revoked_at IS NULL AND locked_at IS NULL').all()) getCurrent(row.id);
       return rows.length;
     },
     onEnd(listener: (event: SessionEnd) => void): () => void {

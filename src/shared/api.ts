@@ -1,5 +1,6 @@
 import { requestMfaReauth,
   expireAuthSession,
+  lockAuthSession,
   getStoredAuthToken } from '@/shared/authToken';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { isBlockedInTargetMode } from '@/shared/transport/target-route-policy';
@@ -33,6 +34,13 @@ const targetRequestUrl = (url: string): string | null => {
     throw error;
   }
 };
+
+// Only an authentication lock should hide the application; other resources may also use 423.
+async function announceSessionLock(response: Response): Promise<void> {
+  if (response.status !== 423) return;
+  const payload = await response.clone().json().catch(() => null);
+  if ((payload?.code ?? payload?.error?.code) === 'AUTH_SESSION_LOCKED') lockAuthSession();
+}
 
 // Utility function for authenticated API calls
 export const authenticatedFetch = (
@@ -79,10 +87,12 @@ export const authenticatedFetch = (
       if ((payload?.code ?? payload?.error?.code) === 'MFA_REAUTH_REQUIRED'
         && !options.signal?.aborted && await requestMfaReauth() && !options.signal?.aborted) {
         const retried = await send();
+        await announceSessionLock(retried);
         if (retried.status === 401 && retried.headers.get('X-Auth-Error')) expireAuthSession();
         return retried;
       }
     }
+    await announceSessionLock(response);
     if (response.status === 401 && response.headers.get('X-Auth-Error')) {
       expireAuthSession();
     }
@@ -232,6 +242,10 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
+    sessionStatus: () => get('/api/auth/session-status'),
+    lock: () => post('/api/auth/lock'),
+    unlock: (code: string) => post('/api/auth/unlock', { code }),
+    setAutoLock: (enabled: boolean) => put('/api/auth/auto-lock', { enabled }),
     mfaStatus: () => get('/api/auth/mfa/status'),
     mfaVerify: (challenge: string, code: string, recovery = false) => post('/api/auth/mfa/verify', { challenge, code, recovery }),
     mfaReauth: (code: string) => post('/api/auth/mfa/reauth', { code }),

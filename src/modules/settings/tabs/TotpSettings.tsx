@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 
+import SessionLockSettings from '@/modules/settings/tabs/SessionLockSettings';
 import { api, readApiJson } from '@/shared/api';
 import { Button, Input } from '@/shared/ui';
 import { isTargetMode } from '@/shared/transport/target-context';
@@ -74,6 +75,7 @@ export default function TotpSettings() {
       <Input id="totp-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
       <Button type="submit" disabled={busy || enabled === null}>{enabled ? 'Replace authenticator' : 'Set up authenticator'}</Button>
     </form>}
+    {enabled && <SessionLockSettings />}
     {enabled && <div className="flex flex-wrap gap-2">
       <Button variant="outline" disabled={busy} onClick={() => void run(async () => {
         const result = await readApiJson<{ recoveryCodes: string[] }>(await api.auth.mfaRecoveryCodes()); setCodes(result.recoveryCodes);

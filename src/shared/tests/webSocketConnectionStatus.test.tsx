@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { act, render } from '@testing-library/react';
 import { useEffect } from 'react';
+import { AUTH_SESSION_LOCKED_EVENT, AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
 /**
@@ -13,7 +14,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
  * when the auth token is refreshed (which must not read as lost either).
  */
 
-type FakeAuth = { user: { id: number } | null; token: string | null; isLoading: boolean };
+type FakeAuth = { user: { id: number } | null; token: string | null; isLoading: boolean; isLocked?: boolean };
 
 // Mutable so a test can hand the provider a refreshed token or sign the user
 // out. `user` keeps one identity throughout; a fresh object would rebuild
@@ -37,7 +38,7 @@ class FakeWebSocket {
   readyState = FakeWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event?: { code: number }) => void) | null = null;
   onerror: ((error: unknown) => void) | null = null;
 
   constructor(readonly url: string) {
@@ -203,4 +204,43 @@ test('signing out while connected stops reporting a live connection', () => {
   assert.equal(socket(0).readyState, FakeWebSocket.CLOSED, 'the socket was closed on sign-out');
   assert.equal(lastStatus(), 'connecting');
   assert.equal(isConnected, false, 'isConnected no longer reports the closed socket as live');
+});
+
+
+test('L-04: lock close signals lock, never expiry or a retry; only unlocking reconnects', () => {
+  const view = renderProvider();
+  const locked = vi.fn(), expired = vi.fn();
+  window.addEventListener(AUTH_SESSION_LOCKED_EVENT, locked);
+  window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, expired);
+  try {
+    act(() => socket(0).serverOpens());
+    act(() => socket(0).onclose?.({ code: 4403 }));
+    assert.equal(locked.mock.calls.length, 1);
+    assert.equal(expired.mock.calls.length, 0);
+    act(() => { vi.advanceTimersByTime(6000); });
+    assert.equal(FakeWebSocket.instances.length, 1);
+    AUTH.current = { ...AUTH.current, isLocked: true };
+    view.rerender(<WebSocketProvider><RecordStatus /></WebSocketProvider>);
+    act(() => { vi.advanceTimersByTime(6000); });
+    assert.equal(FakeWebSocket.instances.length, 1);
+    AUTH.current = { ...AUTH.current, isLocked: false };
+    view.rerender(<WebSocketProvider><RecordStatus /></WebSocketProvider>);
+    assert.equal(FakeWebSocket.instances.length, 2);
+    act(() => socket(1).serverOpens());
+    assert.equal(isConnected, true);
+  } finally {
+    window.removeEventListener(AUTH_SESSION_LOCKED_EVENT, locked);
+    window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, expired);
+  }
+});
+
+test('L-04: HTTP lock notification closes a live socket and cancels reconnect', () => {
+  const view = renderProvider();
+  act(() => socket(0).serverOpens());
+  AUTH.current = { ...AUTH.current, isLocked: true };
+  view.rerender(<WebSocketProvider><RecordStatus /></WebSocketProvider>);
+  assert.equal(socket(0).readyState, FakeWebSocket.CLOSED);
+  assert.equal(isConnected, false);
+  act(() => { vi.advanceTimersByTime(6000); });
+  assert.equal(FakeWebSocket.instances.length, 1);
 });

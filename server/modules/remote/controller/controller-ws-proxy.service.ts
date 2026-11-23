@@ -261,7 +261,7 @@ export function createRemoteWebSocketGateway(options: RemoteWebSocketGatewayOpti
       },
     };
     const untrackPeer = registry.trackConnection(peerId, connection);
-    const untrackSession = getSessionRuntime().connections.track(sessionId, () => connection.close(4401, 'session-ended'));
+    const untrackSession = getSessionRuntime().connections.track(sessionId, reason => connection.close(reason === 'locked' ? 4403 : 4401, reason === 'locked' ? 'session-locked' : 'session-ended'));
     untrack = () => { untrackPeer(); untrackSession(); };
     if (done) { untrack(); return; }
 

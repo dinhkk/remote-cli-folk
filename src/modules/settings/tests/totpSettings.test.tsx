@@ -41,3 +41,10 @@ it('T-00/T-05/T-06/T-09: setup draws locally, clears password and displays recov
   expect(screen.queryByText(codes[0])).toBeNull();
   expect(fetcher.mock.calls.every(([url]) => url.startsWith('/api/auth/'))).toBe(true);
 });
+
+it('L-10/K-23: loading status preserves the expected Unicode text', () => {
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+  const { container, unmount } = render(<TotpSettings />);
+  expect(container.querySelector('p')?.textContent).toBe('Loading\u2026');
+  unmount();
+});
