@@ -698,3 +698,39 @@ test('without saved expansion, initial project selection still opens normally', 
   const controller = renderController(vi.fn(), { ...IDLE, keepProjectsExpanded: true, selectedProject: PROJECT });
   assert.equal(controller.result.current.isProjectExpanded(PROJECT.projectId), true);
 });
+
+
+test('UI-04: changing provider ignores a late response for the previous filter', async () => {
+  let finishOld!: (response: Awaited<ReturnType<typeof jsonResponse>>) => void;
+  const old = new Promise<Awaited<ReturnType<typeof jsonResponse>>>(resolve => { finishOld = resolve; });
+  recentConversations.mockImplementationOnce(() => old).mockImplementation(() => jsonResponse({
+    conversations: [{ sessionId: 'codex-row', provider: 'codex', projectId: null }], total: 1, hasMore: false,
+  }));
+  const { result } = renderController();
+  act(() => result.current.setSearchMode('conversations'));
+  await waitFor(() => assert.equal(recentConversations.mock.calls.length, 1));
+  act(() => result.current.setProviderFilter('codex'));
+  await waitFor(() => assert.equal(result.current.recentConversationsTotal, 1));
+  await act(async () => { finishOld(await jsonResponse({
+    conversations: [{ sessionId: 'old-claude', provider: 'claude', projectId: null }], total: 99, hasMore: false,
+  })); });
+  assert.deepEqual(result.current.recentConversations.map(row => row.sessionId), ['codex-row']);
+  assert.equal(result.current.recentConversationsTotal, 1);
+  const calls = recentConversations.mock.calls.length;
+  act(() => result.current.setProviderFilter('codex'));
+  assert.equal(recentConversations.mock.calls.length, calls, 'clicking the selected filter preserves results');
+});
+
+test('UI-07: leaving conversation mode cancels pagination and late results', async () => {
+  let finish!: (response: Awaited<ReturnType<typeof jsonResponse>>) => void;
+  recentConversations.mockImplementation(() => new Promise<Awaited<ReturnType<typeof jsonResponse>>>(resolve => { finish = resolve; }));
+  const { result } = renderController();
+  act(() => { result.current.setProviderFilter('codex'); result.current.setSearchMode('conversations'); });
+  await waitFor(() => assert.equal(recentConversations.mock.calls.length, 1));
+  act(() => result.current.setSearchMode('projects'));
+  await act(async () => { finish(await jsonResponse({
+    conversations: [{ sessionId: 'late', provider: 'codex', projectId: null }], total: 100, hasMore: true,
+  })); });
+  assert.equal(recentConversations.mock.calls.length, 1);
+  assert.deepEqual(result.current.recentConversations, []);
+});

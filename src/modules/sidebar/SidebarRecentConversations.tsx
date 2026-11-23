@@ -5,7 +5,7 @@ import type { TFunction } from 'i18next';
 import { Button, LLMProviderLogo, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { ProjectSession, RecentConversationListItem, SessionRowActions } from '@/shared/types';
-import { formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
+import { formatCompactAge, PROVIDER_LABELS } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
 
 type SidebarRecentConversationsProps = {
@@ -175,6 +175,8 @@ export default function SidebarRecentConversations({
                     {conversation.sessionTitle}
                   </span>
                   <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] leading-3 text-muted-foreground">
+                    <span className="shrink-0">{t('providerFilter.provider', { provider: PROVIDER_LABELS[conversation.provider] })}</span>
+                    <span aria-hidden="true">·</span>
                     <span className="truncate">{conversation.projectDisplayName}</span>
                     {isProcessing ? (
                       <>

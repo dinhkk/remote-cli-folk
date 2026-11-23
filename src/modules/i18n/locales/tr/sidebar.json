@@ -167,5 +167,11 @@
     "archiveSessions_other": "{{count}} oturumu arşivle",
     "archiveSessionsNotice_one": "Arşivleme, oturumu etkin listeden çıkarır ancak geçmişini korur.",
     "archiveSessionsNotice_other": "Arşivleme, oturumları etkin listeden çıkarır ancak geçmişlerini korur."
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }

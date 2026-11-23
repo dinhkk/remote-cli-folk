@@ -216,5 +216,11 @@
     "archiveSessionsNotice_one": "Archivar mantiene la sesión fuera de la lista activa y conserva su historial.",
     "archiveSessionsNotice_other": "Archivar mantiene las sesiones fuera de la lista activa y conserva su historial.",
     "archiveSessionsNotice_many": "Archivar mantiene las sesiones fuera de la lista activa y conserva su historial."
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }
