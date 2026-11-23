@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Load environment variables before other imports execute.
+import './load-env.js';
 import fs, { promises as fsPromises } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -20,7 +21,6 @@ import { createRemoteModule } from '@/modules/remote/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
-import './load-env.js';
 import { startSessionExpiry } from './modules/auth/services/session-runtime.service.js';
 import { assertAuthModeCompatible } from './modules/auth/services/auth-mode.service.js';
 import { initializeMfa } from './modules/auth/services/mfa-runtime.service.js';
