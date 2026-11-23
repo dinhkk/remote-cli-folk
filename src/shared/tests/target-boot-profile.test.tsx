@@ -206,7 +206,7 @@ test('the same providers in local mode make their usual unprefixed requests and 
   render(<PluginsProvider><Probe /></PluginsProvider>);
   await vi.waitFor(() => assert.ok(spy.fetches.some(({ url }) => url === '/api/plugins')));
 
-  assert.ok(spy.fetches.some(({ url }) => url === '/health'));
+  assert.ok(spy.fetches.some(({ url }) => url === '/api/auth/version'));
   // No request leaves for a third party, not even for the release check.
   assert.ok(spy.fetches.every(({ url }) => !/^https?:\/\//i.test(url)), JSON.stringify(spy.fetches.map(({ url }) => url)));
 });

@@ -1,26 +1,12 @@
-/**
- * Transport guards of `/api/remote/**` (contracts section 2, NFR-7). The chain runs in this order so a
- * caller learns as little as possible and the cheapest refusals come first:
- *
- *   API_KEY (parity with every other `/api` route) -> same-origin -> full JWT in the Authorization
- *   header (a tab token fails here: it is signed with another key, AC-33) -> `Content-Type:
- *   application/json` on writes -> JSON body of at most 4 KB.
- *
- * Authentication runs BEFORE the body parser, so an unauthenticated caller can make the server read
- * nothing. Sensitive endpoints add `requirePassword`: the account password is re-checked through the
- * auth module with the caller's address (so wrong guesses share the login lock-out), and the handler
- * never sees it.
- */
+/** The management API shares the browser session guard and keeps its 4 KB parser. */
 
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 
+import { createApiSessionGuard } from '@/modules/auth/index.js';
 import { AppError } from '@/shared/utils.js';
 
 /** Largest management request body. Everything the UI sends (URL, secret, password) fits in a fraction of it. */
 const MANAGEMENT_BODY_LIMIT = '4kb';
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-/** `Sec-Fetch-Site` values of a request the user's own page made (or typed in the address bar). */
-const SAME_ORIGIN_SITES = new Set(['same-origin', 'none']);
 
 export type ManagementGuardDeps = {
   authenticateToken: RequestHandler;
@@ -32,45 +18,13 @@ export type ManagementGuardDeps = {
 export type ManagementUser = { id: number; username: string };
 
 /** Request after the guard chain ran: `user` is the authenticated owner. */
-export type ManagementRequest = Request & { user: ManagementUser };
+export type ManagementRequest = Request & { user: ManagementUser; authSession: { id: string } };
 
 /** Address used to key the password lock-out (Express applies `trust proxy`). */
 const clientIpOf = (req: Request): string => req.ip ?? req.socket.remoteAddress ?? 'unknown';
 
 const refuse = (next: NextFunction, status: number, code: string, message: string): void => {
   next(new AppError(message, { statusCode: status, code }));
-};
-
-const requireSameOrigin: RequestHandler = (req, _res, next) => {
-  const site = req.get('sec-fetch-site');
-  if (site !== undefined) {
-    if (SAME_ORIGIN_SITES.has(site)) return next();
-    return refuse(next, 403, 'REMOTE_FORBIDDEN', 'The management API only answers requests from its own page.');
-  }
-  // Clients that send no Sec-Fetch-* (scripts, old browsers) must not claim a foreign origin.
-  const origin = req.get('origin');
-  if (origin === undefined) return next();
-  try {
-    if (origin !== 'null' && new URL(origin).host === req.get('host')) return next();
-  } catch {
-    // Unparseable origin: refused below.
-  }
-  return refuse(next, 403, 'REMOTE_FORBIDDEN', 'The management API only answers requests from its own page.');
-};
-
-/** The token must come in the Authorization header: a URL lands in logs, history and referrers. */
-const requireBearerHeader: RequestHandler = (req, res, next) => {
-  const header = req.headers.authorization;
-  if (typeof header === 'string' && header.split(' ')[1]) return next();
-  res.setHeader('X-Auth-Error', 'invalid-token');
-  return refuse(next, 401, 'AUTH_TOKEN_INVALID', 'Access denied. No token provided.');
-};
-
-const requireJsonOnWrites: RequestHandler = (req, _res, next) => {
-  if (SAFE_METHODS.has(req.method)) return next();
-  const mediaType = (req.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase();
-  if (mediaType === 'application/json') return next();
-  return refuse(next, 415, 'REMOTE_UNSUPPORTED_MEDIA', 'Send the request as application/json.');
 };
 
 /**
@@ -102,7 +56,7 @@ export function createManagementGuards(deps: ManagementGuardDeps): { chain: Requ
   };
 
   return {
-    chain: [deps.validateApiKey, requireSameOrigin, requireBearerHeader, deps.authenticateToken, requireJsonOnWrites, parseJson],
+    chain: [deps.validateApiKey, createApiSessionGuard(deps.authenticateToken), parseJson],
     requirePassword,
   };
 }

@@ -125,7 +125,7 @@ describe('master key', () => {
         for (const path of ['/api/remote/relay-config', '/api/remote/host/status', '/api/remote/peers']) {
           const response = await send(server.port, {
             path,
-            headers: { authorization: `Bearer ${rig.jwt}`, 'sec-fetch-site': 'same-origin' },
+            headers: { cookie: `remotecli_session=${rig.jwt}`, 'x-remotecli-request': '1', 'sec-fetch-site': 'same-origin' },
           });
           assert.equal(response.status, 409, path);
           assert.equal(errorCode(response.text()), 'MASTER_KEY_MISMATCH');

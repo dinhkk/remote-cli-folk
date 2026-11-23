@@ -1,10 +1,11 @@
+import express from 'express';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 /**
  * Test rig for the Controller's `/r/<peerId>/**` HTTP proxy: the real router and peer registry over a
  * scripted link (`fake-link`), a real account with real tab tokens on a throwaway database, and an Express
  * server on a loopback port. The test plays the Host by driving the streams the proxy opens.
  */
 
-import express from 'express';
 
 import { createControllerProxyRoutes } from '../../controller/controller-proxy.routes.js';
 import { createPeerRegistry } from '../../controller/peer-registry.service.js';
@@ -117,7 +118,7 @@ export const withHarness = async (options: ProxyHarnessOptions, run: (harness: P
     const server = await serve(app);
 
     // A tab token for a pairing that is already expired cannot be issued; the tests that need one mint it first.
-    const issue = (peerId: string): string => tabs.issue({ userId: user.id, username: user.username, peerId }).tabToken;
+    const issue = (peerId: string): string => tabs.issue({ userId: user.id, username: user.username, peerId, sessionId: getSessionRuntime().store.authenticate(account.jwt)!.id }).tabToken;
     const tabToken = issue(peer.id);
     const harness: ProxyHarness = {
       port: server.port,

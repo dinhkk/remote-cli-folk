@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 
 import express from 'express';
 import type { WebSocketServer } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { authenticateWebSocket, issueTabToken } from '@/modules/auth/index.js';
 import { createWebSocketServer } from '@/modules/websocket/index.js';
@@ -118,7 +119,8 @@ export const withModuleRig = async (options: ModuleRigOptions, run: (rig: Module
         method: call.method ?? 'GET',
         path: `/api/remote${path}`,
         headers: {
-          authorization: `Bearer ${call.token ?? jwt}`,
+          cookie: `remotecli_session=${call.token ?? jwt}`,
+          'x-remotecli-request': '1',
           'content-type': 'application/json',
           'sec-fetch-site': 'same-origin',
           ...call.headers,
@@ -167,7 +169,7 @@ export const withModuleRig = async (options: ModuleRigOptions, run: (rig: Module
           socketFactory: net.factory,
           clock,
         });
-        return { record, k, host, tabToken: issueTabToken({ userId: user.id, username, peerId: record.id }) };
+        return { record, k, host, tabToken: issueTabToken({ userId: user.id, username, peerId: record.id, sessionId: getSessionRuntime().store.authenticate(jwt)!.id }) };
       },
     };
     try {

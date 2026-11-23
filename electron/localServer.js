@@ -64,7 +64,7 @@ async function isRemoteCliServer(baseUrl) {
   const response = await requestJson(`${baseUrl}/health`);
   return response.ok
     && response.json?.status === 'ok'
-    && typeof response.json?.installMode === 'string';
+    && typeof response.json?.timestamp === 'string';
 }
 const isCloudCliServer = isRemoteCliServer;
 

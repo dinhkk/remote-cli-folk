@@ -24,6 +24,7 @@
 import type { IncomingHttpHeaders } from 'node:http';
 
 import express, { type Request, type Response } from 'express';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import type { RemoteBrowserConnection, RemoteErrorCode, RemoteMuxHeaders, RemoteMuxStream, RemoteStreamEnd } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
@@ -275,6 +276,13 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
       sendJsonError(res, 401, expired ? 'AUTH_TOKEN_EXPIRED' : 'AUTH_TOKEN_INVALID', expired ? 'The tab token expired.' : 'Invalid tab token.');
       return;
     }
+
+    const runtime = getSessionRuntime();
+    runtime.store.touch(auth.user.sessionId, req.get('user-agent'));
+    const releaseSession = runtime.connections.track(auth.user.sessionId, () => res.destroy());
+    res.once('close', releaseSession);
+    res.once('finish', releaseSession);
+    if (res.destroyed) return;
 
     // `req.url` is what follows `/r/<peerId>`: the path and query as the browser wrote them.
     const raw = req.url;

@@ -157,35 +157,21 @@ export class ViewHost {
     return true;
   }
 
-  async readLocalStorageValueForOrigin(originUrl, key) {
-    let targetOrigin;
-    try {
-      targetOrigin = new URL(originUrl).origin;
-    } catch {
-      return null;
-    }
-
+  // Main-process only: HttpOnly credentials are never evaluated in or returned to a renderer.
+  async readSessionCookieForOrigin(originUrl) {
+    let target;
+    try { target = new URL(originUrl); } catch { return null; }
+    if (!['http:', 'https:'].includes(target.protocol)) return null;
+    const name = target.protocol === 'https:' ? '__Host-remotecli_session' : 'remotecli_session';
     for (const view of this.tabViews.values()) {
       if (!view || view.webContents.isDestroyed()) continue;
-      let viewOrigin;
-      try {
-        viewOrigin = new URL(view.webContents.getURL()).origin;
-      } catch {
-        continue;
-      }
-      if (viewOrigin !== targetOrigin) continue;
-
-      try {
-        const value = await view.webContents.executeJavaScript(
-          `window.localStorage.getItem(${JSON.stringify(key)})`,
-          true
-        );
-        return typeof value === 'string' && value ? value : null;
-      } catch {
-        return null;
-      }
+      let origin;
+      try { origin = new URL(view.webContents.getURL()).origin; } catch { continue; }
+      if (origin !== target.origin) continue;
+      const cookies = await view.webContents.session.cookies.get({ url: target.origin, name });
+      const cookie = cookies.find((item) => item.httpOnly && /^[A-Za-z0-9_-]{43}$/.test(item.value));
+      return cookie ? `${name}=${cookie.value}` : null;
     }
-
     return null;
   }
 

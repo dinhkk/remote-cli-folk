@@ -1,4 +1,4 @@
-import { getStoredAuthToken } from '@/shared/authToken';
+import { expireAuthSession, getStoredAuthToken } from '@/shared/authToken';
 import { TargetUrlError, httpUrl, isTargetMode } from '@/shared/transport/target-context';
 import { handleTargetResponse } from '@/shared/transport/target-response';
 
@@ -118,12 +118,16 @@ class FetchEventSource implements EventSourceLike {
     try {
       const token = getStoredAuthToken();
       const response = await fetch(target, {
-        headers: { Accept: 'text/event-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { Accept: 'text/event-stream', 'X-RemoteCLI-Request': '1', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: isTargetMode() ? 'omit' : 'same-origin',
         cache: 'no-store',
         signal: this.abort.signal,
       });
       if (!response.ok || !response.body) {
-        if (!this.closed) handleTargetResponse(response);
+        if (!this.closed) {
+          if (isTargetMode()) handleTargetResponse(response);
+          else if (response.status === 401) { expireAuthSession(); this.fail(); return 'stop'; }
+        }
         this.fail();
         return RETRYABLE_STATUSES.has(response.status) ? 'reconnect' : 'stop';
       }
@@ -177,4 +181,4 @@ class FetchEventSource implements EventSourceLike {
  * conversation searches and by the project clone progress stream.
  */
 export const openEventSource = (url: string): EventSourceLike =>
-  isTargetMode() ? new FetchEventSource(url) : (new EventSource(url) as unknown as EventSourceLike);
+  new FetchEventSource(url);

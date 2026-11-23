@@ -1,9 +1,11 @@
+import type { AuthenticatedWebSocketUser } from '@/shared/types.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import pty, { type IPty } from 'node-pty';
 import { WebSocket, type RawData } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { parseIncomingJsonObject, stripAnsiSequences } from '@/shared/utils.js';
 
@@ -546,7 +548,8 @@ function prioritizeUserNpmGlobalBin(env: NodeJS.ProcessEnv): { key: string; valu
  */
 export function handleShellConnection(
   ws: WebSocket,
-  dependencies: ShellWebSocketDependencies
+  dependencies: ShellWebSocketDependencies,
+  authUser?: AuthenticatedWebSocketUser,
 ): void {
   console.log('[INFO] Shell websocket connected');
 
@@ -557,6 +560,10 @@ export function handleShellConnection(
 
   ws.on('message', async (rawMessage) => {
     try {
+      if (typeof authUser?.sessionId === 'string' && !getSessionRuntime().store.getActive(authUser.sessionId)) {
+        ws.close(4401, 'session-ended');
+        return;
+      }
       const data = parseShellMessage(rawMessage);
       if (!data?.type) {
         throw new Error('Invalid websocket payload');
@@ -588,7 +595,7 @@ export function handleShellConnection(
           isPlainShell && initialCommand
             ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
             : '';
-        ptySessionKey = `${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
+        ptySessionKey = `${authUser?.sessionId ?? authUser?.authKind ?? 'internal'}:${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
 
         if (isLoginCommand || forceRestart) {
           const oldSession = ptySessionsMap.get(ptySessionKey);

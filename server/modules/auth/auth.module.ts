@@ -3,9 +3,10 @@ import { createRequire } from 'node:module';
 import { getConnection, userDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 
-import { authenticateToken, generateToken, rotateJwtSecret } from './auth.middleware.js';
+import { authenticateToken, generateToken } from './auth.middleware.js';
 import { createAuthRouter } from './auth.routes.js';
 import { createAuthService } from './auth.service.js';
+import { getSessionRuntime } from './services/session-runtime.service.js';
 import { bumpAuthEpoch } from './services/auth-epoch.service.js';
 import { createLoginRateLimiter } from './services/login-rate-limit.service.js';
 
@@ -47,7 +48,7 @@ const authService = createAuthService({
   loginLimiter,
   dummyPasswordHash: DUMMY_PASSWORD_HASH,
   getSetupToken: () => process.env.REMOTECLI_SETUP_TOKEN || process.env.CLOUDCLI_SETUP_TOKEN || undefined,
-  rotateJwtSecret,
+  revokeSessions: (userId) => getSessionRuntime().store.revokeAll(userId),
   bumpAuthEpoch,
 });
 

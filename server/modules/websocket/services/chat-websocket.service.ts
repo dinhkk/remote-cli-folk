@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import type { WebSocket } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
@@ -712,6 +713,10 @@ export function handleChatConnection(
 
   ws.on('message', async (rawMessage) => {
     try {
+      if (typeof request.user?.sessionId === 'string' && !getSessionRuntime().store.getActive(request.user.sessionId)) {
+        ws.close(4401, 'session-ended');
+        return;
+      }
       const parsed = parseIncomingJsonObject(rawMessage);
       if (!parsed) {
         throw new Error('Invalid websocket payload');

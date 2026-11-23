@@ -22,7 +22,7 @@ export type RouteModule = { prefix: string; file: string; registrations: number;
 
 /** Routers mounted by `server/index.ts` (`app.use(prefix, ..., router)`). The sub-router of projects shares its prefix. */
 export const ROUTE_MODULES: readonly RouteModule[] = [
-  { prefix: '/api/auth', file: 'modules/auth/auth.routes.ts', mountedAs: 'authRoutes', registrations: 7 },
+  { prefix: '/api/auth', file: 'modules/auth/auth.routes.ts', mountedAs: 'authRoutes', registrations: 9 },
   { prefix: '/api/file-tree', file: 'modules/file-tree/file-tree.routes.ts', mountedAs: 'fileTreeRoutes', registrations: 10 },
   { prefix: '/api/projects', file: 'modules/projects/projects.routes.ts', mountedAs: 'projectModuleRoutes', registrations: 10, subRouterCalls: ['createProjectCloneRouter('] },
   { prefix: '/api/projects', file: 'modules/projects/project-clone.routes.ts', registrations: 2 },
@@ -90,12 +90,14 @@ export function mountMismatches(indexSource: string, modules: readonly RouteModu
 }
 
 /** Rows (method x path) the whole inventory expands to: 94 allow + 95 deny. Pinned: a different number is a route change to review. */
-export const EXPECTED_INVENTORY_ROWS = 192;
+export const EXPECTED_INVENTORY_ROWS = 195;
 
 /** The literal-path registrations of `server/index.ts` that are not router mounts (everything else must be in ROUTE_MODULES). */
 export const INDEX_OTHER_LITERALS: ReadonlyArray<{ call: string; note: string }> = [
   { call: 'use /api', note: 'validateApiKey middleware for every /api route' },
   { call: 'get /health', note: 'public health check' },
+  { call: 'get /api/auth/version', note: 'authenticated version metadata' },
+  { call: 'use /r', note: 'CORS for scoped Remote bearer requests' },
   { call: 'get *', note: 'SPA fallback of the Host UI' },
 ];
 

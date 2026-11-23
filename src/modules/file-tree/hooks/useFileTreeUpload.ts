@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 
-import { IS_PLATFORM } from '@/shared/utils';
 import type { FileTreeUploadProgressState, Project } from '@/shared/types';
 import { api } from '@/shared/api';
-import { expireAuthSession, getStoredAuthToken, storeAuthToken } from '@/shared/authToken';
+import { expireAuthSession, getStoredAuthToken } from '@/shared/authToken';
 import { isTargetMode } from '@/shared/transport/target-context';
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_LABEL } from '@/shared/constants';
 
@@ -105,10 +104,11 @@ const uploadFormDataWithProgress = (
     const xhr = new XMLHttpRequest();
 
     xhr.open('POST', api.uploadFilesUrl(projectId));
+    xhr.setRequestHeader('X-RemoteCLI-Request', '1');
 
     const token = getStoredAuthToken();
     // A Remote tab always sends its tab token, even in a platform build.
-    if ((isTargetMode() || !IS_PLATFORM) && token) {
+    if (isTargetMode() && token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }
 
@@ -123,13 +123,7 @@ const uploadFormDataWithProgress = (
     };
 
     xhr.onload = () => {
-      // storeAuthToken/expireAuthSession are inert in a Remote tab, so a header
-      // relayed from the Host cannot touch the Controller's session.
-      const refreshedToken = xhr.getResponseHeader('X-Refreshed-Token');
-      if (refreshedToken) {
-        storeAuthToken(refreshedToken);
-      }
-      if (xhr.getResponseHeader('X-Auth-Error')) {
+      if (xhr.status === 401 && xhr.getResponseHeader('X-Auth-Error')) {
         expireAuthSession();
       }
 

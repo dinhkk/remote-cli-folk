@@ -21,6 +21,7 @@ import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { WebSocket } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { issueTabToken } from '@/modules/auth/index.js';
 import { closeConnection, initializeDatabase } from '@/modules/database/index.js';
@@ -34,6 +35,7 @@ import { createTestAccount } from '../support/auth-test-session.js';
 import { FakeRelay } from '../support/fake-relay.js';
 import { startFakeRelayWsServer, type FakeRelayWsServer } from '../support/fake-relay-ws-server.js';
 import { send } from '../support/http-test-client.js';
+import { buildInventory } from '../support/route-inventory-table.js';
 
 const FORK_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 
@@ -124,6 +126,43 @@ describe('server/index.ts with Remote', () => {
   const previousDatabasePath = process.env.DATABASE_PATH;
   const previousSecret = process.env.JWT_SECRET;
 
+  it('G-01/G-02/K-01: every mounted protected API rejects requests before body parsing; /api has no CORS', async () => {
+    const publicRoutes = new Set(['GET /api/auth/status', 'POST /api/auth/login', 'POST /api/auth/register', 'POST /api/auth/mfa/verify']);
+    const inventory = buildInventory();
+    assert.deepEqual(inventory.problems, []);
+    const routes = inventory.rows.filter((row) => row.route.startsWith('/api/')
+      && !/^\/api\/(agent|browser-use-mcp)(\/|$)/.test(row.route)
+      && !publicRoutes.has(`${row.method} ${row.route}`));
+    assert.ok(routes.length > 150);
+    for (const row of routes) {
+      const route = row.route.replace(/:[A-Za-z0-9_]+/g, 'synthetic').replace(/\*/g, 'synthetic');
+      const response = await send(child.port, {
+        path: route, method: row.method,
+        headers: { origin: 'https://foreign.example', 'content-type': 'application/json' },
+        ...(!['GET', 'HEAD'].includes(row.method) ? { body: '{invalid' } : {}),
+      });
+      assert.equal(response.status, 401, `${row.method} ${route}`);
+      assert.equal(response.headers['access-control-allow-origin'], undefined);
+      assert.equal(response.headers['access-control-allow-credentials'], undefined);
+    }
+  });
+
+  it('N-03/K-26: health exposes only status/timestamp; version metadata needs a session', async () => {
+    const health = jsonBody(await send(child.port, { path: '/health' }));
+    assert.deepEqual(Object.keys(health).sort(), ['status', 'timestamp']);
+    assert.equal(health.status, 'ok');
+    assert.equal((await send(child.port, { path: '/api/auth/version' })).status, 401);
+  });
+
+  it('C-10/C-11/C-12/C-13: static and Remote CORS never enable ambient credentials', async () => {
+    for (const route of ['/manifest.json', `/r/${peerId}/health`]) {
+      const response = await send(child.port, { path: route, headers: { origin: 'null', authorization: `Bearer ${tabToken}` } });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers['access-control-allow-origin'], '*');
+      assert.equal(response.headers['access-control-allow-credentials'], undefined);
+    }
+  });
+
   before(async () => {
     directory = await mkdtemp(path.join(os.tmpdir(), 'remote-mount-'));
     const databasePath = path.join(directory, 'auth.db');
@@ -145,7 +184,7 @@ describe('server/index.ts with Remote', () => {
     const k = crypto.randomBytes(32);
     peerId = storage.pairings.insertPairing({ role: 'controller', peerName: 'Office PC', k, relayUrl: relayServer.url }).id;
     jwt = user.jwt;
-    tabToken = issueTabToken({ userId: user.id, username: user.username, peerId });
+    tabToken = issueTabToken({ userId: user.id, username: user.username, peerId, sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id });
     closeConnection();
 
     // The Host: answers every proxied HTTP request with what it received, echoes WebSocket messages.
@@ -173,7 +212,7 @@ describe('server/index.ts with Remote', () => {
     child = await startServer({ CLOUDCLI_REMOTE_MASTER_KEY: MASTER_KEY }, directory, databasePath);
     // Listing the peers opens the Controller's link (lazy); wait until the Host is reachable through the relay.
     await waitUntil(async () => {
-      const peers = await send(child.port, { path: '/api/remote/peers', headers: { authorization: `Bearer ${jwt}`, 'sec-fetch-site': 'same-origin' } });
+      const peers = await send(child.port, { path: '/api/remote/peers', headers: { cookie: `remotecli_session=${jwt}`, 'x-remotecli-request': '1', 'sec-fetch-site': 'same-origin' } });
       return peers.status === 200 && (JSON.parse(peers.text()) as Array<{ state: string }>)[0]?.state === 'online';
     }, 'the Controller link to come online', 60_000);
   });
@@ -229,7 +268,7 @@ describe('server/index.ts with Remote', () => {
     const response = await send(child.port, {
       method: 'POST',
       path: '/api/remote/peers/join',
-      headers: { authorization: `Bearer ${jwt}`, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+      headers: { cookie: `remotecli_session=${jwt}`, 'x-remotecli-request': '1', 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
       body: JSON.stringify({ code: 'x'.repeat(5000), deviceName: 'phone' }),
     });
     assert.equal(response.status, 413);
@@ -254,7 +293,7 @@ describe('server/index.ts with Remote', () => {
   });
 
   it('refuses the main JWT on /r and a tab token for another peer', async () => {
-    const asJwt = await send(child.port, { path: `/r/${peerId}/api/health`, headers: { authorization: `Bearer ${jwt}` } });
+    const asJwt = await send(child.port, { path: `/r/${peerId}/api/health`, headers: { cookie: `remotecli_session=${jwt}`, 'x-remotecli-request': '1' } });
     assert.equal(asJwt.status, 401);
     const otherPeer = await send(child.port, { path: '/r/another-peer/api/health', headers: tabHeaders() });
     assert.equal(otherPeer.status, 401);
@@ -294,7 +333,7 @@ describe('server/index.ts with Remote', () => {
 
   it('keeps the ordinary behaviour: /health and the regular WebSocket still work', async () => {
     assert.equal(jsonBody(await send(child.port, { path: '/health' })).status, 'ok');
-    const socket = new WebSocket(`ws://127.0.0.1:${child.port}/desktop-notifications?token=${jwt}`);
+    const socket = new WebSocket(`ws://127.0.0.1:${child.port}/desktop-notifications`, { headers: { cookie: `remotecli_session=${jwt}`, origin: `http://127.0.0.1:${child.port}` } });
     await new Promise<void>((resolve, reject) => {
       socket.once('open', resolve);
       socket.once('error', reject);
@@ -326,11 +365,16 @@ describe('server/index.ts with CLOUDCLI_REMOTE_DISABLED=1', () => {
     if (directory) await rm(directory, { recursive: true, force: true });
   });
 
-  it('answers /health as before and has no Remote routes (the SPA fallback answers them)', async () => {
+  it('G-02: health stays public and disabled Remote APIs still require authentication', async () => {
     assert.equal((await send(child.port, { path: '/health' })).status, 200);
     for (const route of ['/api/remote/relay-config', '/r/x/api/health']) {
       const response = await send(child.port, { path: route, headers: { authorization: 'Bearer nothing' } });
-      assert.doesNotMatch(String(response.headers['content-type'] ?? ''), /application\/json/, route);
+      if (route.startsWith('/api/')) {
+        assert.equal(response.status, 401);
+        assert.match(String(response.headers['content-type']), /application\/json/);
+      } else {
+        assert.doesNotMatch(String(response.headers['content-type'] ?? ''), /application\/json/, route);
+      }
     }
     const page = await send(child.port, { path: '/?target=abc', headers: { accept: 'text/html' } });
     assert.equal(page.headers['content-security-policy'], undefined);

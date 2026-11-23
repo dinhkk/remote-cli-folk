@@ -2,6 +2,7 @@ import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 
 import { WebSocket, WebSocketServer, type VerifyClientCallbackAsync, type VerifyClientCallbackSync } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
@@ -187,9 +188,16 @@ export function createWebSocketServer(
 
     const incomingRequest = request as AuthenticatedWebSocketRequest;
     const pathname = pathnameOf(incomingRequest);
+    const sessionId = incomingRequest.user?.sessionId;
+    if (typeof sessionId === 'string') {
+      const runtime = getSessionRuntime();
+      const release = runtime.connections.track(sessionId, () => ws.close(4401, 'session-ended'));
+      ws.once('close', release);
+      if (!runtime.store.getActive(sessionId)) return;
+    }
 
     if (pathname === '/shell') {
-      handleShellConnection(ws, dependencies.shell);
+      handleShellConnection(ws, dependencies.shell, incomingRequest.user);
       return;
     }
 
@@ -204,7 +212,8 @@ export function createWebSocketServer(
     }
 
     if (pathname.startsWith('/plugin-ws/')) {
-      handlePluginWsProxy(ws, pathname, dependencies.getPluginPort);
+      handlePluginWsProxy(ws, pathname, dependencies.getPluginPort,
+        () => typeof sessionId !== 'string' || Boolean(getSessionRuntime().store.getActive(sessionId)));
       return;
     }
 

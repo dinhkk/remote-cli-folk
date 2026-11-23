@@ -134,7 +134,8 @@
     "notifications": "Notifications",
     "plugins": "Plugins",
     "remote": "Remote work",
-    "about": "About"
+    "about": "About",
+    "sessions": "Sessions"
   },
   "notifications": {
     "title": "Notifications",
@@ -892,5 +893,17 @@
     "teamManagementDescription": "Multiple users, role-based access, and shared projects for your team.",
     "licensed": "Licensed under AGPL-3.0",
     "proCta": "Available with RemoteCLI Pro"
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Review signed-in browsers. Signing out also disconnects that session’s open tabs. Sessions expire seven days after sign-in.",
+    "logout": "Sign out this device",
+    "current": "This device",
+    "lastSeen": "Last active",
+    "expires": "Expires",
+    "revoke": "Sign out",
+    "password": "Confirm your password to sign out every device",
+    "logoutAll": "Sign out all devices",
+    "error": "Could not update sessions. Check your connection and try again."
   }
 }

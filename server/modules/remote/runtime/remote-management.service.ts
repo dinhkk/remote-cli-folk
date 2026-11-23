@@ -215,9 +215,9 @@ export function createRemoteManagement(options: RemoteManagementOptions) {
       registry.setAlias(peerId, normalized);
       return { ok: true, alias: normalized };
     },
-    issueTabToken(user: { id: number; username: string }, peerId: string): { tabToken: string; expiresAt: number } {
+    issueTabToken(user: { id: number; username: string }, peerId: string, sessionId: string): { tabToken: string; expiresAt: number } {
       requireController();
-      return tabs.issue({ userId: user.id, username: user.username, peerId });
+      return tabs.issue({ userId: user.id, username: user.username, peerId, sessionId });
     },
   };
 }

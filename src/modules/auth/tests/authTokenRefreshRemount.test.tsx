@@ -6,7 +6,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import { AuthProvider, useAuth } from '@/modules/auth/context/AuthContext';
 import { i18n } from '@/modules/i18n';
-import { storeAuthToken } from '@/shared/authToken';
+const storeAuthToken = (token: string) => window.dispatchEvent(new CustomEvent('auth-token-refreshed', { detail: token }));
 
 /**
  * Issue #1269: once the stored JWT is past half of its lifetime, the server
@@ -29,11 +29,14 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 let requestedPaths: string[] = [];
 let nextRefreshedToken: string | null = null;
 let hasCompletedOnboarding = true;
+let loggedIn = true;
 let onboardingStatusDelayMs = 0;
 
 const stubServer = () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     requestedPaths.push(url);
+    if (url === '/api/auth/user' && !loggedIn) return new Response('{}', { status: 401 });
+    if (url === '/api/auth/login') loggedIn = true;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (url === '/api/auth/user' && nextRefreshedToken) {
       headers['X-Refreshed-Token'] = nextRefreshedToken;
@@ -46,7 +49,7 @@ const stubServer = () => {
       : url === '/api/auth/user'
         ? { user: { id: 1, username: 'triage' } }
         : url === '/api/auth/login'
-          ? { token: makeToken(nowSeconds()), user: { id: 1, username: 'triage' } }
+          ? { user: { id: 1, username: 'triage' } }
           : url === '/api/user/onboarding-status'
             ? { hasCompletedOnboarding }
             : {};
@@ -97,6 +100,7 @@ const renderApp = () => render(
 beforeEach(() => {
   localStorage.clear();
   requestedPaths = [];
+  loggedIn = true;
   nextRefreshedToken = null;
   hasCompletedOnboarding = true;
   onboardingStatusDelayMs = 0;
@@ -114,7 +118,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-test('a refreshed token on the initial auth check does not run a second loading pass', async () => {
+test('K-20: a legacy refresh header on the initial cookie auth check does not run a second loading pass', async () => {
   const agedToken = makeToken(nowSeconds() - 4 * 86400);
   const refreshedToken = makeToken(nowSeconds());
   localStorage.setItem('auth-token', agedToken);
@@ -127,15 +131,15 @@ test('a refreshed token on the initial auth check does not run a second loading 
     await new Promise((resolve) => setTimeout(resolve, 20));
   });
 
-  assert.equal(localStorage.getItem('auth-token'), refreshedToken);
-  assert.equal(seenToken, refreshedToken);
+  assert.equal(localStorage.getItem('auth-token'), null);
+  assert.equal(seenToken, 'cookie-session');
   assert.equal(requestedPaths.filter((path) => path === '/api/auth/user').length, 1);
   assert.equal(loadingPasses, 1);
   assert.equal(workspaceMounts, 1);
   assert.ok(screen.getByText('workspace'));
 });
 
-test('tokens refreshed while the workspace is open do not remount it', async () => {
+test('K-20: ignored legacy refresh events while the workspace is open do not remount it', async () => {
   localStorage.setItem('auth-token', makeToken(nowSeconds() - 4 * 86400));
 
   renderApp();
@@ -153,7 +157,7 @@ test('tokens refreshed while the workspace is open do not remount it', async () 
     });
   }
 
-  await waitFor(() => assert.equal(seenToken, rotations[2]));
+  await waitFor(() => assert.equal(seenToken, 'cookie-session'));
   assert.equal(workspaceMounts, 1);
   assert.equal(loadingPasses, 1);
   assert.deepEqual(
@@ -223,6 +227,7 @@ test('a language change after sign-in does not re-run the auth bootstrap', async
 
 test('signing in before onboarding shows onboarding without mounting the workspace first', async () => {
   hasCompletedOnboarding = false;
+  loggedIn = false;
   // Long enough for React to render whatever the context publishes before
   // the onboarding status arrives.
   onboardingStatusDelayMs = 30;
@@ -254,6 +259,6 @@ test('signing in before onboarding shows onboarding without mounting the workspa
   });
 
   assert.ok(requestedPaths.includes('/api/user/onboarding-status'));
-  assert.notEqual(localStorage.getItem('auth-token'), null);
+  assert.equal(localStorage.getItem('auth-token'), null);
   assert.equal(workspaceMounts, 0);
 });

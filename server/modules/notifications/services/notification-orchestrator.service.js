@@ -181,7 +181,7 @@ function sendWebPushPayload(userId, payload) {
   const subscriptions = pushSubscriptionsDb.getSubscriptions(userId);
   if (!subscriptions.length) return Promise.resolve();
 
-  const serializedPayload = JSON.stringify(payload);
+  const serializedPayload = JSON.stringify({ title: 'RemoteCLI', body: 'Có kết quả mới', data: { url: '/' } });
   return Promise.allSettled(
     subscriptions.map((sub) =>
       webPush.sendNotification(
