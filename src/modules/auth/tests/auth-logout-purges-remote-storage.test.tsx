@@ -43,10 +43,12 @@ afterEach(() => {
   localStorage.clear();
 });
 
-test('logout deletes every remote:* entry and leaves the rest of localStorage alone', async () => {
+test('UI-12/KU-09: logout clears Host conversation paths and leaves unrelated localStorage alone', async () => {
   localStorage.setItem('auth-token', makeToken());
   localStorage.setItem('remote:peer_one11111:local:activeTab', 'git');
   localStorage.setItem('remote:peer_two22222:local:draft', 'hello');
+  localStorage.setItem('remote:peer_one11111:local:remotecli:conversation-path', '/session/conversation-a');
+  localStorage.setItem('remote:peer_two22222:local:remotecli:conversation-path', '/session/conversation-b');
   localStorage.setItem('unrelated-setting', 'keep');
   let logout: (() => void) | null = null;
   let user: unknown = null;
@@ -69,6 +71,8 @@ test('logout deletes every remote:* entry and leaves the rest of localStorage al
 
   assert.equal(localStorage.getItem('remote:peer_one11111:local:activeTab'), null);
   assert.equal(localStorage.getItem('remote:peer_two22222:local:draft'), null);
+  assert.equal(localStorage.getItem('remote:peer_one11111:local:remotecli:conversation-path'), null);
+  assert.equal(localStorage.getItem('remote:peer_two22222:local:remotecli:conversation-path'), null);
   assert.equal(localStorage.getItem('unrelated-setting'), 'keep');
 });
 
