@@ -135,3 +135,53 @@ test('T-08/T-10/K-24: password change and disabling MFA preserve this session an
     assert.ok(cookieOf(newLogin));
   });
 });
+
+
+test('G-04/L-02/L-09/L-11: locked cookie can only inspect, unlock with TOTP, or logout', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const cookie = cookieOf(await login(base))!;
+    assert.equal((await request(base, '/auth/lock', {}, cookie)).status, 409);
+    assert.equal((await (await request(base, '/auth/session-status', undefined, cookie)).json()).autoLock, null);
+    const enrollment = await enroll(base, cookie);
+    assert.equal((await (await request(base, '/auth/session-status', undefined, cookie)).json()).autoLock, true);
+    const locked = await request(base, '/auth/lock', {}, cookie);
+    assert.equal(locked.status, 200, 'lock response must survive closing the other transports');
+    assert.equal(cookieOf(locked), undefined, 'locking does not replace or clear the cookie');
+    for (const [path, body] of [
+      ['/private', undefined], ['/auth/user', undefined], ['/auth/login', { username: 'alice', password }],
+      ['/auth/mfa/verify', { challenge: 'fake', code: '000000' }], ['/auth/auto-lock', { enabled: false }],
+    ] as const) {
+      const response = await request(base, path, body, cookie, path === '/auth/auto-lock' ? 'PUT' : body === undefined ? 'GET' : 'POST');
+      assert.equal(response.status, 423, path);
+      assert.equal(response.headers.get('x-auth-error'), null, 'locked is not expired');
+    }
+    const status = await request(base, '/auth/session-status', undefined, cookie);
+    assert.equal((await status.json()).locked, true);
+    assert.equal((await request(base, '/auth/unlock', { code: enrollment.recoveryCodes[0] }, cookie)).status, 403);
+    t.mock.timers.tick(30_000);
+    const unlocked = await request(base, '/auth/unlock', { code: otp(enrollment.secret) }, cookie);
+    assert.equal(unlocked.status, 200);
+    assert.equal(cookieOf(unlocked), undefined);
+    assert.equal((await request(base, '/private', undefined, cookie)).status, 200);
+    assert.equal((await request(base, '/auth/lock', {}, cookie)).status, 200);
+    assert.equal((await request(base, '/auth/logout', {}, cookie)).status, 200);
+    assert.equal((await request(base, '/auth/session-status', undefined, cookie)).status, 401);
+  });
+});
+
+test('L-08/L-12: turning off default auto-lock requires fresh TOTP, enabling it does not', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const cookie = cookieOf(await login(base))!;
+    const enrollment = await enroll(base, cookie);
+    t.mock.timers.tick(600_000);
+    const stale = await request(base, '/auth/auto-lock', { enabled: false }, cookie, 'PUT');
+    assert.equal(stale.status, 403);
+    assert.equal((await stale.json()).code, 'MFA_REAUTH_REQUIRED');
+    assert.equal((await request(base, '/auth/mfa/reauth', { code: otp(enrollment.secret) }, cookie)).status, 200);
+    assert.equal((await request(base, '/auth/auto-lock', { enabled: false }, cookie, 'PUT')).status, 200);
+    t.mock.timers.tick(600_000);
+    assert.equal((await request(base, '/auth/auto-lock', { enabled: true }, cookie, 'PUT')).status, 200);
+  });
+});

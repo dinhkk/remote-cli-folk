@@ -191,7 +191,7 @@ export function createWebSocketServer(
     const sessionId = incomingRequest.user?.sessionId;
     if (typeof sessionId === 'string') {
       const runtime = getSessionRuntime();
-      const release = runtime.connections.track(sessionId, () => ws.close(4401, 'session-ended'));
+      const release = runtime.connections.track(sessionId, reason => ws.close(reason === 'locked' ? 4403 : 4401, reason === 'locked' ? 'session-locked' : 'session-ended'));
       ws.once('close', release);
       if (!runtime.store.getActive(sessionId)) return;
     }

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import MfaReauthDialog from '@/modules/auth/MfaReauthDialog';
 import { IS_PLATFORM } from '@/shared/utils';
 import { api, readApiErrorMessage } from '@/shared/api';
-import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
+import { AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_LOCKED_EVENT } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
@@ -60,6 +60,8 @@ type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+  isLocked: boolean;
+  unlock: (code: string) => Promise<AuthActionResult>;
   needsSetup: boolean;
   hasCompletedOnboarding: boolean;
   error: string | null;
@@ -109,6 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const cancelMfa = useCallback(() => setMfaChallenge(null), []);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(() => (isTargetMode() ? TARGET_TOKEN_MARKER : null));
+  const [isLocked, setIsLocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
@@ -120,6 +123,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const clearSession = useCallback(() => {
     setMfaChallenge(null);
+    setIsLocked(false);
     setUser(null);
     setToken(null);
     setPasswordWeak(false);
@@ -181,9 +185,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(t(AUTH_ERROR_MESSAGES.sessionExpired));
     };
 
+    const handleLocked = () => { if (!isTargetMode()) setIsLocked(true); };
+    window.addEventListener(AUTH_SESSION_LOCKED_EVENT, handleLocked);
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => {
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+      window.removeEventListener(AUTH_SESSION_LOCKED_EVENT, handleLocked);
     };
   }, [clearSession, endRemoteTabData, t]);
 
@@ -214,6 +221,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       clearStoredToken();
       const userResponse = await api.auth.user();
+      if (userResponse.status === 423) {
+        const sessionResponse = await api.auth.sessionStatus();
+        const session = await parseJsonSafely<{ locked?: boolean }>(sessionResponse);
+        if (sessionResponse.ok && session?.locked) {
+          setIsLocked(true);
+          return;
+        }
+      }
       if (!userResponse.ok) {
         clearSession();
         return;
@@ -225,6 +240,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
+      setIsLocked(false);
       setUser(userPayload.user);
       setToken(COOKIE_SESSION_MARKER);
       await checkOnboardingStatus();
@@ -235,6 +251,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
     }
   }, [checkOnboardingStatus, clearSession]);
+
+  const unlock = useCallback<AuthContextValue['unlock']>(async code => {
+    try {
+      const response = await api.auth.unlock(code);
+      if (!response.ok) return { success: false, error: 'Unable to unlock. Check the code or try again later.' };
+      await checkAuthStatus();
+      return { success: true };
+    } catch { return { success: false, error: 'Unable to connect. Try again.' }; }
+  }, [checkAuthStatus]);
 
   // Remote tab: the Controller page already signed the user in and handed the
   // frame a tab token, so there is no login and no auth probe. The user shown
@@ -387,6 +412,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user,
       token,
       isLoading,
+      isLocked, unlock,
       needsSetup,
       hasCompletedOnboarding,
       error,
@@ -403,6 +429,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       error,
       hasCompletedOnboarding,
       isLoading,
+      isLocked, unlock,
       login,
       mfaChallenge, cancelMfa, verifyMfa,
       logout,
@@ -415,5 +442,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ],
   );
 
-  return <AuthContext.Provider value={contextValue}>{children}{user && !isTargetMode() && <MfaReauthDialog />}</AuthContext.Provider>;
+  return <AuthContext.Provider value={contextValue}>{children}{user && !isLocked && !isTargetMode() && <MfaReauthDialog />}</AuthContext.Provider>;
 }

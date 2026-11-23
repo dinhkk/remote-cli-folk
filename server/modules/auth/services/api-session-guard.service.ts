@@ -1,9 +1,10 @@
 import type { RequestHandler } from 'express';
 
+import { isLockedSessionRouteAllowed } from './session-lock-policy.service.js';
 import { requireRecentMfa } from './mfa-runtime.service.js';
 import type { AuthSession } from './session-store.service.js';
 import { getSessionRuntime } from './session-runtime.service.js';
-import { isSessionHttpRequestAllowed, readAuthTransportConfig } from './session-transport.service.js';
+import { isSessionHttpRequestAllowed, readAuthTransportConfig, readSessionCookie } from './session-transport.service.js';
 
 const PUBLIC_ROUTES = new Set([
   'GET /api/auth/status',
@@ -45,9 +46,14 @@ export function createApiSessionGuard(authenticate: RequestHandler): RequestHand
         return;
       }
       const auth = request as typeof request & { authSession?: AuthSession; user?: { id: number } };
-      const session = auth.authSession;
+      const cookie = PUBLIC_ROUTES.has(`${request.method} ${path}`) ? readSessionCookie(request) : null;
+      const session = auth.authSession ?? (cookie ? getSessionRuntime().store.authenticate(cookie, true) : null);
+      if (session?.lockedAt != null && !isLockedSessionRouteAllowed(request.method, path)) {
+        response.status(423).json({ code: 'AUTH_SESSION_LOCKED', error: 'Unlock this session to continue' });
+        return;
+      }
       if (auth.user && isSensitiveAction(request.method, path)) {
-        try { requireRecentMfa(auth.user.id, session); } catch (error) { return proceed(error); }
+        try { requireRecentMfa(auth.user.id, session ?? undefined); } catch (error) { return proceed(error); }
       }
       if (session) getSessionRuntime().store.touch(session.id, request.get('user-agent'));
       proceed();
