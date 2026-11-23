@@ -25,7 +25,7 @@ type AuthDependencies = {
   };
   hashPassword(password: string): Promise<string>;
   comparePassword(password: string, passwordHash: string): Promise<boolean>;
-  generateToken(user: AuthUser): string;
+  generateToken(user: AuthUser, userAgent?: string): string;
   loginLimiter: LoginRateLimiter;
   /** bcrypt hash compared when a username does not exist, so timing does not reveal it. */
   dummyPasswordHash: string;
@@ -104,6 +104,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       passwordInput: unknown,
       setupTokenInput?: unknown,
       clientIp = 'unknown',
+      userAgent = '',
     ) {
       const username = typeof usernameInput === 'string' ? usernameInput : '';
       const password = typeof passwordInput === 'string' ? passwordInput : '';
@@ -153,7 +154,7 @@ export function createAuthService(dependencies: AuthDependencies) {
         const user = dependencies.users.createUser(username, passwordHash);
         dependencies.transaction.commit();
         committed = true;
-        const token = dependencies.generateToken(user);
+        const token = dependencies.generateToken(user, userAgent);
         dependencies.users.updateLastLogin(numericUserId(user.id));
 
         return {
@@ -173,7 +174,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
     },
 
-    async login(usernameInput: unknown, passwordInput: unknown, clientIp = 'unknown') {
+    async login(usernameInput: unknown, passwordInput: unknown, clientIp = 'unknown', userAgent = '') {
       const username = typeof usernameInput === 'string' ? usernameInput : '';
       const password = typeof passwordInput === 'string' ? passwordInput : '';
       if (!username || !password) {
@@ -209,7 +210,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       return {
         success: true,
         user: { id: user.id, username: user.username },
-        token: dependencies.generateToken(user),
+        token: dependencies.generateToken(user, userAgent),
         // Passwords created before the 12 character rule keep working; the client nudges a change.
         ...(password.length < MIN_PASSWORD_LENGTH ? { passwordWeak: true } : {}),
       };

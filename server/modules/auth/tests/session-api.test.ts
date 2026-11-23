@@ -142,3 +142,23 @@ test('C-05/C-06/K-04: every browser socket path requires a cookie and a valid Or
     }
   });
 });
+
+
+test('K-07/A-03: login initializes the browser label without a change event', async () => {
+  await withServer(async (base) => {
+    const response = await fetch(`${base}/api/auth/login`, {
+      method: 'POST', headers: { ...headers(base), 'User-Agent': 'Firefox/130.0' },
+      body: JSON.stringify({ username: 'alice', password }),
+    });
+    assert.equal(response.status, 200);
+    const cookie = response.headers.get('set-cookie')!.split(';', 1)[0];
+    const db = getConnection();
+    assert.equal(db.prepare<{ browser: string }>('SELECT browser FROM auth_sessions').get()?.browser, 'Firefox');
+    const changes = () => db.prepare<{ count: number }>("SELECT COUNT(*) AS count FROM auth_events WHERE kind = 'browser-changed'").get()!.count;
+    assert.equal(changes(), 0);
+    await fetch(`${base}/api/private`, { headers: { ...headers(base, cookie), 'User-Agent': 'Firefox/130.0' } });
+    assert.equal(changes(), 0);
+    await fetch(`${base}/api/private`, { headers: { ...headers(base, cookie), 'User-Agent': 'Chrome/131.0' } });
+    assert.equal(changes(), 1);
+  });
+});

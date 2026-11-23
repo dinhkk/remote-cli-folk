@@ -251,7 +251,7 @@ test('the bridge against the real middleware: loopback token, API_KEY, ?token st
         assert.equal(sample.sockets.length, socketsBefore);
       });
 
-      await t.test('G-06: /api/auth/* remains denied and refresh never mints a browser credential', async () => {
+      await t.test('H-05: /api/auth/* remains denied and refresh never mints a browser credential', async () => {
         // A direct internal refresh can return the user, but cannot issue a browser session.
         const direct = await fetch(`http://127.0.0.1:${sample.port}/api/auth/refresh`, { method: 'POST', headers: { authorization: `Bearer ${issueLoopbackToken()}` } });
         assert.equal(direct.status, 200);

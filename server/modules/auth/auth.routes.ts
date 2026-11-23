@@ -43,7 +43,6 @@ export function createAuthRouter(
     const store = getSessionRuntime().store;
     const session = store.authenticate(token);
     if (!session) throw new Error('Session issuance failed');
-    store.touch(session.id, req.get('user-agent'));
     res.setHeader('Set-Cookie', sessionCookie(req, token, session.expiresAt));
     res.setHeader('Cache-Control', 'no-store');
     if (!req.secure && !isLocalSessionRequest(req, readAuthTransportConfig(process.env))) {
@@ -64,7 +63,7 @@ export function createAuthRouter(
     try {
       const body = req.body as { username?: unknown; password?: unknown; setupToken?: unknown };
       const setupToken = body.setupToken ?? req.get('x-setup-token');
-      deliverLogin(req, res, await service.register(body.username, body.password, setupToken, clientIp(req)));
+      deliverLogin(req, res, await service.register(body.username, body.password, setupToken, clientIp(req), req.get('user-agent')));
     } catch (error) {
       forwardError(res, next, error);
     }
@@ -73,7 +72,7 @@ export function createAuthRouter(
   router.post('/login', async (req, res, next) => {
     try {
       const body = req.body as { username?: unknown; password?: unknown };
-      deliverLogin(req, res, await service.login(body.username, body.password, clientIp(req)));
+      deliverLogin(req, res, await service.login(body.username, body.password, clientIp(req), req.get('user-agent')));
     } catch (error) {
       forwardError(res, next, error);
     }
