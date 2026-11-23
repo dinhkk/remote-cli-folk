@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import TotpSettings from '@/modules/settings/tabs/TotpSettings';
 import { useAuth } from '@/modules/auth';
 import { api, readApiJson } from '@/shared/api';
 import { expireAuthSession } from '@/shared/authToken';
@@ -69,5 +70,6 @@ export default function SessionsSettingsTab() {
         onChange={(event) => setPassword(event.target.value)} />
       <Button type="submit" variant="destructive" disabled={busy || !password}>{t('sessions.logoutAll')}</Button>
     </form>
+    <TotpSettings />
   </section>;
 }

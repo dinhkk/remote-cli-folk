@@ -14,3 +14,17 @@ export const getStoredAuthToken = (): string | null => {
   localStorage.removeItem('auth-token');
   return null;
 };
+
+let handler: (() => Promise<boolean>) | null = null;
+let pending: Promise<boolean> | null = null;
+
+/** Requests share one visible prompt. The caller retries only its refused request, once. */
+export function requestMfaReauth(): Promise<boolean> {
+  if (!handler) return Promise.resolve(false);
+  if (!pending) pending = handler().finally(() => { pending = null; });
+  return pending;
+}
+export function registerMfaReauth(next: () => Promise<boolean>): () => void {
+  handler = next;
+  return () => { if (handler === next) handler = null; };
+}
