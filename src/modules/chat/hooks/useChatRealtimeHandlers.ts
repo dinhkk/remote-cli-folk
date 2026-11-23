@@ -110,7 +110,7 @@ export function useChatRealtimeHandlers({
     };
 
     const handleEvent = (msg: ServerEvent) => {
-      if (!msg.kind) {
+      if (!msg.kind || msg.kind === 'websocket_connected') {
         return;
       }
 

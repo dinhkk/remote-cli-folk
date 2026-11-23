@@ -26,6 +26,8 @@ const store = {
   appendRealtime: vi.fn(),
   refreshLatestFromServer: vi.fn(),
   setActiveSession: vi.fn(),
+    subscribe: () => () => {},
+    getRevision: () => 0,
   isStale: vi.fn(() => false),
   updateStreaming: vi.fn(),
   finalizeStreaming: vi.fn(),

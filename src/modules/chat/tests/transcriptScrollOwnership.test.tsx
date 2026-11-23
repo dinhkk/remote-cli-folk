@@ -85,6 +85,8 @@ function createStore(messagesBySession: Map<string, NormalizedMessage[]>) {
       deferred: false,
     })),
     setActiveSession: vi.fn(),
+    subscribe: () => () => {},
+    getRevision: () => 0,
     isStale: vi.fn(() => false),
     updateStreaming: vi.fn(),
     finalizeStreaming: vi.fn(),
