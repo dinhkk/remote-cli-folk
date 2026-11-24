@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,6 +27,11 @@ const loadScenarios = async (): Promise<Scenario[] | null> => {
     // The relay package's dev dependencies (vitest) are not installed: nothing to compare against.
     const code = (error as NodeJS.ErrnoException).code;
     if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') return null;
+    // Without relay-local vitest, Node can fall back to the root package's incompatible
+    // version. Only classify that known fallback error as missing relay dependencies.
+    const relayVitest = path.resolve(path.dirname(scenariosPath), '../../node_modules/vitest/package.json');
+    if (!existsSync(relayVitest) && error instanceof Error &&
+        error.message.includes('Vitest failed to access its internal state')) return null;
     throw error;
   }
 };
@@ -41,7 +47,7 @@ if (scenarios === null) {
     test('fake relay passes the relay conformance scenarios', () => {
       assert.fail(
         'The relay conformance scenarios could not be loaded because the relay/ dev dependencies are not installed ' +
-          '(run `npm ci` in project/cloud-cli-remote/claudecodeui/relay), or set SKIP_RELAY_CONFORMANCE=1 to skip this guard on purpose.',
+          '(run `npm ci` in relay/), or set SKIP_RELAY_CONFORMANCE=1 to skip this guard on purpose.',
       );
     });
   }
