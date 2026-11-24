@@ -346,3 +346,28 @@ Add custom tabs with their own frontend components and backend services. Install
 This project is licensed under the [GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)](LICENSE).
 
 Author: **Tùng Huynh** ([@tunghuynh](https://github.com/tunghuynh))
+
+## Running tests from a source checkout
+
+Use Node.js 22.5 or newer. Install both packages before running the server suite:
+
+```bash
+# From the repository root
+npm ci
+cd relay
+npm ci
+cd ..
+npm test
+```
+
+The server suite imports the relay package's conformance scenarios, so installing only
+the root dependencies is insufficient. Missing relay dependencies fail this guard with
+setup instructions. Set `SKIP_RELAY_CONFORMANCE=1` only to explicitly skip that guard;
+it is not a substitute for running conformance before review.
+
+The 12 parent-workspace documentation checks require `docs/deployment-guide.md`,
+`docs/system-architecture.md`, `docs/project-roadmap.md`, and
+`project/cloud-cli-remote/claudecodeui/relay/README.md` relative to the directory three
+levels above this checkout. These checks are skipped with the missing paths listed
+when all four files are absent, as in a standalone public checkout. If any is present,
+the checks run normally and report missing or invalid documentation.
