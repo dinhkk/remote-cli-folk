@@ -111,6 +111,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
   const cancelMfa = useCallback(() => setMfaChallenge(null), []);
   const [user, setUser] = useState<AuthUser | null>(null);
+  // Read by the expiry listener without re-subscribing it on every sign-in.
+  const userRef = useRef<AuthUser | null>(null);
+  userRef.current = user;
   const [token, setToken] = useState<string | null>(() => (isTargetMode() ? TARGET_TOKEN_MARKER : null));
   const [isLocked, setIsLocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -182,9 +185,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (isTargetMode()) {
         return;
       }
+      const reason = event instanceof CustomEvent ? event.detail : undefined;
+      // "session-required" means the request carried no session cookie. That ends a session
+      // only when this page was signed in (the browser dropped the cookie at its expiry);
+      // a browser that never signed in just sees the login page, with no expiry notice.
+      const endedSignedInSession = reason !== 'session-required' || userRef.current !== null;
       clearSession();
       endRemoteTabData();
-      setError(previous => (event instanceof CustomEvent && event.detail === 'mfa-attempts-exceeded')
+      if (!endedSignedInSession) return;
+      setError(previous => reason === 'mfa-attempts-exceeded'
         || previous === t('security.attemptsRevoked') ? t('security.attemptsRevoked') : t(AUTH_ERROR_MESSAGES.sessionExpired));
     };
 

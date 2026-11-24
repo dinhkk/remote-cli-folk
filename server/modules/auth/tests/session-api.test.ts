@@ -83,6 +83,27 @@ test('G-01/G-02/K-01: all API prefixes and unknown routes require a session befo
   });
 });
 
+test('SF-01: only a request that carried a session cookie is told its session expired; every case stays 401', async () => {
+  await withServer(async (base) => {
+    const reasonFor = async (cookie?: string) => {
+      const response = await fetch(`${base}/api/auth/user`, { headers: headers(base, cookie) });
+      assert.equal(response.status, 401);
+      return response.headers.get('x-auth-error');
+    };
+    assert.equal(await reasonFor(), 'session-required', 'a browser that never signed in');
+    assert.equal(await reasonFor(`remotecli_session=${'A'.repeat(43)}`), 'session-expired', 'a well-formed but unknown cookie');
+    assert.equal(await reasonFor('remotecli_session=malformed'), 'session-required', 'a malformed cookie is no session at all');
+    const cookie = await login(base);
+    assert.equal((await fetch(`${base}/api/auth/user`, { headers: headers(base, cookie) })).status, 200);
+    const ended = await fetch(`${base}/api/auth/logout-all`, { method: 'POST', headers: headers(base, cookie), body: JSON.stringify({ password }) });
+    assert.equal(ended.status, 200);
+    assert.equal(await reasonFor(cookie), 'session-expired', 'a session ended by logout-all');
+    const old = jwt.sign({ userId: 1 }, getJwtSecret(), { expiresIn: '7d' });
+    const bearer = await fetch(`${base}/api/auth/user?token=${old}`, { headers: { ...headers(base), Authorization: `Bearer ${old}` } });
+    assert.equal(bearer.status, 401, 'URL tokens and bearers are still refused');
+  });
+});
+
 test('A-03/C-01/K-11: real login cookies, owner session list, logout A preserves B and ends A streams', async () => {
   await withServer(async (base) => {
     const a = await login(base), b = await login(base);

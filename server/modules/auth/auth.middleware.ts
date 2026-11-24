@@ -72,7 +72,9 @@ const authenticateToken = (req, res, next) => {
     const session = secret ? runtime.store.authenticate(secret, true) : null;
     const user = session && userDb.getUserById(session.userId);
     if (!session || !user) {
-      res.setHeader('X-Auth-Error', 'session-expired');
+      // Only a request that still carried a session cookie can have lost a session; a browser
+      // with no cookie at all is told it must sign in, so it does not read as an ended session.
+      res.setHeader('X-Auth-Error', secret ? 'session-expired' : 'session-required');
       return res.status(401).json({ error: 'Please log in again', code: 'AUTH_TOKEN_INVALID' });
     }
     if (session.lockedAt !== null && !isLockedSessionRouteAllowed(req.method, req.originalUrl)) {
