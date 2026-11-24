@@ -9,9 +9,11 @@ export default function MfaReauthDialog() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const generation = useRef(0);
   const resolve = useRef<((value: boolean) => void) | null>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const finish = (value: boolean) => {
+    generation.current++; setBusy(false);
     resolve.current?.(value); resolve.current = null;
     setOpen(false); setCode(''); setError('');
     previousFocus.current?.focus();
@@ -26,10 +28,17 @@ export default function MfaReauthDialog() {
   if (!open) return null;
   return <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
     <form role="dialog" aria-modal="true" aria-labelledby="mfa-reauth-title" className="w-full max-w-sm space-y-4 rounded-xl border bg-background p-5 shadow-xl"
-      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) finish(false); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); return; }
+        if (e.key !== 'Tab') return;
+        const nodes = [...e.currentTarget.querySelectorAll<HTMLElement>('input:not(:disabled), button:not(:disabled), [tabindex="0"]')];
+        const first = nodes[0], last = nodes[nodes.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }}
       onSubmit={(e) => { e.preventDefault(); if (busy) return; setBusy(true); setError('');
-        const supplied = code; setCode('');
-        void api.auth.mfaReauth(supplied).then(readApiJson).then(() => finish(true)).catch(() => setError('Verification failed. Check the code or try again later.')).finally(() => setBusy(false));
+        const supplied = code, attempt = generation.current; setCode('');
+        void api.auth.mfaReauth(supplied).then(readApiJson).then(() => { if (attempt === generation.current) finish(true); }).catch(() => { if (attempt === generation.current) setError('Verification failed. Check the code or try again later.'); }).finally(() => { if (attempt === generation.current) setBusy(false); });
       }}>
       <h2 id="mfa-reauth-title" className="font-semibold">Verify sensitive action</h2>
       <p className="text-sm text-muted-foreground">Enter a new code from your authenticator. Verification lasts 10 minutes.</p>
