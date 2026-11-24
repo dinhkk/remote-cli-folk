@@ -454,7 +454,9 @@
 
                     <section id="authentication">
                         <h2>Authentication</h2>
-                        <p>All API requests require authentication using an API key in the <code>X-API-Key</code> header.</p>
+                        <p>Browser management APIs use the session cookie issued after sign-in (and authenticator verification when enabled). The cookie is HttpOnly; on HTTPS it is Secure and named <code>__Host-remotecli_session</code>. Local HTTP uses <code>remotecli_session</code>.</p>
+                        <p>Browser requests must include <code>X-RemoteCLI-Request: 1</code>, use same-origin credentials, and send JSON for JSON mutations. Locked sessions must be unlocked before continuing; sensitive actions can require recent authenticator verification. Do not read or store a bearer token in browser storage.</p>
+                        <p>The automation endpoints under <code>/api/agent</code> use an API key in the <code>X-API-Key</code> header instead. Keys are accepted only in headers, never as query parameters. An API key does not replace a browser session for management APIs.</p>
 
                         <p>Generate API keys in Settings → API & Tokens.</p>
                     </section>
@@ -845,12 +847,11 @@ data: {"type":"done"}</code></pre>
             const modelCell = document.getElementById('model-options-cell');
             if (!modelCell) return;
 
-            const token = localStorage.getItem('auth-token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = { 'X-RemoteCLI-Request': '1' };
 
             const results = await Promise.allSettled(
                 PROVIDER_ORDER.map(({ id }) =>
-                    fetch(`/api/providers/${id}/models`, { headers }).then(r => r.json())
+                    fetch(`/api/providers/${id}/models`, { headers, credentials: 'same-origin', cache: 'no-store' }).then(r => r.json())
                 )
             );
 
