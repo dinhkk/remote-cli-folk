@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 
 import { api, readApiJson } from '@/shared/api';
@@ -5,6 +6,7 @@ import { registerMfaReauth } from '@/shared/authToken';
 import { Button, Input } from '@/shared/ui';
 
 export default function MfaReauthDialog() {
+  const { t } = useTranslation('auth');
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -38,14 +40,14 @@ export default function MfaReauthDialog() {
       }}
       onSubmit={(e) => { e.preventDefault(); if (busy) return; setBusy(true); setError('');
         const supplied = code, attempt = generation.current; setCode('');
-        void api.auth.mfaReauth(supplied).then(readApiJson).then(() => { if (attempt === generation.current) finish(true); }).catch(() => { if (attempt === generation.current) setError('Verification failed. Check the code or try again later.'); }).finally(() => { if (attempt === generation.current) setBusy(false); });
+        void api.auth.mfaReauth(supplied).then(readApiJson).then(() => { if (attempt === generation.current) finish(true); }).catch(() => { if (attempt === generation.current) setError(t('security.failed')); }).finally(() => { if (attempt === generation.current) setBusy(false); });
       }}>
-      <h2 id="mfa-reauth-title" className="font-semibold">Verify sensitive action</h2>
-      <p className="text-sm text-muted-foreground">Enter a new code from your authenticator. Verification lasts 10 minutes.</p>
-      <label htmlFor="mfa-reauth-code" className="block text-sm">Authenticator code</label>
+      <h2 id="mfa-reauth-title" className="font-semibold">{t('security.reauthTitle')}</h2>
+      <p className="text-sm text-muted-foreground">{t('security.reauthHint')}</p>
+      <label htmlFor="mfa-reauth-code" className="block text-sm">{t('security.code')}</label>
       <Input id="mfa-reauth-code" autoFocus autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value)} />
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <div className="flex gap-2"><Button type="submit" disabled={busy}>Verify</Button><Button type="button" variant="outline" disabled={busy} onClick={() => finish(false)}>Cancel</Button></div>
+      <div className="flex gap-2"><Button type="submit" disabled={busy}>{t('security.verify')}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => finish(false)}>{t('security.cancel')}</Button></div>
     </form>
   </div>;
 }

@@ -1,3 +1,4 @@
+import '@/modules/i18n';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 

@@ -1,5 +1,7 @@
+import '@/modules/i18n';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
+
 import MfaReauthDialog from '@/modules/auth/MfaReauthDialog';
 import { requestMfaReauth } from '@/shared/authToken';
 afterEach(cleanup);

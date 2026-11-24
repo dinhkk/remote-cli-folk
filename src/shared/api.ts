@@ -85,7 +85,9 @@ export const authenticatedFetch = (
     if (response.status === 403 && !url.startsWith('/api/auth/mfa/reauth')) {
       const payload = await response.clone().json().catch(() => null);
       if ((payload?.code ?? payload?.error?.code) === 'MFA_REAUTH_REQUIRED'
-        && !options.signal?.aborted && await requestMfaReauth() && !options.signal?.aborted) {
+        && !options.signal?.aborted) {
+        if (!await requestMfaReauth()) return new Response(JSON.stringify({ error: { code: 'MFA_REAUTH_CANCELLED' } }), { status: 403 });
+        if (options.signal?.aborted) return response;
         const retried = await send();
         await announceSessionLock(retried);
         if (retried.status === 401 && retried.headers.get('X-Auth-Error')) expireAuthSession();
