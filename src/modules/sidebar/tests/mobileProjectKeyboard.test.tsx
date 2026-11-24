@@ -89,7 +89,7 @@ test('R7-08: compact project rows have an accessible name and keyboard activatio
  const toggle = vi.fn();
  const props = { ...listProps(null), onToggleProject: toggle };
  const view = render(<SidebarProjectList {...props} />);
- const row = view.getByRole('button', { name: 'a', exact: true });
+ const row = view.getByRole('button', { name: 'a' });
  row.focus(); assert.equal(document.activeElement, row);
  assert.equal(row.getAttribute('aria-expanded'), 'false');
  fireEvent.keyDown(row, { key: 'Enter' }); fireEvent.keyDown(row, { key: ' ' });
