@@ -234,6 +234,13 @@ export const sessionMessagesUrl = (
 const fileContentPath = (projectId: string, filePath: string) =>
   `/api/file-tree/projects/${projectId}/files/content${query({ path: filePath })}`;
 
+/**
+ * The Local HTML preview page of a saved `.html`/`.htm` file. The preview iframe loads it by `src` (the
+ * server answers it with a sandbox policy), so it is a plain same-origin path, never a Remote tab URL.
+ */
+export const htmlPreviewPath = (projectId: string, filePath: string) =>
+  `/api/file-tree/projects/${encodeURIComponent(projectId)}/files/html-preview${query({ path: filePath })}`;
+
 const pluginAssetPath = (pluginName: string, assetFile: string) =>
   `/api/plugins/${encodeURIComponent(pluginName)}/assets/${encodeURIComponent(assetFile)}`;
 
@@ -371,6 +378,9 @@ export const api = {
   // media call sites fetch a blob through here instead of using a bare `src`.
   readFileBlob: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>
     get(fileContentPath(projectId, filePath), options),
+  // Whether the isolated HTML preview page can be served for this file (no session, too large, missing...).
+  checkHtmlPreview: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>
+    get(htmlPreviewPath(projectId, filePath), options),
   saveFile: (projectId: string, filePath: string, content: string) =>
     put(`/api/file-tree/projects/${projectId}/file`, { filePath, content }),
   // Without `directoryPath` the whole project tree (within the server's entry budget); with it, one folder the

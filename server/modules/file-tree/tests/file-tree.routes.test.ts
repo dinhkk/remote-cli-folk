@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import http from 'node:http';
+import { Readable } from 'node:stream';
 import test from 'node:test';
 
 import express, { type RequestHandler } from 'express';
 
 import { createFileTreeRouter } from '@/modules/file-tree/file-tree.routes.js';
 import type { FileTreeServices } from '@/shared/types.js';
+import { AppError } from '@/shared/utils.js';
 
 function createFakeServices(overrides: Partial<FileTreeServices> = {}): FileTreeServices {
   const unexpectedOperation = async (): Promise<never> => {
@@ -18,6 +21,7 @@ function createFakeServices(overrides: Partial<FileTreeServices> = {}): FileTree
     createWorkspaceFolder: unexpectedOperation,
     readTextFile: unexpectedOperation,
     openFile: unexpectedOperation,
+    openHtmlPreview: unexpectedOperation,
     saveTextFile: unexpectedOperation,
     listProjectFiles: unexpectedOperation,
     createEntry: unexpectedOperation,
@@ -33,9 +37,15 @@ const passUploadRequest: RequestHandler = (_request, _response, next) => next();
 async function withFileTreeServer(
   services: FileTreeServices,
   run: (baseUrl: string) => Promise<void>,
+  authKind: string | null = 'session',
 ): Promise<void> {
   const app = express();
   app.use(express.json());
+  // What authenticateToken records for the request in the real server.
+  app.use((request, _response, next) => {
+    if (authKind) (request as typeof request & { authKind?: string }).authKind = authKind;
+    next();
+  });
   app.use('/api/file-tree', createFileTreeRouter(
     services,
     passUploadRequest,
@@ -201,4 +211,102 @@ test('create route rejects invalid entry types without calling the service', asy
   });
 
   assert.equal(createCalled, false);
+});
+
+// What a browser sends with the app's status check of the preview page.
+const FETCH_METADATA = { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' };
+
+const HTML_PREVIEW_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+  + "img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'";
+
+test('HP-04/HP-10a: the HTML preview page is the saved file under a sandbox policy with no network source', async () => {
+  for (const html of ['<p>plain</p>', '<script>document.title = "ran"</script><p>with script</p>']) {
+    const inputs: string[][] = [];
+    await withFileTreeServer(createFakeServices({
+      openHtmlPreview: async (projectId, filePath, maximumBytes) => {
+        inputs.push([projectId, filePath]);
+        assert.equal(maximumBytes, 10 * 1024 * 1024, 'the preview size limit');
+        return { stream: Readable.from([Buffer.from(html)]) };
+      },
+    }), async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=${encodeURIComponent('site/index.html')}`, { headers: FETCH_METADATA });
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), html);
+      assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+      assert.equal(response.headers.get('content-security-policy'), HTML_PREVIEW_CSP);
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+      assert.equal(response.headers.get('cross-origin-resource-policy'), 'same-origin');
+    });
+    assert.deepEqual(inputs, [['p1', 'site/index.html']]);
+  }
+  const sandbox = HTML_PREVIEW_CSP.split('; ')[0].split(' ').slice(1);
+  assert.deepEqual(sandbox, ['allow-scripts']);
+  // No source the document could fetch from (frame-ancestors only says who may frame it).
+  const fetchSources = HTML_PREVIEW_CSP.split('; ').filter((directive) => !directive.startsWith('frame-ancestors') && !directive.startsWith('sandbox'))
+    .flatMap((directive) => directive.split(' ').slice(1));
+  for (const network of ['http:', 'https:', 'ws:', 'wss:', "'self'", '*']) {
+    assert.ok(!fetchSources.includes(network), network);
+  }
+});
+
+test('HP-02/HP-04: the HTML preview answers JSON errors and serves nothing without a browser session', async () => {
+  const opened: string[] = [];
+  const services = createFakeServices({
+    openHtmlPreview: async (_projectId, filePath) => {
+      opened.push(filePath);
+      throw new AppError('Path must be under project root', { statusCode: 403, code: 'PATH_OUTSIDE_PROJECT' });
+    },
+  });
+  for (const authKind of [null, 'loopback', 'platform']) {
+    await withFileTreeServer(services, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=a.html`, { headers: FETCH_METADATA });
+      assert.equal(response.status, 401, String(authKind));
+      assert.match(response.headers.get('content-type') ?? '', /application\/json/);
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(response.headers.get('content-security-policy'), null);
+    }, authKind);
+  }
+  assert.deepEqual(opened, [], 'no file is opened without a session');
+  await withFileTreeServer(services, async (baseUrl) => {
+    const outside = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=${encodeURIComponent('../../etc/x.html')}`, { headers: FETCH_METADATA });
+    assert.equal(outside.status, 403);
+    assert.deepEqual(await outside.json(), { error: 'Path must be under project root' });
+    const missing = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview`, { headers: FETCH_METADATA });
+    assert.equal(missing.status, 400);
+    assert.match(missing.headers.get('content-type') ?? '', /application\/json/);
+  });
+});
+
+test('HP-09: raw file content carries a sandbox policy and nosniff, and still streams the file', async () => {
+  await withFileTreeServer(createFakeServices({
+    openFile: async () => ({ contentType: 'image/png', stream: Readable.from([Buffer.from([0x89, 0x50, 0x4e, 0x47])]) }),
+  }), async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/content?path=logo.png`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/png');
+    assert.equal(response.headers.get('content-security-policy'), 'sandbox');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47]);
+  });
+});
+
+test('condition 2/6: without Fetch Metadata the preview page is refused, so the app only displays the HTML', async () => {
+  await withFileTreeServer(createFakeServices({
+    openHtmlPreview: async () => { throw new Error('the file must not be opened'); },
+  }), async (baseUrl) => {
+    for (const missing of ['Sec-Fetch-Site', 'Sec-Fetch-Mode', 'Sec-Fetch-Dest']) {
+      const headers: Record<string, string> = { ...FETCH_METADATA };
+      delete headers[missing];
+      // node:http: fetch would add a Sec-Fetch-Mode of its own.
+      const status = await new Promise<number>((resolve, reject) => {
+        http.get(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=a.html`, { headers }, (response) => {
+          response.resume();
+          resolve(response.statusCode ?? 0);
+        }).on('error', reject);
+      });
+      assert.equal(status, 400, missing);
+    }
+  });
 });

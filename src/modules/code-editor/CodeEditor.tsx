@@ -71,6 +71,7 @@ export default function CodeEditor({
     previewKind,
     fileProjectId,
     hasUnsavedChanges,
+    savedCount,
     handleSave,
     handleDownload,
   } = useCodeEditorDocument({
@@ -126,6 +127,12 @@ export default function CodeEditor({
     const extension = file.name.split('.').pop()?.toLowerCase();
     return extension === 'html' || extension === 'htm';
   }, [file.name]);
+
+  // The Local HTML preview loads the saved file; it loads it again after every save (`savedCount`).
+  const htmlPreviewSource = useMemo(
+    () => (isHtmlPreviewFile && fileProjectId ? { projectId: fileProjectId, filePath: file.path } : null),
+    [isHtmlPreviewFile, fileProjectId, file.path],
+  );
 
   const isMermaidFile = useMemo(() => {
     const extension = file.name.split('.').pop()?.toLowerCase();
@@ -328,6 +335,9 @@ export default function CodeEditor({
               markdownPreview={markdownPreview}
               isMarkdownFile={isMarkdownFile}
               isHtmlPreviewFile={isHtmlPreviewFile}
+              htmlPreviewSource={htmlPreviewSource}
+              hasUnsavedChanges={hasUnsavedChanges}
+              previewReloadKey={savedCount}
               isMermaidFile={isMermaidFile}
               isDarkMode={isDarkMode}
               fontSize={fontSize}

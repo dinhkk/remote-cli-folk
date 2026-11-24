@@ -4,7 +4,9 @@ import { isLockedSessionRouteAllowed } from './session-lock-policy.service.js';
 import { requireRecentMfa } from './mfa-runtime.service.js';
 import type { AuthSession } from './session-store.service.js';
 import { getSessionRuntime } from './session-runtime.service.js';
-import { isSessionHttpRequestAllowed, readAuthTransportConfig, readSessionCookie } from './session-transport.service.js';
+import {
+  isHtmlPreviewDocumentRequest, isSessionHttpRequestAllowed, readAuthTransportConfig, readSessionCookie,
+} from './session-transport.service.js';
 
 const PUBLIC_ROUTES = new Set([
   'GET /api/auth/status',
@@ -37,7 +39,9 @@ export function createApiSessionGuard(authenticate: RequestHandler): RequestHand
     if (/^\/api\/(agent|browser-use-mcp)(\/|$)/.test(path)) return next();
     const checkBrowser: RequestHandler = (request, response, proceed) => {
       if ((request as typeof request & { authKind?: string }).authKind === 'loopback') return proceed();
-      if (!isSessionHttpRequestAllowed(request, config)) {
+      // The HTML preview frame is the one browser load that cannot send the request header; every other
+      // check below still applies to it.
+      if (!isHtmlPreviewDocumentRequest(request, path) && !isSessionHttpRequestAllowed(request, config)) {
         response.status(403).json({ error: 'Request origin or header is not allowed', code: 'AUTH_REQUEST_FORBIDDEN' });
         return;
       }

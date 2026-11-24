@@ -43,5 +43,12 @@
   "unsavedChanges": {
     "confirmClose": "Ada perubahan yang belum disimpan. Tutup file ini dan buang perubahannya?",
     "indicator": "Perubahan belum disimpan"
+  },
+  "htmlPreview": {
+    "untrustedLocal": "Konten tidak tepercaya. Skrip file berjalan di bingkai terisolasi tanpa jaringan dan tanpa akses ke aplikasi ini. File yang ditautkan (CDN, file proyek lain) tidak dimuat.",
+    "untrustedRemote": "Konten tidak tepercaya. Skrip dalam file tidak berjalan di tab Remote.",
+    "unsavedChanges": "Menampilkan file yang tersimpan. Simpan untuk melihat perubahan yang belum disimpan.",
+    "scriptsDisabled": "Konten tidak tepercaya. Skrip dalam file tidak berjalan di sini.",
+    "tooLarge": "File lebih besar dari 10 MB, jadi skripnya tidak berjalan."
   }
 }
