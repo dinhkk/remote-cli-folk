@@ -3,7 +3,6 @@ import http from 'node:http';
 
 import express from 'express';
 
-import { pluginsDisabledError } from './plugins-switch.js';
 import type { createPluginsService } from './plugins.service.js';
 
 function wildcardPath(req: express.Request): string {
@@ -14,21 +13,9 @@ function routeParameter(value: string | string[]): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
 }
 
-/**
- * Creates plugin routes; transport streaming remains here while decisions live in the service.
- * With `disabled`, the list is empty and says so, and every other route answers 403 PLUGINS_DISABLED
- * without touching the plugin directory or any plugin process.
- */
-export function createPluginsRouter(
-  service: ReturnType<typeof createPluginsService>,
-  { disabled = false }: { disabled?: boolean } = {},
-): express.Router {
+/** Creates plugin routes; transport streaming remains here while decisions live in the service. */
+export function createPluginsRouter(service: ReturnType<typeof createPluginsService>): express.Router {
   const router = express.Router();
-  if (disabled) {
-    router.get('/', (_req, res) => { res.json({ plugins: [], disabled: true }); });
-    router.use((_req, _res, next) => { next(pluginsDisabledError()); });
-    return router;
-  }
   const respond = (operation: (req: express.Request) => unknown | Promise<unknown>) =>
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try { res.json(await operation(req)); } catch (error) { next(error); }

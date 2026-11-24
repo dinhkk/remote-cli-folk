@@ -5,11 +5,10 @@ import os from 'os';
 
 import { spawn } from 'cross-spawn';
 
-import { PLUGINS_DISABLED, pluginsDisabledError } from './plugins-switch.js';
-
 import {
   createPluginGitError, createPluginGitSpawnError, getPluginGitSpawnOptions, stopPluginGitOnServerExit,
 } from './plugin-git.service.js';
+import { PLUGINS_DISABLED, pluginsDisabledError } from './plugins-switch.js';
 
 const PLUGINS_DIR = path.join(os.homedir(), '.claude-code-ui', 'plugins');
 const PLUGINS_CONFIG_PATH = path.join(os.homedir(), '.claude-code-ui', 'plugins.json');
