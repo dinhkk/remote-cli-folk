@@ -3,9 +3,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Secret, TOTP } from 'otpauth';
 
 import type { Database } from '../../database/index.js';
-
 import { AppError } from '../../../shared/utils.js';
 import { secretAad, type SecretBox } from '../../remote/index.js';
+
 import type { createSessionStore } from './session-store.service.js';
 
 export const MFA_FRESH_MS = 10 * 60 * 1000;
