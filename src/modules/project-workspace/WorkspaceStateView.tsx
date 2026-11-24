@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 
 import { QuickSessionLockButton } from '@/modules/auth';
 import { isTargetMode } from '@/shared/transport/target-context';
-
 import MobileMenuButton from '@/modules/project-workspace/MobileMenuButton';
 
 type WorkspaceStateViewProps = {
@@ -21,7 +20,7 @@ export default function WorkspaceStateView({ mode, isMobile, onMenuClick }: Work
   return (
     <div className="flex h-full flex-col">
       {(isMobile || !isLoading) && (
-        <div className="pwa-header-safe flex items-center justify-between flex-shrink-0 border-b border-border/50 bg-background/80 p-2 backdrop-blur-sm sm:p-3">
+        <div className="pwa-header-safe flex flex-shrink-0 items-center justify-between border-b border-border/50 bg-background/80 p-2 backdrop-blur-sm sm:p-3">
           {isMobile ? <MobileMenuButton onMenuClick={onMenuClick} compact /> : <span />}
           {!isLoading && !isTargetMode() && <QuickSessionLockButton />}
         </div>
