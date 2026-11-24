@@ -165,3 +165,45 @@ test('a retained run\'s eviction timer cannot evict the session\'s next run earl
     mock.timers.reset();
   }
 });
+
+
+for (const beforeReload of [true, false]) {
+ test(`R7-10: provider error ${beforeReload ? 'before' : 'after'} reload arrives once without replaying a completed prompt`, async () => {
+  await withIsolatedDatabase(async () => {
+   const old = createFakeSocket();
+   const run = chatRunRegistry.startRun({ appSessionId: SESSION_ID, provider: 'codex', providerSessionId: null, connection: old as never, userId: 1 })!;
+   const error = { id: 'failure-1', timestamp: '2026-01-01T00:00:01.000Z', kind: 'error', provider: 'codex', sessionId: SESSION_ID, content: 'Synthetic provider rejected model' };
+   const finish = () => { run.writer.send(error); run.writer.send({ kind: 'complete', provider: 'codex', sessionId: SESSION_ID, exitCode: 1 }); };
+   if (beforeReload) finish();
+   const fresh = createFakeSocket();
+   const runtime = { hasBackgroundWork: () => false, getPendingApprovalsForSession: () => [], run: () => { throw new Error('Subscribe must never send a prompt'); } };
+   handleChatConnection(fresh as never, { user: { id: 1 } } as never, { runtime: runtime as never });
+   fresh.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID, lastSeq: 0 }] }));
+   await settle();
+   if (!beforeReload) finish();
+   assert.equal(fresh.frames.filter(f => f.kind === 'error').length, 1);
+   assert.equal(fresh.frames.find(f => f.kind === 'error')?.id, 'failure-1');
+   assert.equal(fresh.frames.find(f => f.kind === 'error')?.timestamp, error.timestamp);
+   assert.equal(fresh.frames.filter(f => f.kind === 'text').length, 0);
+   const seq = fresh.frames.find(f => f.kind === 'error')!.seq;
+   fresh.frames.length = 0;
+   fresh.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID, lastSeq: seq }] }));
+   await settle();
+   assert.equal(fresh.frames.filter(f => f.kind === 'error').length, 0);
+  });
+ });
+}
+
+test('R7-10: completed error buffer expires at the existing five-minute boundary', async () => {
+ mock.timers.enable({ apis: ['setTimeout'] });
+ try {
+  await withIsolatedDatabase(async () => {
+   const run = startAndCompleteRun(createFakeSocket());
+   run.writer.send({ kind: 'error', id: 'expired-error', content: 'Synthetic failure', provider: 'claude', sessionId: SESSION_ID });
+   assert.equal(chatRunRegistry.replayEvents(SESSION_ID, 0).filter(e => e.kind === 'error').length, 1);
+   mock.timers.tick(FIVE_MINUTES);
+   assert.equal(chatRunRegistry.getRun(SESSION_ID), undefined);
+   assert.deepEqual(chatRunRegistry.replayEvents(SESSION_ID, 0), []);
+  });
+ } finally { mock.timers.reset(); }
+});

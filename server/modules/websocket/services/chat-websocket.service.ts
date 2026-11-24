@@ -586,18 +586,12 @@ function handleChatSubscribe(
       });
     }
 
-    // Replay only for RUNNING runs, strictly after the ack. Completed runs
-    // are fully persisted to the provider transcript and served over REST —
-    // replaying them (e.g. after a page reload where the client's lastSeq is
-    // 0) would duplicate messages the history fetch already returned.
-    if (isProcessing) {
-      for (const event of chatRunRegistry.replayEvents(sessionId, lastSeq)) {
-        sendJson(ws, event);
-      }
-      if (sessionId !== rawSessionId) {
-        for (const event of chatRunRegistry.replayEvents(rawSessionId, lastSeq)) {
-          sendJson(ws, event);
-        }
+    // Completed replies come from REST. Runtime errors may never reach the
+    // provider transcript, so replay only those from the existing buffer.
+    // Preserve their ids/timestamps for reconciliation with REST and retries.
+    for (const replayId of new Set([sessionId, rawSessionId])) {
+      for (const event of chatRunRegistry.replayEvents(replayId, lastSeq)) {
+        if (isProcessing || event.kind === 'error') sendJson(ws, event);
       }
     }
   }
