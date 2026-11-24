@@ -129,4 +129,3 @@ test('QL-05: every locale supplies translated accessible label and error', () =>
     if (!path.includes('/en/')) assert.notEqual(locale.quickLock.label, 'Lock session', path);
   }
 });
-
