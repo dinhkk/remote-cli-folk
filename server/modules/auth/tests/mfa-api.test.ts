@@ -210,3 +210,33 @@ test('R7-01: enabling API keys needs recent TOTP; disabling and accounts without
     assert.equal(apiKeysDb.getApiKeys(1).find(k => k.id === key.id)?.is_active, 1);
   });
 });
+
+
+test('R7-02: increasing hours needs recent TOTP, decreasing does not; invalid input never changes policy', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const cookie = cookieOf(await login(base))!;
+    const enrollment = await enroll(base, cookie);
+    const status = async () => (await (await request(base, '/auth/session-status', undefined, cookie)).json()).idleHours;
+    assert.equal(await status(), 24);
+    t.mock.timers.tick(600_000);
+    const refused = await request(base, '/auth/auto-lock', { idleHours: 48 }, cookie, 'PUT');
+    assert.equal(refused.status, 403);
+    assert.equal((await refused.json()).code, 'MFA_REAUTH_REQUIRED');
+    assert.equal(await status(), 24);
+    for (const idleHours of [0, 169, -1, 1.5, '2', null, true, {}, []]) {
+      assert.equal((await request(base, '/auth/auto-lock', { idleHours }, cookie, 'PUT')).status, 400);
+      assert.equal(await status(), 24);
+    }
+    assert.equal((await request(base, '/auth/auto-lock', {}, cookie, 'PUT')).status, 400);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 1 }, cookie, 'PUT')).status, 200);
+    assert.equal(await status(), 1);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 1, enabled: false }, cookie, 'PUT')).status, 403);
+    assert.equal((await request(base, '/auth/mfa/reauth', { code: otp(enrollment.secret) }, cookie)).status, 200);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 168 }, cookie, 'PUT')).status, 200);
+    assert.equal(await status(), 168);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 48, enabled: false }, cookie, 'PUT')).status, 200);
+    const saved = await (await request(base, '/auth/session-status', undefined, cookie)).json();
+    assert.equal(saved.idleHours, 48); assert.equal(saved.autoLock, false);
+  });
+});

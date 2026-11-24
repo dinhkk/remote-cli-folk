@@ -246,6 +246,7 @@ export const api = {
     lock: () => post('/api/auth/lock'),
     unlock: (code: string) => post('/api/auth/unlock', { code }),
     setAutoLock: (enabled: boolean) => put('/api/auth/auto-lock', { enabled }),
+    setIdleLockHours: (idleHours: number) => put('/api/auth/auto-lock', { idleHours }),
     mfaStatus: () => get('/api/auth/mfa/status'),
     mfaVerify: (challenge: string, code: string, recovery = false) => post('/api/auth/mfa/verify', { challenge, code, recovery }),
     mfaReauth: (code: string) => post('/api/auth/mfa/reauth', { code }),
