@@ -340,6 +340,8 @@ const MOUNTED: Array<[string, string, 'allow' | 'deny']> = [
   ['POST', '/api/file-tree/create-folder', 'allow'],
   ['GET', '/api/file-tree/projects/p1/file', 'allow'],
   ['GET', '/api/file-tree/projects/p1/files/content', 'allow'],
+  // The Local HTML preview page runs the file's script; a Remote tab never loads it.
+  ['GET', '/api/file-tree/projects/p1/files/html-preview', 'deny'],
   ['PUT', '/api/file-tree/projects/p1/file', 'allow'],
   ['POST', '/api/file-tree/projects/p1/files/upload', 'allow'],
   ['DELETE', '/api/file-tree/projects/p1/files', 'allow'],

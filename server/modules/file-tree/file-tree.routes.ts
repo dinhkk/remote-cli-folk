@@ -17,6 +17,22 @@ type UploadedRequest = Request & {
   files?: Express.Multer.File[];
 };
 
+/**
+ * Policy of the HTML preview document: a sandbox without `allow-same-origin` (opaque origin: no cookie, no
+ * storage, no access to the app), inline script and style only, no network source of any kind.
+ */
+const HTML_PREVIEW_CSP = [
+  'sandbox allow-scripts',
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  'img-src data: blob:',
+  'font-src data:',
+  'media-src data: blob:',
+  "form-action 'none'",
+  "base-uri 'none'",
+].join('; ');
+
 function readBody(request: Request): Record<string, unknown> {
   return typeof request.body === 'object' && request.body !== null
     ? request.body as Record<string, unknown>
@@ -131,6 +147,9 @@ export function createFileTreeRouter(
   }, logger));
 
   router.get('/projects/:projectId/files/content', createRouteHandler(async (request, response) => {
+    // Raw bytes of any type: a browser that opens one as a page gets an opaque origin and never sniffs the type.
+    response.setHeader('Content-Security-Policy', 'sandbox');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
     const file = await services.openFile(readProjectId(request), filePath);
     response.setHeader('Content-Type', file.contentType);
@@ -139,6 +158,30 @@ export function createFileTreeRouter(
       logger.error('Error streaming File Tree content', error);
       if (!response.headersSent) {
         response.status(500).json({ error: 'Error reading file' });
+      }
+    });
+  }, logger));
+
+  // The Local HTML preview frame loads this page: the file's script runs in a sandboxed document with an
+  // opaque origin and no network source, so it can read neither the session nor the app, nor call the server.
+  router.get('/projects/:projectId/files/html-preview', createRouteHandler(async (request, response) => {
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'no-store');
+    if ((request as Request & { authKind?: string }).authKind !== 'session') {
+      throw new AppError('The preview needs a browser session', { code: 'HTML_PREVIEW_SESSION_REQUIRED', statusCode: 401 });
+    }
+    const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
+    const file = await services.openHtmlPreview(readProjectId(request), filePath);
+    response.setHeader('Content-Type', 'text/html; charset=utf-8');
+    response.setHeader('Content-Security-Policy', HTML_PREVIEW_CSP);
+    response.setHeader('Referrer-Policy', 'no-referrer');
+    file.stream.pipe(response);
+    file.stream.on('error', (error) => {
+      logger.error('Error streaming the HTML preview', error);
+      if (!response.headersSent) {
+        response.status(500).json({ error: 'Error reading file' });
+      } else {
+        response.destroy();
       }
     });
   }, logger));

@@ -64,6 +64,7 @@ export const REMOTE_DENY_RULES: readonly RouteRule[] = [
   { pattern: '/api/providers/*/mcp/**', note: 'MCP server definitions carry commands and secret env/headers; listing and writing them is Host configuration' },
   { pattern: '/api/providers/mcp/**', note: 'adds an MCP server to every provider at once: global Host configuration write' },
   { pattern: '/api/providers/*/settings-permissions', note: 'contents of the Host Claude settings files; informational only (the permission panel degrades without it)' },
+  { pattern: '/api/file-tree/projects/*/files/html-preview', methods: ['GET'], note: 'the Local HTML preview runs the file\'s script; a Remote tab only displays HTML (srcdoc under the tab policy) and never loads this page' },
   { pattern: '/health', note: 'the Controller answers its own /health; the Host never serves it through the relay' },
   { pattern: '/r/**', note: 'Controller proxy mount: a Host must not be used as a hop to another Host' },
 ];

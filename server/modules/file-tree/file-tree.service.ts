@@ -573,6 +573,22 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       };
     },
 
+    async openHtmlPreview(projectId, filePath) {
+      const projectRoot = await resolveProjectRoot(projectId);
+      // Only files of the project itself: the preview runs the file's script, so no other file is served here.
+      const resolvedPath = resolvePathInsideProject(projectRoot, filePath);
+      if (!/\.html?$/i.test(resolvedPath)) {
+        throw createFileTreeError('Only .html and .htm files can be previewed', 400, 'HTML_PREVIEW_UNSUPPORTED');
+      }
+      try {
+        const stats = await fileSystem.stat(resolvedPath);
+        if (stats.isDirectory()) throw new Error('not a file');
+      } catch {
+        throw createFileTreeError('File not found', 404, 'FILE_NOT_FOUND');
+      }
+      return { stream: fileSystem.createReadStream(resolvedPath) };
+    },
+
     async saveTextFile(projectId, filePath, content) {
       const projectRoot = await resolveProjectRoot(projectId);
       const resolvedPath = resolvePathInsideProject(projectRoot, filePath);
