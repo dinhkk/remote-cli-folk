@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import http from 'node:http';
 import { Readable } from 'node:stream';
 import test from 'node:test';
 
@@ -212,6 +213,9 @@ test('create route rejects invalid entry types without calling the service', asy
   assert.equal(createCalled, false);
 });
 
+// What a browser sends with the app's status check of the preview page.
+const FETCH_METADATA = { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' };
+
 const HTML_PREVIEW_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
   + "img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'";
 
@@ -225,7 +229,7 @@ test('HP-04/HP-10a: the HTML preview page is the saved file under a sandbox poli
         return { stream: Readable.from([Buffer.from(html)]) };
       },
     }), async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=${encodeURIComponent('site/index.html')}`);
+      const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=${encodeURIComponent('site/index.html')}`, { headers: FETCH_METADATA });
       assert.equal(response.status, 200);
       assert.equal(await response.text(), html);
       assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
@@ -257,7 +261,7 @@ test('HP-02/HP-04: the HTML preview answers JSON errors and serves nothing witho
   });
   for (const authKind of [null, 'loopback', 'platform']) {
     await withFileTreeServer(services, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=a.html`);
+      const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=a.html`, { headers: FETCH_METADATA });
       assert.equal(response.status, 401, String(authKind));
       assert.match(response.headers.get('content-type') ?? '', /application\/json/);
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
@@ -266,10 +270,10 @@ test('HP-02/HP-04: the HTML preview answers JSON errors and serves nothing witho
   }
   assert.deepEqual(opened, [], 'no file is opened without a session');
   await withFileTreeServer(services, async (baseUrl) => {
-    const outside = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=${encodeURIComponent('../../etc/x.html')}`);
+    const outside = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=${encodeURIComponent('../../etc/x.html')}`, { headers: FETCH_METADATA });
     assert.equal(outside.status, 403);
     assert.deepEqual(await outside.json(), { error: 'Path must be under project root' });
-    const missing = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview`);
+    const missing = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview`, { headers: FETCH_METADATA });
     assert.equal(missing.status, 400);
     assert.match(missing.headers.get('content-type') ?? '', /application\/json/);
   });
@@ -285,5 +289,24 @@ test('HP-09: raw file content carries a sandbox policy and nosniff, and still st
     assert.equal(response.headers.get('content-security-policy'), 'sandbox');
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
     assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47]);
+  });
+});
+
+test('condition 2/6: without Fetch Metadata the preview page is refused, so the app only displays the HTML', async () => {
+  await withFileTreeServer(createFakeServices({
+    openHtmlPreview: async () => { throw new Error('the file must not be opened'); },
+  }), async (baseUrl) => {
+    for (const missing of ['Sec-Fetch-Site', 'Sec-Fetch-Mode', 'Sec-Fetch-Dest']) {
+      const headers: Record<string, string> = { ...FETCH_METADATA };
+      delete headers[missing];
+      // node:http: fetch would add a Sec-Fetch-Mode of its own.
+      const status = await new Promise<number>((resolve, reject) => {
+        http.get(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=a.html`, { headers }, (response) => {
+          response.resume();
+          resolve(response.statusCode ?? 0);
+        }).on('error', reject);
+      });
+      assert.equal(status, 400, missing);
+    }
   });
 });

@@ -174,6 +174,11 @@ export function createFileTreeRouter(
     if ((request as Request & { authKind?: string }).authKind !== 'session') {
       throw new AppError('The preview needs a browser session', { code: 'HTML_PREVIEW_SESSION_REQUIRED', statusCode: 401 });
     }
+    // The frame load is accepted only with Fetch Metadata. A browser that sends none would get a refused frame,
+    // so its status check is refused too and the app falls back to displaying the HTML.
+    if (['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'].some((name) => typeof request.headers[name] !== 'string')) {
+      throw new AppError('This browser does not send Fetch Metadata', { code: 'HTML_PREVIEW_FETCH_METADATA_REQUIRED', statusCode: 400 });
+    }
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
     const file = await services.openHtmlPreview(readProjectId(request), filePath, HTML_PREVIEW_MAXIMUM_BYTES);
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
