@@ -14,6 +14,8 @@ import type { RemotePeer } from '@/shared/types';
  * every Remote tab is an isolated frame that stays mounted when you switch away.
  */
 
+vi.mock('@/modules/auth', () => ({ QuickSessionLockButton: () => <button aria-label="Lock Controller session" /> }));
+
 const HOOK = vi.hoisted(() => ({
   peers: [] as RemotePeer[],
   isLoading: false,
@@ -300,4 +302,19 @@ test('UI-09/UI-10/KU-06/KU-07: loading and errors preserve selection; successful
   HOOK.peers = [];
   view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
   assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), null);
+});
+
+test('QL-08: only the active Remote tab exposes a Controller-shell lock control', () => {
+  HOOK.peers = [peer('host-a', 'Host A'), peer('host-b', 'Host B')];
+  const view = renderShell();
+  assert.equal(screen.queryByRole('button', { name: 'Lock Controller session' }), null);
+  fireEvent.click(screen.getByRole('tab', { name: 'Host A' }));
+  const button = screen.getByRole('button', { name: 'Lock Controller session' });
+  assert.ok(view.container.contains(button));
+  assert.equal(button.closest('[role="tablist"]'), null, 'lock stays outside the horizontally scrolling tabs');
+  assert.equal(screen.getAllByRole('button', { name: 'Lock Controller session' }).length, 1);
+  fireEvent.click(screen.getByRole('tab', { name: 'Host B' }));
+  assert.equal(screen.getAllByRole('button', { name: 'Lock Controller session' }).length, 1);
+  fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
+  assert.equal(screen.queryByRole('button', { name: 'Lock Controller session' }), null);
 });
