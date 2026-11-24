@@ -62,7 +62,7 @@ export class ChatSessionWriter {
    * stream away from everyone before it, so a second tab silently froze
    * mid-run and only caught up on the next REST history refresh.
    */
-  private readonly connections = new Set<RealtimeClientConnection>();
+  private readonly connections = new Map<RealtimeClientConnection, boolean>();
   /**
    * The provider-native session id as the runtime knows it. Kept locally
    * (besides the registry) because runtimes read it back via `getSessionId()`
@@ -77,7 +77,7 @@ export class ChatSessionWriter {
     // through `decorateOutboundEvent` into the run's replay buffer, so a
     // client that subscribes mid-run catches up from the beginning.
     if (options.connection) {
-      this.connections.add(options.connection);
+      this.connections.set(options.connection, false);
     }
     this.userId = options.userId;
     this.providerSessionId = options.providerSessionId;
@@ -136,8 +136,8 @@ export class ChatSessionWriter {
    * method it stands in for, so runtime adapters keep working unchanged —
    * but it adds rather than replaces.
    */
-  updateWebSocket(newConnection: RealtimeClientConnection): void {
-    this.connections.add(newConnection);
+  updateWebSocket(newConnection: RealtimeClientConnection, errorsOnly = false): void {
+    this.connections.set(newConnection, errorsOnly);
   }
 
   setSessionId(sessionId: string): void {
@@ -164,9 +164,9 @@ export class ChatSessionWriter {
     // its old connection behind, and without dropping it here the set would
     // grow for the whole life of the run. Deleting during iteration is safe
     // for a Set — the removed entry is simply not revisited.
-    for (const connection of this.connections) {
+    for (const [connection, errorsOnly] of this.connections) {
       if (connection.readyState === WS_OPEN_STATE) {
-        connection.send(payload);
+        if (!errorsOnly || message.kind === 'error') connection.send(payload);
       } else {
         this.connections.delete(connection);
       }

@@ -553,11 +553,12 @@ function handleChatSubscribe(
     // keeps producing events through the same writer (task progress, the
     // turn the CLI pushes when a task reports), so a tab opened during that
     // work attaches too; the registry keeps the run while the work lasts.
-    if (isProcessing || dependencies.runtime.hasBackgroundWork(sessionId)) {
-      chatRunRegistry.attachConnection(sessionId, ws);
-      if (sessionId !== rawSessionId) {
-        chatRunRegistry.attachConnection(rawSessionId, ws);
-      }
+    const errorsOnly = !isProcessing && !dependencies.runtime.hasBackgroundWork(sessionId);
+    // A provider can report completion before a later CLI failure. Keep the
+    // retained run's error channel live even when the subscribe ack is idle.
+    chatRunRegistry.attachConnection(sessionId, ws, errorsOnly);
+    if (sessionId !== rawSessionId) {
+      chatRunRegistry.attachConnection(rawSessionId, ws, errorsOnly);
     }
 
     // Pending approvals are tracked under the app session id inside the
