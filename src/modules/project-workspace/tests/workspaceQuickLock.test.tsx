@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 import React from 'react';
 import { test, vi } from 'vitest';
 
+import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import type { Project } from '@/shared/types';
 
@@ -25,4 +26,11 @@ for (const isMobile of [false, true]) {
     assert.ok(button.closest('header'));
     assert.equal(view.getAllByRole('button', { name: 'Lock session' }).length, 1);
   });
+}
+
+for (const isMobile of [false, true]) {
+ test(`R7-09: empty Local workspace has exactly one lock button (mobile ${isMobile})`, () => {
+  const view = render(<WorkspaceStateView mode="empty" isMobile={isMobile} onMenuClick={() => {}} />);
+  assert.equal(view.getAllByRole('button', { name: 'Lock session' }).length, 1);
+ });
 }

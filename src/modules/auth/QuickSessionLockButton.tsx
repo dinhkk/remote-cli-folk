@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react';
+import { Lock, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -43,6 +43,13 @@ export default function QuickSessionLockButton() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!failed) return;
+    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setFailed(false); };
+    window.addEventListener('keydown', dismiss);
+    return () => window.removeEventListener('keydown', dismiss);
+  }, [failed]);
+
   const lock = async () => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -66,8 +73,9 @@ export default function QuickSessionLockButton() {
       onClick={() => { void lock(); }}>
       <Lock aria-hidden="true" />
     </Button>
-    {failed && <p role="alert" className="absolute right-0 top-full z-50 w-64 rounded-md border bg-background p-3 text-sm text-destructive shadow-md">
+    {failed && <div role="alert" className="absolute right-0 top-full z-50 w-64 rounded-md border bg-background p-3 text-sm text-destructive shadow-md">
+      <button type="button" aria-label={t('passwordWeak.dismiss')} className="float-right ml-2 rounded p-1 focus-visible:outline" onClick={() => setFailed(false)}><X className="h-4 w-4" aria-hidden="true" /></button>
       {t('quickLock.error')}
-    </p>}
+    </div>}
   </div>;
 }
