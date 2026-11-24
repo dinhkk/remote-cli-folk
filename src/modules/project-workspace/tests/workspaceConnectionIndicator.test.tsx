@@ -19,6 +19,7 @@ import type { AppTab, Project } from '@/shared/types';
 const AUTH = { user: { id: 1 }, token: 'token', isLoading: false };
 
 vi.mock('@/modules/auth', () => ({
+  QuickSessionLockButton: () => null,
   useAuth: () => AUTH,
 }));
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { QuickSessionLockButton } from '@/modules/auth';
 import { useRemoteTabs } from '@/modules/remote/hooks/useRemoteTabs';
 import { RemoteTabFrame } from '@/modules/remote/RemoteTabFrame';
 import { onOpenRemoteTabRequest } from '@/modules/remote/utils/open-remote-tab-request';
@@ -169,6 +170,7 @@ export function RemoteTabsShell({
             {peers.map(renderTab)}
           </div>
           {indicator?.('tabbar')}
+          {activeId !== LOCAL_TAB && <QuickSessionLockButton />}
         </div>
       )}
       {/* No tab bar to sit in: a floating pill, which is fixed-position and so cannot shift the app. */}

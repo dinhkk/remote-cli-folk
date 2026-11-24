@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 
+import { MFA_STATUS_CHANGED_EVENT } from '@/modules/auth';
 import SessionLockSettings from '@/modules/settings/tabs/SessionLockSettings';
 import { api, readApiJson } from '@/shared/api';
 import { Button, Input } from '@/shared/ui';
@@ -58,7 +59,7 @@ export default function TotpSettings() {
     {enrollment ? <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => {
       const supplied = code; setCode('');
       const result = await readApiJson<{ recoveryCodes: string[] }>(await api.auth.mfaActivate(supplied));
-      setCodes(result.recoveryCodes); setEnrollment(null); setEnabled(true);
+      setCodes(result.recoveryCodes); setEnrollment(null); setEnabled(true); window.dispatchEvent(new Event(MFA_STATUS_CHANGED_EVENT));
     }); }}>
       <EnrollmentQr uri={enrollment.uri} />
       <p className="break-all text-sm">Setup key: <code>{enrollment.secret}</code></p>
@@ -81,7 +82,7 @@ export default function TotpSettings() {
         const result = await readApiJson<{ recoveryCodes: string[] }>(await api.auth.mfaRecoveryCodes()); setCodes(result.recoveryCodes);
       })}>Replace recovery codes</Button>
       <Button variant="destructive" disabled={busy} onClick={() => void run(async () => {
-        await readApiJson(await api.auth.mfaDisable()); setEnabled(false); setCodes([]); setEnrollment(null);
+        await readApiJson(await api.auth.mfaDisable()); setEnabled(false); window.dispatchEvent(new Event(MFA_STATUS_CHANGED_EVENT)); setCodes([]); setEnrollment(null);
         setNotice('Two-factor authentication disabled. Other devices have been signed out.');
       })}>Disable TOTP</Button>
     </div>}
