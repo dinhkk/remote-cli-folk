@@ -48,3 +48,31 @@ test.each([true, false])('R7-10: replay error merges in its original turn, befor
  await act(async () => { await view.result.current.refreshLatestFromServer(sessionId); });
  expect(view.result.current.getMessages(sessionId).filter(m => m.kind === 'error')).toHaveLength(1);
 });
+
+test.each([true, false])('EH-03: persisted and replay errors with different clocks merge in their own turn, REST first=%s', async restFirst => {
+  const sessionId = 'persisted-error-session';
+  const row = (id: string, seconds: number, kind: 'text' | 'error', content: string): NormalizedMessage => ({
+    id, sessionId, provider: 'codex', kind, ...(kind === 'text' ? { role: 'user' as const } : {}),
+    content, timestamp: `2026-01-01T00:00:0${seconds}.000Z`,
+  });
+  const prompt = row('u1', 0, 'text', 'first');
+  const error = row('disk1', 1, 'error', 'rejected model');
+  const next = row('u2', 3, 'text', 'second');
+  const secondError = row('disk2', 4, 'error', 'rejected model');
+  const messages = [prompt, error, next, secondError];
+  const replay = { ...error, id: 'live1', timestamp: '2026-01-01T00:00:01.300Z', content: JSON.stringify({ message: 'rejected model' }) };
+  history.mockImplementation(async () => ({ ok: true, json: async () => ({ data: { messages, total: messages.length, hasMore: false } }) }));
+  const view = renderHook(() => useSessionStore());
+  if (!restFirst) act(() => view.result.current.appendRealtime(sessionId, replay));
+  await act(async () => { await view.result.current.fetchFromServer(sessionId); });
+  act(() => {
+    view.result.current.appendRealtime(sessionId, replay);
+    view.result.current.appendRealtime(sessionId, { ...secondError, id: 'live2', timestamp: '2026-01-01T00:00:04.400Z' });
+  });
+  for (let reload = 0; reload < 2; reload++) {
+    await act(async () => { await view.result.current.refreshLatestFromServer(sessionId); });
+    expect(view.result.current.getMessages(sessionId).map(m => m.id)).toEqual(['u1', 'disk1', 'u2', 'disk2']);
+  }
+  act(() => view.result.current.appendRealtime(sessionId, { ...secondError, id: 'different-error', content: 'other failure' }));
+  expect(view.result.current.getMessages(sessionId).filter(m => m.kind === 'error')).toHaveLength(3);
+});
