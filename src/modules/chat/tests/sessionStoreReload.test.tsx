@@ -76,3 +76,39 @@ test.each([true, false])('EH-03: persisted and replay errors with different cloc
   act(() => view.result.current.appendRealtime(sessionId, { ...secondError, id: 'different-error', content: 'other failure' }));
   expect(view.result.current.getMessages(sessionId).filter(m => m.kind === 'error')).toHaveLength(3);
 });
+
+test.each(['claude', 'codex'] as LLMProvider[])('EH-03: %s live error wrappers and history render once, retaining distinct failures', async provider => {
+  const sessionId = `wrapped-${provider}`;
+  const content = provider === 'claude' ? 'Not logged in · Please run /login' : 'nested model error';
+  const wrapped = provider === 'claude' ? `Claude Code returned an error result: ${content}`
+    : JSON.stringify({ error: { message: content, type: 'invalid_request_error' } });
+  const prompt: NormalizedMessage = { id: 'u', sessionId, provider, kind: 'text', role: 'user', content: 'test', timestamp: '2026-01-01T00:00:00.000Z' };
+  const error: NormalizedMessage = { id: 'sdk', sessionId, provider, kind: 'error', content, timestamp: '2026-01-01T00:00:01.000Z' };
+  const terminal = { ...error, id: 'runtime', content: wrapped, timestamp: '2026-01-01T00:00:01.200Z' };
+  const other = { ...error, id: 'other', content: 'A different error in the same turn', timestamp: '2026-01-01T00:00:01.400Z' };
+  const persisted = [prompt, { ...error, id: 'disk' }];
+  history.mockImplementation(async () => ({ ok: true, json: async () => ({ data: { messages: persisted, total: 2, hasMore: false } }) }));
+  const live = renderHook(() => useSessionStore());
+  act(() => {
+    live.result.current.appendRealtime(sessionId, prompt);
+    live.result.current.appendRealtime(sessionId, error);
+    live.result.current.appendRealtime(sessionId, terminal);
+  });
+  expect(live.result.current.getMessages(sessionId).map(m => m.kind)).toEqual(['text', 'error']);
+  act(() => live.result.current.appendRealtime(sessionId, other));
+  expect(live.result.current.getMessages(sessionId).filter(m => m.kind === 'error')).toHaveLength(2);
+  live.unmount();
+  for (const beforeRest of [true, false]) {
+    const reloaded = renderHook(() => useSessionStore());
+    if (beforeRest) act(() => reloaded.result.current.appendRealtime(sessionId, terminal));
+    await act(async () => { await reloaded.result.current.fetchFromServer(sessionId); });
+    act(() => reloaded.result.current.appendRealtime(sessionId, terminal));
+    for (let refresh = 0; refresh < 2; refresh++) {
+      await act(async () => { await reloaded.result.current.refreshLatestFromServer(sessionId); });
+      expect(reloaded.result.current.getMessages(sessionId).map(m => m.kind)).toEqual(['text', 'error']);
+    }
+    act(() => reloaded.result.current.appendRealtime(sessionId, other));
+    expect(reloaded.result.current.getMessages(sessionId).filter(m => m.kind === 'error')).toHaveLength(2);
+    reloaded.unmount();
+  }
+});

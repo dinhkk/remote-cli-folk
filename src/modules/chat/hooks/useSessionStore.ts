@@ -287,13 +287,18 @@ function dedupeAdjacentAssistantEchoes(merged: NormalizedMessage[]): NormalizedM
   return out;
 }
 
-function errorText(content: string | undefined): string | undefined {
+function errorText(content: string | undefined, provider: LLMProvider): string | undefined {
   if (!content) return content;
+  // Only this documented Claude runtime wrapper is equivalent to its recorded error.
+  if (provider === 'claude') content = content.replace(/^Claude Code returned an error result: /, '');
   try {
     const parsed: unknown = JSON.parse(content);
     if (parsed && typeof parsed === 'object' && 'message' in parsed && typeof parsed.message === 'string') {
       return parsed.message;
     }
+    if (parsed && typeof parsed === 'object' && 'error' in parsed
+      && parsed.error && typeof parsed.error === 'object' && 'message' in parsed.error
+      && typeof parsed.error.message === 'string') return parsed.error.message;
   } catch { /* Plain error text is already canonical. */ }
   return content;
 }
@@ -303,7 +308,7 @@ function isErrorEchoedOnServer(message: NormalizedMessage, server: NormalizedMes
   if (message.kind !== 'error') return false;
   const matches = (row: NormalizedMessage) => row.kind === 'error'
     && row.sessionId === message.sessionId && row.provider === message.provider
-    && errorText(row.content) === errorText(message.content);
+    && errorText(row.content, row.provider) === errorText(message.content, message.provider);
   if (server.some(row => matches(row) && row.timestamp === message.timestamp)) return true;
   const time = readMessageTime(message);
   if (time === null) return false;
@@ -801,8 +806,11 @@ export function useSessionStore() {
         ? msg
         : { ...msg, sessionId };
     // Replay can race the live error or a second subscription on reconnect.
-    if (normalizedMessage.kind === 'error' && slot.realtimeMessages.some(row =>
-      row.kind === 'error' && row.id === normalizedMessage.id)) return;
+    if (normalizedMessage.kind === 'error' && (
+      slot.realtimeMessages.some(row => row.kind === 'error' && row.id === normalizedMessage.id)
+      || isErrorEchoedOnServer(normalizedMessage,
+        [...slot.serverMessages, ...slot.realtimeMessages].sort(compareMessagesChronologically))
+    )) return;
     let updated = [...slot.realtimeMessages, normalizedMessage];
     if (updated.length > MAX_REALTIME_MESSAGES) {
       updated = updated.slice(-MAX_REALTIME_MESSAGES);

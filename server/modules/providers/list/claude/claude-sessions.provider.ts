@@ -1279,7 +1279,10 @@ export class ClaudeSessionsProvider implements IProviderSessions {
 
     // Claude marks persisted API failures explicitly; synthetic model names alone
     // are not evidence of an error (usage notices can be synthetic too).
-    if (raw.isApiErrorMessage === true && raw.message?.role === 'assistant') {
+    // Live SDKAssistantMessage uses an explicit error code instead of the disk marker.
+    const isLiveApiError = raw.type === 'assistant' && typeof raw.session_id === 'string'
+      && typeof raw.error === 'string' && raw.error.length > 0;
+    if ((raw.isApiErrorMessage === true || isLiveApiError) && raw.message?.role === 'assistant') {
       const content = typeof raw.message.content === 'string' ? raw.message.content
         : Array.isArray(raw.message.content) ? raw.message.content
           .filter((part: AnyRecord) => part?.type === 'text' && typeof part.text === 'string')

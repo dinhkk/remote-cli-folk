@@ -2311,3 +2311,14 @@ test('EH-02: Claude recorded API errors are errors, without inventing failures f
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('EH-03: the live SDK assistant error is not an ordinary answer', () => {
+  const provider = new ClaudeSessionsProvider();
+  const content = 'Not logged in · Please run /login';
+  const raw = { type: 'assistant', session_id: 'native-error', uuid: 'sdk-error',
+    error: 'authentication_failed', message: { role: 'assistant', content: [{ type: 'text', text: content }] } };
+  const messages = provider.normalizeMessage(raw, 'error-session');
+  assert.deepEqual(messages.map(row => [row.kind, row.content]), [['error', content]]);
+  const ordinary = provider.normalizeMessage({ ...raw, error: undefined }, 'error-session');
+  assert.deepEqual(ordinary.map(row => [row.kind, row.content]), [['text', content]]);
+});
