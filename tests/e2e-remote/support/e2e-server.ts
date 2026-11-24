@@ -79,9 +79,19 @@ const toResponse = async (response: Response): Promise<ApiResponse> => {
   };
 };
 
+/**
+ * Where each server's data, HOME and projects live. The server refuses workspaces under `/tmp` (a system
+ * directory) and every project sits in this HOME, so on Linux the default `/tmp` becomes `/var/tmp`, which
+ * the server allows. An explicit TMPDIR elsewhere is kept as is.
+ */
+const e2eTempBase = (): string => {
+  const base = os.tmpdir();
+  return process.platform === 'linux' && (base === '/tmp' || base.startsWith('/tmp/')) ? '/var/tmp' : base;
+};
+
 /** Starts a server and registers its admin account. Resolves when `/health` answers and the account exists. */
 export async function startE2eServer({ name, env = {}, register = true, sourceRoot = FORK_ROOT, legacyAuth = false }: StartServerOptions): Promise<E2eServer> {
-  const root = await mkdtemp(path.join(os.tmpdir(), `e2e-remote-${name}-`));
+  const root = await mkdtemp(path.join(e2eTempBase(), `e2e-remote-${name}-`));
   const home = path.join(root, 'home');
   await mkdir(path.join(home, '.remotecli'), { recursive: true });
   await mkdir(path.join(home, '.cloudcli'), { recursive: true });
