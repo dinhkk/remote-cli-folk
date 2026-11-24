@@ -46,7 +46,7 @@ export default function SessionLockSettings() {
     <form className="flex flex-wrap items-end gap-2" onSubmit={event => {
       event.preventDefault();
       const hours = Number(draftHours);
-      if (!Number.isInteger(hours) || hours < 1 || hours > 168) return;
+      if (busy || autoLock === null || hours === idleHours || !Number.isInteger(hours) || hours < 1 || hours > 168) return;
       void run(async () => {
         const result = await readApiJson<{ idleHours: number }>(await api.auth.setIdleLockHours(hours));
         setIdleHours(result.idleHours); setDraftHours(String(result.idleHours));
@@ -57,7 +57,7 @@ export default function SessionLockSettings() {
           disabled={busy || autoLock === null} onChange={event => setDraftHours(event.target.value)}
           className="w-24 rounded border bg-background px-2 py-1" />
       </label>
-      <Button type="submit" variant="outline" disabled={busy || autoLock === null
+      <Button type="submit" variant="outline" className="aria-disabled:opacity-50" aria-disabled={busy || autoLock === null
         || !Number.isInteger(Number(draftHours)) || Number(draftHours) < 1 || Number(draftHours) > 168
         || Number(draftHours) === idleHours}>{t('security.saveHours')}</Button>
     </form>

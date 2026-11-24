@@ -92,6 +92,6 @@ it('R7-02: loads account hours, confirms increase through reauth and preserves s
     await screen.findByRole('alert');
     expect(screen.getByText('Automatically lock after 48 hours without web activity')).toBeTruthy();
     fireEvent.change(hours, { target: { value: '169' } });
-    expect((screen.getByRole('button', { name: 'Save hours' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Save hours' }).getAttribute('aria-disabled')).toBe('true');
   } finally { unregister(); }
 });
