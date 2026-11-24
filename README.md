@@ -288,6 +288,7 @@ remotecli update
 | `DATABASE_PATH` | Path to the SQLite storage database | `~/.remotecli/data.db` (or application root) |
 | `CLAUDE_CLI_PATH` | Custom path to the Claude Code CLI binary | `claude` |
 | `CONTEXT_WINDOW` | Fallback context window token limit | `160000` |
+| `REMOTECLI_PLUGINS_DISABLED` | `1` turns the plugin feature off: no plugin is installed, updated, started or served, and the UI shows no plugin tabs. Read at startup; installed plugins stay on disk and work again once the variable is removed. Recommended on a server used only as a Remote Controller. | unset (plugins on) |
 
 ---
 
@@ -310,7 +311,7 @@ Open full terminal sessions directly in the browser to run builds, test suites, 
 All agent tools (such as Bash, Write, Edit, Glob, Grep) can be inspected, allowed, or blocked through the **Tools Settings** modal. Prevent unintended destructive commands from running automatically.
 
 ### 🧩 Extensible Plugin System
-Add custom tabs with their own frontend components and backend services. Install community plugins or develop custom extensions for task queues, session intelligence, or custom dashboards.
+Add custom tabs with their own frontend components and backend services. Install community plugins or develop custom extensions for task queues, session intelligence, or custom dashboards. Set `REMOTECLI_PLUGINS_DISABLED=1` to turn plugins off on a server (recommended on a Controller-only server).
 
 ---
 
