@@ -652,6 +652,24 @@ test('EH-01/EH-07: persisted turn errors survive reload once, in order, across m
         if (errorIds) assert.deepEqual(ids, errorIds);
         errorIds = ids;
       }
+      for (const [encoded, expected] of [
+        [JSON.stringify({ error: { message: 'nested model error', type: 'invalid_request_error' } }), 'nested model error'],
+        [JSON.stringify({ message: 'top-level error', error: { message: 'nested ignored' } }), 'top-level error'],
+        ['{"error":{"message":42}}', '{"error":{"message":42}}'],
+        ['{invalid JSON', '{invalid JSON'],
+      ]) {
+        await writeFile(file, [
+          JSON.stringify({ type: 'session_meta', payload: { id: 'provider-errors', cwd: workspace } }),
+          event(0, { type: 'task_started', turn_id: 'encoded-turn' }),
+          event(1, { type: 'user_message', message: 'encoded error prompt' }),
+          event(2, { type: 'task_complete', turn_id: 'encoded-turn', error: { message: encoded } }),
+          '',
+        ].join('\n'));
+        const result = await provider.fetchHistory('app-errors');
+        assert.deepEqual(result.messages.map(row => [row.kind, row.content]), [
+          ['text', 'encoded error prompt'], ['error', expected],
+        ]);
+      }
     });
   } finally {
     restoreHome();

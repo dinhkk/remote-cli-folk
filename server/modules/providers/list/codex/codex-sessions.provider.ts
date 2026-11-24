@@ -1282,7 +1282,9 @@ function readCodexErrorMessage(error: unknown): string {
   if (typeof message !== 'string') return 'Turn failed';
   try {
     const parsed = readObjectRecord(JSON.parse(message));
-    return typeof parsed?.message === 'string' ? parsed.message : message;
+    if (typeof parsed?.message === 'string') return parsed.message;
+    const nested = readObjectRecord(parsed?.error);
+    return typeof nested?.message === 'string' ? nested.message : message;
   } catch {
     return message;
   }
