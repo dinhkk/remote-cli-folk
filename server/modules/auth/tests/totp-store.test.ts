@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomBytes } from 'node:crypto';
@@ -113,4 +116,79 @@ test('T-10: disable clears pending/active material and invalidates challenges', 
   assert.equal(f.store.enabled(1), false);
   assert.equal(f.db.prepare('SELECT 1 FROM auth_recovery_codes').get(), undefined);
   assert.throws(() => f.store.completeLogin(c.challenge, e.recoveryCodes[0], true));
+});
+
+
+test('TH-01/02/03/06/07: session failures revoke only that session; success resets and replay stays global', t => {
+  const f = fixture(t); const e = f.activate();
+  const b = f.sessions.create(1, 'second', f.now()).session;
+  const verify = (id: string, value: string) => f.store.verifySessionTotp(1, id, value, f.sessions);
+  for (let n = 1; n <= 3; n++) assert.throws(() => verify(f.session.id, 'bad'), error => {
+    assert.equal((error as {details:{attemptsRemaining:number}}).details.attemptsRemaining, 5-n); return true;
+  });
+  f.advance(30_000); verify(f.session.id, code(e.secret, f.now()));
+  assert.equal(f.db.prepare('SELECT 1 FROM auth_session_mfa_attempts').get(), undefined);
+  assert.throws(() => verify(b.id, code(e.secret, f.now())), error => (error as {code:string}).code === 'MFA_CODE_INVALID');
+  for (let n = 0; n < 5; n++) assert.throws(() => verify(f.session.id, 'bad'));
+  assert.equal(f.sessions.getCurrent(f.session.id), null);
+  assert.ok(f.sessions.getActive(b.id));
+  assert.equal(f.db.prepare('SELECT 1 FROM auth_throttle').get(), undefined);
+  assert.equal(f.db.prepare('SELECT 1 FROM auth_session_mfa_attempts WHERE session_id=?').get(f.session.id), undefined);
+  assert.equal(f.db.prepare<{n:number}>("SELECT count(*) n FROM auth_events WHERE session_id=? AND kind='mfa-attempts-exceeded'").get(f.session.id)?.n,1);
+  f.advance(30_000); verify(b.id, code(e.secret, f.now()));
+  f.advance(30_000); assert.equal(f.store.completeLogin(f.store.challenge(1)!.challenge, code(e.secret, f.now()), false).userId,1);
+});
+
+test('TH-04/05: account login throttle remains, but cannot block verified sessions', t => {
+  const f=fixture(t); const e=f.activate();
+  const challenge=f.store.challenge(1)!.challenge;
+  for(let n=0;n<5;n++) assert.throws(()=>f.store.completeLogin(challenge,'bad',false));
+  const blocked=f.db.prepare('SELECT * FROM auth_throttle').get();
+  f.advance(30_000);
+  f.store.verifySessionTotp(1,f.session.id,code(e.secret,f.now()),f.sessions);
+  assert.deepEqual(f.db.prepare('SELECT * FROM auth_throttle').get(),blocked);
+  assert.throws(()=>f.store.completeLogin(challenge,code(e.secret,f.now()),false), error=>(error as {code:string}).code==='AUTH_RATE_LIMITED');
+});
+
+test('TH-03/09: additive migration preserves epoch/sessions and failures survive store recreation', t => {
+  const f=fixture(t);f.activate();
+  const before=f.db.prepare('SELECT * FROM auth_sessions').all();
+  const epoch=f.db.prepare('SELECT * FROM app_config').all();
+  for(let n=0;n<4;n++) assert.throws(()=>f.store.verifySessionTotp(1,f.session.id,'bad',f.sessions));
+  migrateAuthSessions(f.db,f.now());
+  assert.deepEqual(f.db.prepare('SELECT * FROM auth_sessions').all(),before);
+  assert.deepEqual(f.db.prepare('SELECT * FROM app_config').all(),epoch);
+  const sessions=createSessionStore(f.db,f.now),store=createTotpStore(f.db,()=>f.box,f.now);
+  assert.throws(()=>store.verifySessionTotp(1,f.session.id,'bad',sessions), error=>(error as {code:string}).code==='MFA_SESSION_REVOKED');
+  assert.equal(sessions.getCurrent(f.session.id),null);
+});
+
+test('TH-03: explicit revocation, revoke-all and expiration remove session attempt rows', t => {
+  const f=fixture(t); f.activate();
+  for(const action of ['revoke','all','expire']) {
+    const session=f.sessions.create(1,'browser',f.now()).session;
+    assert.throws(()=>f.store.verifySessionTotp(1,session.id,'bad',f.sessions));
+    if(action==='revoke') f.sessions.revoke(session.id,1);
+    else if(action==='all') f.sessions.revokeAll(1);
+    else { f.advance(8*86400_000); f.sessions.expire(); }
+    assert.equal(f.db.prepare('SELECT 1 FROM auth_session_mfa_attempts WHERE session_id=?').get(session.id),undefined);
+  }
+});
+
+test('TH-03: attempt counter survives closing and reopening the database', () => {
+ const dir=mkdtempSync(path.join(os.tmpdir(),'session-attempts-'));const file=path.join(dir,'auth.db');
+ let db=new Database(file);
+ try {
+  db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY); INSERT INTO users VALUES(1); CREATE TABLE app_config (key TEXT PRIMARY KEY, value TEXT);");
+  const now=()=>1_700_000_000_000;const box=createSecretBox(randomBytes(32));
+  migrateAuthSessions(db,now());migrateTotp(db,now());
+  let sessions=createSessionStore(db,now),mfa=createTotpStore(db,()=>box,now);
+  const session=sessions.create(1).session;const enrollment=mfa.beginEnrollment(1,'synthetic',session.id);
+  mfa.activate(1,session.id,code(enrollment.secret,now()));sessions.markMfa(session.id,now());
+  for(let n=0;n<4;n++)assert.throws(()=>mfa.verifySessionTotp(1,session.id,'bad',sessions));
+  db.close();db=new Database(file);migrateAuthSessions(db,now());
+  sessions=createSessionStore(db,now);mfa=createTotpStore(db,()=>box,now);
+  assert.throws(()=>mfa.verifySessionTotp(1,session.id,'bad',sessions),error=>(error as {code:string}).code==='MFA_SESSION_REVOKED');
+  assert.equal(sessions.getCurrent(session.id),null);
+ } finally {db.close();rmSync(dir,{recursive:true,force:true});}
 });

@@ -100,7 +100,7 @@ test('K-20: additive migration increments legacy epoch only once and preserves e
   assert.equal(db.prepare<{ value: string }>("SELECT value FROM app_config WHERE key='auth.token_epoch'").get()?.value, '4');
   assert.equal(db.prepare('SELECT * FROM users').all().length, 2);
   assert.deepEqual(db.prepare<{ id: string }>('SELECT id FROM schema_migrations ORDER BY id').all().map(row => row.id),
-    ['auth-session-idle-policy-v1', 'auth-sessions-v1']);
+    ['auth-session-idle-policy-v1', 'auth-session-mfa-attempts-v1', 'auth-sessions-v1']);
   assert.equal(store.authenticate(a.secret)?.id, a.session.id);
 });
 

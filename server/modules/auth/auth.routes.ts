@@ -112,7 +112,16 @@ export function createAuthRouter(
       const auth = req as AuthenticatedRequest;
       if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
       if (auth.authSession.lockedAt === null) return res.json({ locked: false });
-      getMfaStore().verifyTotp(auth.authSession.userId, req.body?.code);
+      auth.releaseAuthConnection?.();
+      try {
+        getMfaStore().verifySessionTotp(auth.authSession.userId, auth.authSession.id, req.body?.code, getSessionRuntime().store);
+      } catch (error) {
+        if (error instanceof AppError && error.code === 'MFA_SESSION_REVOKED') {
+          res.setHeader('X-Auth-Error', 'mfa-attempts-exceeded');
+          res.setHeader('Set-Cookie', clearSessionCookie(req));
+        }
+        throw error;
+      }
       if (!getSessionRuntime().store.unlock(auth.authSession.id, auth.authSession.userId, Date.now())) {
         return res.status(401).json({ code: 'AUTH_TOKEN_INVALID' });
       }

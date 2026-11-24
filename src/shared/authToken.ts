@@ -11,10 +11,10 @@ export const lockAuthSession = (): void => {
 
 export const AUTH_SESSION_EXPIRED_EVENT = 'auth-session-expired';
 
-export const expireAuthSession = (): void => {
+export const expireAuthSession = (reason?: string | null): void => {
   if (isTargetMode()) return;
   localStorage.removeItem('auth-token');
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT, { detail: reason }));
 };
 
 export const getStoredAuthToken = (): string | null => {

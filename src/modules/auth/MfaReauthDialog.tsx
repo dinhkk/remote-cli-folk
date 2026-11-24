@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useEffect, useRef, useState } from 'react';
 
-import { api, readApiJson } from '@/shared/api';
+import { api, readApiJson, ApiRequestError } from '@/shared/api';
 import { registerMfaReauth } from '@/shared/authToken';
 import { Button, Input } from '@/shared/ui';
 
@@ -68,7 +68,13 @@ export default function MfaReauthDialog() {
       }}
       onSubmit={(e) => { e.preventDefault(); if (busy) return; setBusy(true); setError('');
         const supplied = code, attempt = generation.current; setCode('');
-        void api.auth.mfaReauth(supplied).then(readApiJson).then(() => { if (attempt === generation.current) finish(true); }).catch(() => { if (attempt === generation.current) setError(t('security.failed')); }).finally(() => { if (attempt === generation.current) setBusy(false); });
+        void api.auth.mfaReauth(supplied).then(readApiJson).then(() => { if (attempt === generation.current) finish(true); }).catch((caught: unknown) => {
+          if (attempt !== generation.current) return;
+          const details = caught instanceof ApiRequestError ? caught.details as { attemptsRemaining?: unknown } | undefined : undefined;
+          const remaining = details?.attemptsRemaining;
+          setError(typeof remaining === 'number' && Number.isInteger(remaining) && remaining >= 0 && remaining < 5
+            ? t('security.attemptsRemaining', { count: remaining }) : t('security.failed'));
+        }).finally(() => { if (attempt === generation.current) setBusy(false); });
       }}>
       <h2 id="mfa-reauth-title" className="font-semibold">{t('security.reauthTitle')}</h2>
       <p className="text-sm text-muted-foreground">{t('security.reauthHint')}</p>
