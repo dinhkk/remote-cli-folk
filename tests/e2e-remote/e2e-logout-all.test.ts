@@ -28,10 +28,13 @@ describe('logout-all on the Controller', () => {
     const token = await world.tabToken();
     const chat = await world.openChat(token);
     const shell = await RemoteSocket.open(world.controller.baseUrl, world.peerId, 'shell', token);
-    // A regular (non-Remote) socket of the same login must also die: the secret is rotated, JWT_SECRET is not pinned.
+    // A regular (non-Remote) socket of the same login must also die. It authenticates like a browser:
+    // the session cookie plus a same-origin Origin (a token in the URL is refused by design).
     const local = await new Promise<import('ws').WebSocket>((resolve, reject) => {
       void import('ws').then(({ WebSocket }) => {
-        const socket = new WebSocket(`${world.controller.baseUrl.replace(/^http/, 'ws')}/ws?token=${world.controller.jwt}`);
+        const socket = new WebSocket(`${world.controller.baseUrl.replace(/^http/, 'ws')}/ws`, {
+          headers: { cookie: `remotecli_session=${world.controller.jwt}`, origin: world.controller.baseUrl },
+        });
         socket.once('open', () => resolve(socket));
         socket.once('error', reject);
       });
