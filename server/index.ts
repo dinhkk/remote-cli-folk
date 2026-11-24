@@ -105,6 +105,8 @@ const remote = createRemoteModule({
     port: Number.parseInt(process.env.SERVER_PORT || '3001', 10),
     bindHost: process.env.HOST,
     indexHtmlPath: path.join(APP_ROOT, 'dist', 'index.html'),
+    // A Local plugin's module is imported from a blob URL; with plugins off no page allows blob: scripts.
+    pluginScripts: !PLUGINS_DISABLED,
 });
 const queryClaude = providerRuntimeService.getRunner('claude');
 const queryCursor = providerRuntimeService.getRunner('cursor');

@@ -29,8 +29,8 @@ import type { RemoteRelayLink } from '@/shared/types.js';
 
 import { createRelayLink } from '../../link/relay-link.js';
 import { initializeRemoteStorage } from '../../storage/remote-storage.service.js';
-import { MAIN_PAGE_CSP } from '../../runtime/main-page-security-headers.js';
-import { buildTargetPageCsp, readInlineScriptHashes } from '../../runtime/target-page-csp.js';
+import { buildMainPageCsp } from '../../runtime/main-page-security-headers.js';
+import { buildTargetPageCsp, readInlineScriptHashes, sameHostSocketSources } from '../../runtime/target-page-csp.js';
 import { createTestAccount } from '../support/auth-test-session.js';
 import { FakeRelay } from '../support/fake-relay.js';
 import { startFakeRelayWsServer, type FakeRelayWsServer } from '../support/fake-relay-ws-server.js';
@@ -302,11 +302,17 @@ describe('server/index.ts with Remote', () => {
   it('puts the target-page CSP on the page served with ?target= and not on the plain page', async () => {
     const target = await send(child.port, { path: '/?target=abc', headers: { accept: 'text/html' } });
     // The real server allows the inline scripts of the built page by hash (none when there is no build).
-    const expected = buildTargetPageCsp(readInlineScriptHashes(path.join(FORK_ROOT, 'dist', 'index.html')));
+    const hashes = readInlineScriptHashes(path.join(FORK_ROOT, 'dist', 'index.html'));
+    const sockets = sameHostSocketSources(`127.0.0.1:${child.port}`);
+    const expected = buildTargetPageCsp(hashes, sockets);
     assert.equal(target.headers['content-security-policy'], expected);
     assert.ok(expected.startsWith("default-src 'self'"));
     const plain = await send(child.port, { path: '/', headers: { accept: 'text/html' } });
-    assert.equal(plain.headers['content-security-policy'], MAIN_PAGE_CSP, 'the plain page has only the main-page policy');
+    // The child inherits this environment: plugins are on (blob: scripts allowed) unless the switch is set.
+    const blobScripts = process.env.REMOTECLI_PLUGINS_DISABLED !== '1';
+    assert.equal(plain.headers['content-security-policy'], buildMainPageCsp({ frameAncestors: true, scriptHashes: hashes, socketSources: sockets, blobScripts }),
+      'the plain page has the main-page policy with the same inline-script hashes');
+    assert.ok(!/script-src[^;]*blob:/.test(target.headers['content-security-policy'] as string), 'the ?target= page never allows blob: scripts');
   });
 
   it('upgrades /r/<peer>/ws with the tab-token subprotocol, echoes only the marker, and reaches the Host', async () => {
