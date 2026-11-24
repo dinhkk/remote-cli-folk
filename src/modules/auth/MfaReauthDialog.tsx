@@ -16,11 +16,8 @@ export default function MfaReauthDialog() {
   const previousFocus = useRef<HTMLElement | null>(null);
   const lastFocused = useRef<HTMLElement | null>(null);
   const restoreObserver = useRef<MutationObserver | null>(null);
-  const restoreTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearRestore = () => {
     restoreObserver.current?.disconnect(); restoreObserver.current = null;
-    if (restoreTimer.current) clearTimeout(restoreTimer.current);
-    restoreTimer.current = null;
   };
   const restoreFocus = () => {
     clearRestore();
@@ -35,7 +32,6 @@ export default function MfaReauthDialog() {
     // The caller releases its busy state only after the reauth promise settles.
     restoreObserver.current = new MutationObserver(attempt);
     restoreObserver.current.observe(target, { attributes: true, attributeFilter: ['disabled'] });
-    restoreTimer.current = setTimeout(clearRestore, 5000);
     attempt();
   };
   const finish = (value: boolean) => {
