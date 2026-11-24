@@ -25,6 +25,7 @@ function EnrollmentQr({ uri }: { uri: string }) {
 export default function TotpSettings() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [code, setCode] = useState('');
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
@@ -87,13 +88,13 @@ export default function TotpSettings() {
       })}>Disable TOTP</Button>
     </div>}
     <form className="space-y-3 border-t pt-4" onSubmit={(e) => { e.preventDefault(); void run(async () => {
-      const old = password, next = newPassword; setPassword(''); setNewPassword('');
+      const old = currentPassword, next = newPassword; setCurrentPassword(''); setNewPassword('');
       await readApiJson(await api.auth.changePassword(old, next));
       setNotice('Password changed. Other devices have been signed out.');
     }); }}>
       <h3 className="font-medium">Change password</h3>
       <label htmlFor="change-current-password" className="block text-sm">Current password</label>
-      <Input id="change-current-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+      <Input id="change-current-password" type="password" autoComplete="current-password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
       <label htmlFor="change-new-password" className="block text-sm">New password (at least 12 characters)</label>
       <Input id="change-new-password" type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
       <Button type="submit" disabled={busy || enabled === null}>Change password</Button>
