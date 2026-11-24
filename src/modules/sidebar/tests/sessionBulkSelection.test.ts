@@ -337,6 +337,8 @@ test('the compact layout selects with the same rules and hides its options butto
 });
 
 type SessionActivity = {
+  projects?: Project[];
+  isMobile?: boolean;
   selectedProject?: Project | null;
   keepProjectsExpanded?: boolean;
   activeSessions: ReadonlySet<string>;
@@ -347,15 +349,15 @@ const IDLE: SessionActivity = { activeSessions: NO_IDS, backgroundSessionIds: NO
 
 const renderController = (onSessionDelete = vi.fn(), initialActivity: SessionActivity = IDLE) =>
   renderHook(
-    ({ activeSessions, backgroundSessionIds, keepProjectsExpanded, selectedProject = null }: SessionActivity) =>
+    ({ activeSessions, backgroundSessionIds, keepProjectsExpanded, selectedProject = null, projects = PROJECTS, isMobile = false }: SessionActivity) =>
       useSidebarController({
-        projects: PROJECTS,
+        projects,
         selectedProject,
         selectedSession: null,
         activeSessions,
         backgroundSessionIds,
         isLoading: false,
-        isMobile: false,
+        isMobile,
         t,
         onRefresh: noop,
         onProjectSelect: noop,
@@ -734,3 +736,14 @@ test('UI-07: leaving conversation mode cancels pagination and late results', asy
   assert.equal(recentConversations.mock.calls.length, 1);
   assert.deepEqual(result.current.recentConversations, []);
 });
+
+for (const keepProjectsExpanded of [false, true]) {
+  test(`PL-01: mobile initial load does not auto-expand all projects (multi-open ${keepProjectsExpanded})`, () => {
+    const projects = Array.from({ length: 14 }, (_, index) => ({ ...PROJECT, projectId: `mobile-${index}` }));
+    const controller = renderController(vi.fn(), { ...IDLE, projects, isMobile: true, keepProjectsExpanded });
+    assert.deepEqual(projects.filter(p => controller.result.current.isProjectExpanded(p.projectId)).map(p => p.projectId), ['mobile-0']);
+    act(() => controller.result.current.toggleProject('mobile-10'));
+    assert.equal(controller.result.current.isProjectExpanded('mobile-10'), true);
+    assert.equal(controller.result.current.isProjectExpanded('mobile-0'), keepProjectsExpanded);
+  });
+}

@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "Sabitlenen projeler",
+    "other": "Diğer projeler ({{count}})"
+  },
   "projects": {
     "title": "Projeler",
     "newProject": "Yeni Proje",

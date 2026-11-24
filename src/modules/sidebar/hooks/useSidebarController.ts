@@ -227,7 +227,7 @@ export function useSidebarController({
     const isInitialSelection = !selectionExpansion.current.seenSelection;
 
     // On initial load or when no project is selected yet, auto-expand the first project
-    // (or all on mobile) so mobile drawer and fresh target-mode tabs display sessions immediately,
+    // so mobile drawer and fresh target-mode tabs display sessions immediately,
     // unless an explicit saved set (including an empty set) was restored.
     if (!selectedProjectId) {
       if (
@@ -235,7 +235,7 @@ export function useSidebarController({
         expandedProjects.size === 0 &&
         (!keepProjectsExpanded || restoredExpandedProjects.current === null)
       ) {
-        const idsToExpand = isMobile ? projects.map((p) => p.projectId) : [projects[0].projectId];
+        const idsToExpand = [projects[0].projectId];
         setExpandedProjects(new Set(idsToExpand));
       }
       return;

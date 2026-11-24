@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "已釘選的專案",
+    "other": "其他專案 ({{count}})"
+  },
   "projects": {
     "title": "專案",
     "newProject": "新增專案",

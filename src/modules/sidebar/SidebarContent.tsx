@@ -438,7 +438,7 @@ export default function SidebarContent({
                   {runningSessionsCount}
                 </span>
               </div>
-              <SidebarProjectList {...projectListProps} />
+              <SidebarProjectList {...projectListProps} showAllProjects={searchMode === 'running' || searchFilter.trim().length > 0} />
             </div>
           )
         ) : searchMode === 'archived' ? (
@@ -698,7 +698,7 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          <SidebarProjectList {...projectListProps} />
+          <SidebarProjectList {...projectListProps} showAllProjects={searchFilter.trim().length > 0} />
         )}
       </ScrollArea>
 

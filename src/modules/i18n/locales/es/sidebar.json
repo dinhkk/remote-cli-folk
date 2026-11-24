@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "Proyectos fijados",
+    "other": "Otros proyectos ({{count}})"
+  },
   "projects": {
     "title": "Proyectos",
     "newProject": "Nuevo proyecto",

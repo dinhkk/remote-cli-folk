@@ -293,6 +293,7 @@ function SidebarProjectItem({
 
         {!isCompact && (
         <Button
+          data-project-toggle
           variant="ghost"
           className={cn(
             'sticky top-0 z-10 flex w-full justify-between p-2 h-auto font-normal hover:bg-accent/50',
