@@ -239,5 +239,11 @@
       "closeSidebar": "Seitenleiste schließen",
       "resizeSidebar": "Seitenleistenbreite ändern"
     }
+  },
+  "remoteHosts": {
+    "loading": "Hosts werden geladen…",
+    "loadError": "Die Liste der Hosts konnte nicht geladen werden. Der ausgewählte Host-Tab kehrt zurück, sobald die Liste geladen ist.",
+    "retry": "Erneut versuchen",
+    "openLocal": "Local öffnen"
   }
 }

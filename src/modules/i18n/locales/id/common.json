@@ -351,5 +351,11 @@
     "closeLoginModal": "Tutup modal login",
     "pluginLoadFailed": "Plugin gagal dimuat: {{error}}"
   },
-  "cancel": "Batal"
+  "cancel": "Batal",
+  "remoteHosts": {
+    "loading": "Memuat Host…",
+    "loadError": "Daftar Host tidak dapat dimuat. Tab Host yang dipilih akan kembali setelah daftar dimuat.",
+    "retry": "Coba lagi",
+    "openLocal": "Buka Local"
+  }
 }

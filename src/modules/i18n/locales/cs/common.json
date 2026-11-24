@@ -469,5 +469,11 @@
     "taskRowNotLoaded": "Spuštěno dříve v této konverzaci; kliknutím načtete",
     "taskOfAgent": "Spuštěno jedním z agentů této relace"
   },
-  "cancel": "Zrušit"
+  "cancel": "Zrušit",
+  "remoteHosts": {
+    "loading": "Načítání hostitelů…",
+    "loadError": "Seznam hostitelů se nepodařilo načíst. Vybraná karta hostitele se vrátí, jakmile se seznam načte.",
+    "retry": "Zkusit znovu",
+    "openLocal": "Otevřít Local"
+  }
 }

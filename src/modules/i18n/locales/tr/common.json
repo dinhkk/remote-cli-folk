@@ -269,5 +269,11 @@
       "closeSidebar": "Kenar çubuğunu kapat",
       "resizeSidebar": "Kenar çubuğunu yeniden boyutlandır"
     }
+  },
+  "remoteHosts": {
+    "loading": "Ana makineler yükleniyor…",
+    "loadError": "Ana makine listesi yüklenemedi. Liste yüklendiğinde seçili ana makine sekmesi geri gelecek.",
+    "retry": "Tekrar dene",
+    "openLocal": "Local'i aç"
   }
 }

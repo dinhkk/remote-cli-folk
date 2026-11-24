@@ -446,5 +446,11 @@
     "taskRowNotLoaded": "Se lanzó antes en esta conversación; haz clic para cargarla",
     "taskOfAgent": "Lanzada por uno de los agentes de esta sesión"
   },
-  "cancel": "Cancelar"
+  "cancel": "Cancelar",
+  "remoteHosts": {
+    "loading": "Cargando hosts…",
+    "loadError": "No se pudo cargar la lista de hosts. La pestaña del host seleccionado volverá cuando se cargue la lista.",
+    "retry": "Reintentar",
+    "openLocal": "Abrir Local"
+  }
 }

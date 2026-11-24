@@ -21,13 +21,14 @@ const HOOK = vi.hoisted(() => ({
   isLoading: false,
   hasLoadError: false,
   requestTabToken: vi.fn(),
+  refresh: vi.fn(async () => undefined),
 }));
 vi.mock('@/modules/remote/hooks/useRemoteTabs', () => ({
   useRemoteTabs: () => ({
     peers: HOOK.peers,
     isLoading: HOOK.isLoading,
     hasLoadError: HOOK.hasLoadError,
-    refresh: async () => undefined,
+    refresh: HOOK.refresh,
     requestTabToken: HOOK.requestTabToken,
   }),
 }));
@@ -301,6 +302,39 @@ test('UI-09/UI-10/KU-06/KU-07: loading and errors preserve selection; successful
   assert.equal(screen.getByRole('tab', { name: 'Test Host' }).getAttribute('aria-selected'), 'true');
   HOOK.peers = [];
   view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), null);
+});
+
+test('SF-02: a saved Host whose list is loading or failed shows a visible state, not a blank page', () => {
+  sessionStorage.setItem(SELECTED_REMOTE_TAB_KEY, 'host-A');
+  HOOK.isLoading = true;
+  const view = renderShell();
+  assert.equal(screen.getByRole('status').textContent, 'Loading Hosts…');
+  assert.equal(screen.queryByRole('button', { name: 'Try again' }), null);
+
+  HOOK.isLoading = false; HOOK.hasLoadError = true;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.match(screen.getByRole('alert').textContent ?? '', /Could not load the list of Hosts/);
+  HOOK.refresh.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  assert.equal(HOOK.refresh.mock.calls.length, 1);
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), 'host-A', 'retrying keeps the saved Host');
+  assert.ok(screen.getByTestId('local-app').parentElement?.classList.contains('hidden'), 'no automatic fallback to Local');
+
+  // The list recovers: the saved Host comes back by itself and the state goes away.
+  HOOK.peers = [peer('host-A', 'Test Host')]; HOOK.hasLoadError = false;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(screen.queryByTestId('remote-hosts-pending'), null);
+  assert.equal(screen.getByRole('tab', { name: 'Test Host' }).getAttribute('aria-selected'), 'true');
+});
+
+test('SF-02: after a failed list the user can choose Local', () => {
+  sessionStorage.setItem(SELECTED_REMOTE_TAB_KEY, 'host-A');
+  HOOK.hasLoadError = true;
+  renderShell();
+  fireEvent.click(screen.getByRole('button', { name: 'Open Local' }));
+  assert.equal(screen.queryByTestId('remote-hosts-pending'), null);
+  assert.ok(!screen.getByTestId('local-app').parentElement?.classList.contains('hidden'));
   assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), null);
 });
 
