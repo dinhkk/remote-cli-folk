@@ -1,3 +1,4 @@
+import '@/modules/i18n';
 import { afterEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import QRCode from 'qrcode';

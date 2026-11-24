@@ -129,3 +129,17 @@ test('QL-05: every locale supplies translated accessible label and error', () =>
     if (!path.includes('/en/')) assert.notEqual(locale.quickLock.label, 'Lock session', path);
   }
 });
+
+test('R7-09: lock failure is dismissible by close and Escape, and clears after success', async () => {
+ mocks.lock.mockImplementation(async () => response({}, 500));
+ const view = render(<QuickSessionLockButton />);
+ const button = await view.findByRole('button', { name: 'quickLock.label' });
+ fireEvent.click(button); await view.findByRole('alert');
+ fireEvent.click(view.getByRole('button', { name: 'passwordWeak.dismiss' }));
+ assert.equal(view.queryByRole('alert'), null);
+ fireEvent.click(button); await view.findByRole('alert');
+ fireEvent.keyDown(window, { key: 'Escape' }); assert.equal(view.queryByRole('alert'), null);
+ fireEvent.click(button); await view.findByRole('alert');
+ mocks.lock.mockImplementation(async () => response({ success: true }));
+ fireEvent.click(button); await waitFor(() => assert.equal(view.queryByRole('alert'), null));
+});

@@ -305,7 +305,8 @@ function pruneRealtimeSupersededByServer(
   const reconciledRealtimeMessages = removeOptimisticUserEchoes(serverMessages, realtimeMessages);
 
   return reconciledRealtimeMessages.filter((message) => {
-    if (serverIds.has(message.id)) {
+    if (serverIds.has(message.id) || (message.kind === 'error' && serverMessages.some(row =>
+      row.kind === 'error' && row.timestamp === message.timestamp && row.content === message.content))) {
       return false;
     }
 
@@ -348,7 +349,8 @@ function computeMerged(server: NormalizedMessage[], realtime: NormalizedMessage[
   const serverIds = new Set(server.map((message) => message.id));
   const reconciledRealtime = removeOptimisticUserEchoes(server, realtime);
   const extra = reconciledRealtime.filter((message) => {
-    if (serverIds.has(message.id)) {
+    if (serverIds.has(message.id) || (message.kind === 'error' && server.some(row =>
+      row.kind === 'error' && row.timestamp === message.timestamp && row.content === message.content))) {
       return false;
     }
     return true;
@@ -768,6 +770,9 @@ export function useSessionStore() {
       msg.sessionId === sessionId
         ? msg
         : { ...msg, sessionId };
+    // Replay can race the live error or a second subscription on reconnect.
+    if (normalizedMessage.kind === 'error' && slot.realtimeMessages.some(row =>
+      row.kind === 'error' && row.id === normalizedMessage.id)) return;
     let updated = [...slot.realtimeMessages, normalizedMessage];
     if (updated.length > MAX_REALTIME_MESSAGES) {
       updated = updated.slice(-MAX_REALTIME_MESSAGES);

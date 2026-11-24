@@ -1,3 +1,4 @@
+import '@/modules/i18n';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 
@@ -57,4 +58,40 @@ it('K-23: activation reveals lock controls with the server default enabled', asy
   fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
   await screen.findByRole('button', { name: 'Lock now' });
   await waitFor(() => expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true));
+});
+
+
+it('R7-02: loads account hours, confirms increase through reauth and preserves saved hours on failure', async () => {
+  const { registerMfaReauth } = await import('@/shared/authToken');
+  const prompt = vi.fn(async () => true);
+  const unregister = registerMfaReauth(prompt);
+  let attempts = 0;
+  const fetcher = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url === '/api/auth/mfa/status') return new Response('{"enabled":true}');
+    if (url === '/api/auth/auto-lock') {
+      expect(options?.body).toBe('{"idleHours":48}');
+      return ++attempts === 1
+        ? new Response('{"code":"MFA_REAUTH_REQUIRED"}', { status: 403 })
+        : new Response('{"autoLock":true,"idleHours":48}');
+    }
+    return new Response('{"autoLock":true,"idleHours":12}');
+  });
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    render(<TotpSettings />);
+    const hours = await screen.findByRole('spinbutton', { name: 'Hours before automatic lock' });
+    await waitFor(() => expect((hours as HTMLInputElement).value).toBe('12'));
+    expect(screen.getByText('Automatically lock after 12 hours without web activity')).toBeTruthy();
+    fireEvent.change(hours, { target: { value: '48' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save hours' }));
+    await screen.findByText('Automatically lock after 48 hours without web activity');
+    expect(prompt).toHaveBeenCalledTimes(1); expect(attempts).toBe(2);
+    fetcher.mockImplementation(async () => new Response('{}', { status: 400 }));
+    fireEvent.change(hours, { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save hours' }));
+    await screen.findByRole('alert');
+    expect(screen.getByText('Automatically lock after 48 hours without web activity')).toBeTruthy();
+    fireEvent.change(hours, { target: { value: '169' } });
+    expect(screen.getByRole('button', { name: 'Save hours' }).getAttribute('aria-disabled')).toBe('true');
+  } finally { unregister(); }
 });

@@ -3,7 +3,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Database } from '../../database/index.js';
 
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-export const SESSION_IDLE_LOCK_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_SESSION_IDLE_HOURS = 24;
+export const SESSION_IDLE_LOCK_MS = DEFAULT_SESSION_IDLE_HOURS * 60 * 60 * 1000;
 export const DEFAULT_SESSION_AUTO_LOCK = true;
 const ACTIVITY_WRITE_INTERVAL_MS = 5 * 60 * 1000;
 const MIGRATION_ID = 'auth-sessions-v1';
@@ -93,6 +94,12 @@ export function migrateAuthSessions(db: Database, now = Date.now()): void {
         created_at INTEGER NOT NULL
       );
     `);
+    db.exec(`CREATE TABLE IF NOT EXISTS auth_session_idle_policy (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id),
+      idle_hours INTEGER NOT NULL DEFAULT 24 CHECK(typeof(idle_hours) = 'integer' AND idle_hours BETWEEN 1 AND 168)
+    )`);
+    db.prepare('INSERT OR IGNORE INTO schema_migrations (id, applied_at) VALUES (?, ?)')
+      .run('auth-session-idle-policy-v1', now);
     if (db.prepare('SELECT id FROM schema_migrations WHERE id = ?').get(MIGRATION_ID)) return;
     const stored = db.prepare<{ value: string }>('SELECT value FROM app_config WHERE key = ?')
       .get('auth.token_epoch');
@@ -145,6 +152,9 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
     const row = db.prepare<{ auto_lock: number }>('SELECT auto_lock FROM auth_session_preferences WHERE user_id=?').get(userId);
     return row ? row.auto_lock === 1 : DEFAULT_SESSION_AUTO_LOCK;
   };
+  const idleLockHours = (userId: number): number =>
+    db.prepare<{ idle_hours: number }>('SELECT idle_hours FROM auth_session_idle_policy WHERE user_id=?').get(userId)?.idle_hours
+      ?? DEFAULT_SESSION_IDLE_HOURS;
   const lock = (id: string): boolean => {
     const changed = db.transaction(() => {
       const session = read(id);
@@ -168,7 +178,7 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
     const enabled = mfaEnabled(session.userId);
     if (session.mfaVerifiedAt === null && enabled) return null;
     if (session.lockedAt === null && enabled && autoLockEnabled(session.userId)
-      && now() - (activity.get(id) ?? session.lastSeenAt) >= SESSION_IDLE_LOCK_MS) {
+      && now() - (activity.get(id) ?? session.lastSeenAt) >= idleLockHours(session.userId) * 60 * 60 * 1000) {
       lock(id);
       return read(id);
     }
@@ -205,6 +215,12 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
     getCurrent,
     lock,
     autoLockEnabled,
+    idleLockHours,
+    setIdleLockHours(userId: number, hours: number) {
+      if (!Number.isInteger(hours) || hours < 1 || hours > 168) throw new RangeError('Idle lock hours must be an integer from 1 to 168');
+      db.prepare('INSERT INTO auth_session_idle_policy (user_id, idle_hours) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET idle_hours=excluded.idle_hours')
+        .run(userId, hours);
+    },
     setAutoLock(userId: number, enabled: boolean) {
       db.prepare('INSERT INTO auth_session_preferences (user_id, auto_lock) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET auto_lock=excluded.auto_lock')
         .run(userId, enabled ? 1 : 0);

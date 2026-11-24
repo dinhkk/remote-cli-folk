@@ -85,7 +85,9 @@ export const authenticatedFetch = (
     if (response.status === 403 && !url.startsWith('/api/auth/mfa/reauth')) {
       const payload = await response.clone().json().catch(() => null);
       if ((payload?.code ?? payload?.error?.code) === 'MFA_REAUTH_REQUIRED'
-        && !options.signal?.aborted && await requestMfaReauth() && !options.signal?.aborted) {
+        && !options.signal?.aborted) {
+        if (!await requestMfaReauth()) return new Response(JSON.stringify({ error: { code: 'MFA_REAUTH_CANCELLED' } }), { status: 403 });
+        if (options.signal?.aborted) return response;
         const retried = await send();
         await announceSessionLock(retried);
         if (retried.status === 401 && retried.headers.get('X-Auth-Error')) expireAuthSession();
@@ -246,6 +248,7 @@ export const api = {
     lock: () => post('/api/auth/lock'),
     unlock: (code: string) => post('/api/auth/unlock', { code }),
     setAutoLock: (enabled: boolean) => put('/api/auth/auto-lock', { enabled }),
+    setIdleLockHours: (idleHours: number) => put('/api/auth/auto-lock', { idleHours }),
     mfaStatus: () => get('/api/auth/mfa/status'),
     mfaVerify: (challenge: string, code: string, recovery = false) => post('/api/auth/mfa/verify', { challenge, code, recovery }),
     mfaReauth: (code: string) => post('/api/auth/mfa/reauth', { code }),

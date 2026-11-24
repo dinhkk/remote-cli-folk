@@ -29,3 +29,22 @@ test.each(['claude', 'codex'] as LLMProvider[])('UI-23: %s reload merges persist
   expect(restored.result.current.getMessages(sessionId).map(m => m.content)).toEqual(['synthetic question', 'complete answer']);
   expect(restored.result.current.getMessages('other-session')).toEqual([]);
 });
+
+
+test.each([true, false])('R7-10: replay error merges in its original turn, before REST=%s', async beforeRest => {
+ const sessionId = 'error-session';
+ const prompt: NormalizedMessage = { id: 'u1', sessionId, provider: 'codex', kind: 'text', role: 'user', content: 'question', timestamp: '2026-01-01T00:00:00.000Z' };
+ const later: NormalizedMessage = { ...prompt, id: 'u2', content: 'next question', timestamp: '2026-01-01T00:00:02.000Z' };
+ const failure: NormalizedMessage = { id: 'e1', sessionId, provider: 'codex', kind: 'error', content: 'Synthetic rejected model', timestamp: '2026-01-01T00:00:01.000Z' };
+ let messages = [prompt, later];
+ history.mockImplementation(async () => ({ ok: true, json: async () => ({ data: { messages, total: messages.length, hasMore: false } }) }));
+ const view = renderHook(() => useSessionStore());
+ if (beforeRest) act(() => view.result.current.appendRealtime(sessionId, failure));
+ await act(async () => { await view.result.current.fetchFromServer(sessionId); });
+ act(() => { view.result.current.appendRealtime(sessionId, failure); view.result.current.appendRealtime(sessionId, failure); });
+ expect(view.result.current.getMessages(sessionId).map(m => m.id)).toEqual(['u1','e1','u2']);
+ expect(view.result.current.getMessages('other-session')).toEqual([]);
+ messages = [prompt, { ...failure, id: 'persisted-error' }, later];
+ await act(async () => { await view.result.current.refreshLatestFromServer(sessionId); });
+ expect(view.result.current.getMessages(sessionId).filter(m => m.kind === 'error')).toHaveLength(1);
+});

@@ -95,7 +95,8 @@ export function createAuthRouter(
     const store = getSessionRuntime().store;
     const enabled = getMfaStore().enabled(auth.authSession.userId);
     res.json({ locked: auth.authSession.lockedAt !== null, totpEnabled: enabled,
-      autoLock: enabled ? store.autoLockEnabled(auth.authSession.userId) : null });
+      autoLock: enabled ? store.autoLockEnabled(auth.authSession.userId) : null,
+      idleHours: store.idleLockHours(auth.authSession.userId) });
   });
 
   router.post('/lock', authenticateToken, (req, res) => {
@@ -123,10 +124,20 @@ export function createAuthRouter(
     try {
       const auth = req as AuthenticatedRequest;
       if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
-      if (typeof req.body?.enabled !== 'boolean') return res.status(400).json({ code: 'AUTH_INVALID_INPUT' });
-      if (!req.body.enabled) requireRecentMfa(auth.authSession.userId, auth.authSession);
-      getSessionRuntime().store.setAutoLock(auth.authSession.userId, req.body.enabled);
-      res.json({ autoLock: req.body.enabled });
+      const { enabled, idleHours } = req.body ?? {};
+      if ((enabled === undefined && idleHours === undefined)
+        || (enabled !== undefined && typeof enabled !== 'boolean')
+        || (idleHours !== undefined && (!Number.isInteger(idleHours) || idleHours < 1 || idleHours > 168))) {
+        return res.status(400).json({ code: 'AUTH_INVALID_INPUT' });
+      }
+      const store = getSessionRuntime().store;
+      const userId = auth.authSession.userId;
+      if (enabled === false || (idleHours !== undefined && idleHours > store.idleLockHours(userId))) {
+        requireRecentMfa(userId, auth.authSession);
+      }
+      if (idleHours !== undefined) store.setIdleLockHours(userId, idleHours);
+      if (enabled !== undefined) store.setAutoLock(userId, enabled);
+      res.json({ autoLock: store.autoLockEnabled(userId), idleHours: store.idleLockHours(userId) });
     } catch (error) { forwardError(res, next, error); }
   });
 

@@ -9,7 +9,8 @@ import express from 'express';
 import { TOTP } from 'otpauth';
 
 import { AppError } from '../../../shared/utils.js';
-import { getConnection } from '../../database/index.js';
+import { getConnection, apiKeysDb } from '../../database/index.js';
+import { settingsRoutes } from '../../settings/index.js';
 import { authRoutes } from '../auth.module.js';
 import { authenticateToken } from '../auth.middleware.js';
 import { createApiSessionGuard } from '../services/api-session-guard.service.js';
@@ -31,6 +32,7 @@ async function fixture(run: (base: string) => Promise<void>) {
       app.use('/api/auth', authRoutes);
       app.get('/api/private', (_req, res) => res.json({ ok: true }));
       app.post('/api/settings/api-keys', (_req, res) => res.json({ ok: true }));
+      app.use('/api/settings', settingsRoutes);
       app.post('/api/remote/peers/join', (_req, res) => res.json({ ok: true }));
       app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         const known = error instanceof AppError;
@@ -183,5 +185,58 @@ test('L-08/L-12: turning off default auto-lock requires fresh TOTP, enabling it 
     assert.equal((await request(base, '/auth/auto-lock', { enabled: false }, cookie, 'PUT')).status, 200);
     t.mock.timers.tick(600_000);
     assert.equal((await request(base, '/auth/auto-lock', { enabled: true }, cookie, 'PUT')).status, 200);
+  });
+});
+
+
+test('R7-01: enabling API keys needs recent TOTP; disabling and accounts without TOTP do not', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const cookie = cookieOf(await login(base))!;
+    const key = apiKeysDb.createApiKey(1, 'synthetic-key');
+    const path = `/settings/api-keys/${key.id}/toggle`;
+    for (const isActive of [false, true]) {
+      assert.equal((await request(base, path, { isActive }, cookie, 'PATCH')).status, 200);
+    }
+    const enrollment = await enroll(base, cookie);
+    t.mock.timers.tick(600_000);
+    assert.equal((await request(base, path, { isActive: false }, cookie, 'PATCH')).status, 200);
+    const refused = await request(base, path, { isActive: true }, cookie, 'PATCH');
+    assert.equal(refused.status, 403);
+    assert.equal((await refused.json()).code, 'MFA_REAUTH_REQUIRED');
+    assert.equal(apiKeysDb.getApiKeys(1).find(k => k.id === key.id)?.is_active, 0);
+    assert.equal((await request(base, '/auth/mfa/reauth', { code: otp(enrollment.secret) }, cookie)).status, 200);
+    assert.equal((await request(base, path, { isActive: true }, cookie, 'PATCH')).status, 200);
+    assert.equal(apiKeysDb.getApiKeys(1).find(k => k.id === key.id)?.is_active, 1);
+  });
+});
+
+
+test('R7-02: increasing hours needs recent TOTP, decreasing does not; invalid input never changes policy', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const cookie = cookieOf(await login(base))!;
+    const enrollment = await enroll(base, cookie);
+    const status = async () => (await (await request(base, '/auth/session-status', undefined, cookie)).json()).idleHours;
+    assert.equal(await status(), 24);
+    t.mock.timers.tick(600_000);
+    const refused = await request(base, '/auth/auto-lock', { idleHours: 48 }, cookie, 'PUT');
+    assert.equal(refused.status, 403);
+    assert.equal((await refused.json()).code, 'MFA_REAUTH_REQUIRED');
+    assert.equal(await status(), 24);
+    for (const idleHours of [0, 169, -1, 1.5, '2', null, true, {}, []]) {
+      assert.equal((await request(base, '/auth/auto-lock', { idleHours }, cookie, 'PUT')).status, 400);
+      assert.equal(await status(), 24);
+    }
+    assert.equal((await request(base, '/auth/auto-lock', {}, cookie, 'PUT')).status, 400);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 1 }, cookie, 'PUT')).status, 200);
+    assert.equal(await status(), 1);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 1, enabled: false }, cookie, 'PUT')).status, 403);
+    assert.equal((await request(base, '/auth/mfa/reauth', { code: otp(enrollment.secret) }, cookie)).status, 200);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 168 }, cookie, 'PUT')).status, 200);
+    assert.equal(await status(), 168);
+    assert.equal((await request(base, '/auth/auto-lock', { idleHours: 48, enabled: false }, cookie, 'PUT')).status, 200);
+    const saved = await (await request(base, '/auth/session-status', undefined, cookie)).json();
+    assert.equal(saved.idleHours, 48); assert.equal(saved.autoLock, false);
   });
 });

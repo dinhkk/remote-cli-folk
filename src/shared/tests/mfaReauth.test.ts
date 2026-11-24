@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { authenticatedFetch } from '@/shared/api';
+import { api, authenticatedFetch } from '@/shared/api';
 import { AUTH_SESSION_LOCKED_EVENT, AUTH_SESSION_EXPIRED_EVENT, registerMfaReauth, requestMfaReauth } from '@/shared/authToken';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -61,4 +61,20 @@ it.each(['{"code":"RESOURCE_LOCKED"}', 'not-json'])('L-02: unrelated or malforme
   } finally {
     window.removeEventListener(AUTH_SESSION_LOCKED_EVENT, locked);
   }
+});
+
+
+it.each([true, false])('R7-01: API key toggle prompts on server request and retries only after confirmation (%s)', async confirmed => {
+  const prompt = vi.fn(async () => confirmed);
+  const unregister = registerMfaReauth(prompt);
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ code: 'MFA_REAUTH_REQUIRED' }), { status: 403 }))
+    .mockResolvedValueOnce(new Response('{"success":true}', { status: 200 }));
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    expect((await api.settings.toggleApiKey('7', true)).status).toBe(confirmed ? 200 : 403);
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(confirmed ? 2 : 1);
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'PATCH', body: '{"isActive":true}' });
+    if (confirmed) expect(fetcher.mock.calls[1]).toEqual(fetcher.mock.calls[0]);
+  } finally { unregister(); }
 });

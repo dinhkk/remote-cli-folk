@@ -14,7 +14,7 @@ import { connectedClients } from '@/modules/websocket/services/websocket-state.s
  * A session's turn ends while its agents, workflow or backgrounded command are
  * still going. The run registry marks the run completed at the turn's
  * `complete`, but the runtime keeps producing events through that run's
- * writer — task progress, and the turn the CLI pushes when the task reports.
+ * writer â€” task progress, and the turn the CLI pushes when the task reports.
  * A tab opened during that work has to attach to the run to see them, and the
  * run has to still be there to attach to.
  */
@@ -87,7 +87,7 @@ test('a tab that subscribes during background work receives the run\'s later eve
     newTab.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID, lastSeq: 0 }] }));
     await settle();
 
-    // Not processing — the composer stays usable — but attached.
+    // Not processing â€” the composer stays usable â€” but attached.
     assert.equal(newTab.frames[0]?.kind, 'chat_subscribed');
     assert.equal(newTab.frames[0]?.isProcessing, false);
 
@@ -165,3 +165,73 @@ test('a retained run\'s eviction timer cannot evict the session\'s next run earl
     mock.timers.reset();
   }
 });
+
+
+for (const beforeReload of [true, false]) {
+ test(`R7-10: provider error ${beforeReload ? 'before' : 'after'} reload arrives once without replaying a completed prompt`, async () => {
+  await withIsolatedDatabase(async () => {
+   const old = createFakeSocket();
+   const run = chatRunRegistry.startRun({ appSessionId: SESSION_ID, provider: 'codex', providerSessionId: null, connection: old as never, userId: 1 })!;
+   const error = { id: 'failure-1', timestamp: '2026-01-01T00:00:01.000Z', kind: 'error', provider: 'codex', sessionId: SESSION_ID, content: 'Synthetic provider rejected model' };
+   const finish = () => { run.writer.send(error); run.writer.send({ kind: 'complete', provider: 'codex', sessionId: SESSION_ID, exitCode: 1 }); };
+   if (beforeReload) finish();
+   const fresh = createFakeSocket();
+   const runtime = { hasBackgroundWork: () => false, getPendingApprovalsForSession: () => [], run: () => { throw new Error('Subscribe must never send a prompt'); } };
+   handleChatConnection(fresh as never, { user: { id: 1 } } as never, { runtime: runtime as never });
+   fresh.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID, lastSeq: 0 }] }));
+   await settle();
+   if (!beforeReload) finish();
+   assert.equal(fresh.frames.filter(f => f.kind === 'error').length, 1);
+   assert.equal(fresh.frames.find(f => f.kind === 'error')?.id, 'failure-1');
+   assert.equal(fresh.frames.find(f => f.kind === 'error')?.timestamp, error.timestamp);
+   assert.equal(fresh.frames.filter(f => f.kind === 'text').length, 0);
+   const seq = fresh.frames.find(f => f.kind === 'error')!.seq;
+   fresh.frames.length = 0;
+   fresh.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID, lastSeq: seq }] }));
+   await settle();
+   assert.equal(fresh.frames.filter(f => f.kind === 'error').length, 0);
+  });
+ });
+}
+
+test('R7-10: completed error buffer expires at the existing five-minute boundary', async () => {
+ mock.timers.enable({ apis: ['setTimeout'] });
+ try {
+  await withIsolatedDatabase(async () => {
+   const run = startAndCompleteRun(createFakeSocket());
+   run.writer.send({ kind: 'error', id: 'expired-error', content: 'Synthetic failure', provider: 'claude', sessionId: SESSION_ID });
+   assert.equal(chatRunRegistry.replayEvents(SESSION_ID, 0).filter(e => e.kind === 'error').length, 1);
+   mock.timers.tick(FIVE_MINUTES);
+   assert.equal(chatRunRegistry.getRun(SESSION_ID), undefined);
+   assert.deepEqual(chatRunRegistry.replayEvents(SESSION_ID, 0), []);
+  });
+ } finally { mock.timers.reset(); }
+});
+
+for (const provider of ['claude', 'codex'] as const) {
+ for (const completeBeforeSubscribe of [false, true]) {
+  test(`R7-10: ${provider} reload subscribes ${completeBeforeSubscribe ? 'after completion' : 'while running'} then receives a later error`, async () => {
+   await withIsolatedDatabase(async () => {
+    const old = createFakeSocket();
+    const run = chatRunRegistry.startRun({ appSessionId: SESSION_ID, provider, providerSessionId: null, connection: old as never, userId: 1 })!;
+    old.readyState = 3;
+    const complete = () => run.writer.send({ kind: 'complete', provider, sessionId: SESSION_ID, exitCode: 1 });
+    if (completeBeforeSubscribe) complete();
+    const fresh = createFakeSocket();
+    let sends = 0;
+    handleChatConnection(fresh as never, { user: { id: 1 } } as never, { runtime: {
+     hasBackgroundWork: () => false, getPendingApprovalsForSession: () => [], run: async () => { sends++; },
+    } as never });
+    fresh.emit('message', JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: SESSION_ID }] }));
+    await settle();
+    assert.equal(fresh.frames[0].isProcessing, !completeBeforeSubscribe);
+    if (!completeBeforeSubscribe) complete();
+    await settle();
+    run.writer.send({ id: 'late-error', timestamp: '2026-01-01T00:00:02Z', kind: 'error', provider, sessionId: SESSION_ID, content: 'Synthetic late CLI failure' });
+    assert.equal(fresh.frames.filter(frame => frame.kind === 'error').length, 1);
+    assert.equal(fresh.frames.find(frame => frame.kind === 'error')?.id, 'late-error');
+    assert.equal(sends, 0, 'subscribing must never dispatch another prompt');
+   });
+  });
+ }
+}
