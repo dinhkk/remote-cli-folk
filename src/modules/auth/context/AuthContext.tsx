@@ -113,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   // Read by the expiry listener without re-subscribing it on every sign-in.
   const userRef = useRef<AuthUser | null>(null);
-  userRef.current = user;
+  useEffect(() => { userRef.current = user; }, [user]);
   const [token, setToken] = useState<string | null>(() => (isTargetMode() ? TARGET_TOKEN_MARKER : null));
   const [isLocked, setIsLocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
