@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import type { SidebarProjectListProps } from '@/shared/types';
@@ -72,6 +72,16 @@ export default function SidebarProjectList({
 
   const [otherOpen, setOtherOpen] = useState(false);
   const otherId = useId();
+  const projectRows = useRef(new Map<string, HTMLDivElement>());
+  const focusedProject = useRef<{ id: string; element: HTMLElement } | null>(null);
+
+  // Moving a row between groups remounts it. Restore keyboard focus only when
+  // that move removed the focused element, never when focus moved elsewhere.
+  useLayoutEffect(() => {
+    const previous = focusedProject.current;
+    if (!previous || previous.element.isConnected || document.activeElement !== document.body) return;
+    projectRows.current.get(previous.id)?.querySelector<HTMLElement>('[data-project-toggle]')?.focus();
+  });
   const pinned = filteredProjects.filter((project) => isProjectStarred(project.projectId));
   const ordinary = filteredProjects.filter((project) => !isProjectStarred(project.projectId));
   const isInUse = (project: typeof projects[number]) =>
@@ -105,8 +115,15 @@ export default function SidebarProjectList({
     // React key + per-project state lookups all use the DB `projectId`
     // so they remain stable across renames and session changes.
     return (
+    <div key={project.projectId}
+      ref={(element) => {
+        if (element) projectRows.current.set(project.projectId, element);
+        else projectRows.current.delete(project.projectId);
+      }}
+      onFocusCapture={(event) => {
+        focusedProject.current = { id: project.projectId, element: event.target as HTMLElement };
+      }}>
     <SidebarProjectItem
-      key={project.projectId}
       project={project}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
@@ -149,6 +166,7 @@ export default function SidebarProjectList({
       onDeleteSelectedSessions={onDeleteSelectedSessions}
       t={t}
     />
+    </div>
   );
   };
 
