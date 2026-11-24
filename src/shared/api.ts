@@ -90,13 +90,13 @@ export const authenticatedFetch = (
         if (options.signal?.aborted) return response;
         const retried = await send();
         await announceSessionLock(retried);
-        if (retried.status === 401 && retried.headers.get('X-Auth-Error')) expireAuthSession();
+        if (retried.status === 401 && retried.headers.get('X-Auth-Error')) expireAuthSession(retried.headers.get('X-Auth-Error'));
         return retried;
       }
     }
     await announceSessionLock(response);
     if (response.status === 401 && response.headers.get('X-Auth-Error')) {
-      expireAuthSession();
+      expireAuthSession(response.headers.get('X-Auth-Error'));
     }
     return response;
   });

@@ -17,7 +17,7 @@ export default function SessionLockScreen() {
         if (busy) return;
         setBusy(true); setError('');
         const supplied = code; setCode('');
-        void unlock(supplied).then(result => { if (!result.success) setError(t('security.failed')); }).finally(() => setBusy(false));
+        void unlock(supplied).then(result => { if (!result.success) setError(typeof result.attemptsRemaining === 'number' ? t('security.attemptsRemaining', { count: result.attemptsRemaining }) : t('security.failed')); }).finally(() => setBusy(false));
       }}>
       <h1 id="session-lock-title" className="text-xl font-semibold">{t('security.locked')}</h1>
       <p className="text-sm text-muted-foreground">{t('security.unlockHint')}</p>

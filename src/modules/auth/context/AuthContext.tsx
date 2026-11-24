@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import MfaReauthDialog from '@/modules/auth/MfaReauthDialog';
 import { IS_PLATFORM } from '@/shared/utils';
-import { api, readApiErrorMessage } from '@/shared/api';
+import { api, readApiErrorMessage, readApiJson, ApiRequestError } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT, AUTH_SESSION_LOCKED_EVENT } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
@@ -35,7 +35,7 @@ const AUTH_ERROR_MESSAGES = {
   sessionExpired: 'errors.sessionExpired',
 } as const;
 
-type AuthActionResult = { success: true; mfaRequired?: boolean } | { success: false; error: string };
+type AuthActionResult = { success: true; mfaRequired?: boolean } | { success: false; error: string; attemptsRemaining?: number };
 
 type AuthSessionPayload = {
   mfaRequired?: boolean;
@@ -177,14 +177,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [checkOnboardingStatus]);
 
   useEffect(() => {
-    const handleSessionExpired = () => {
+    const handleSessionExpired = (event: Event) => {
       // A Remote tab never owns a session: the Controller page does.
       if (isTargetMode()) {
         return;
       }
       clearSession();
       endRemoteTabData();
-      setError(t(AUTH_ERROR_MESSAGES.sessionExpired));
+      setError(previous => (event instanceof CustomEvent && event.detail === 'mfa-attempts-exceeded')
+        || previous === t('security.attemptsRevoked') ? t('security.attemptsRevoked') : t(AUTH_ERROR_MESSAGES.sessionExpired));
     };
 
     const handleLocked = () => { if (!isTargetMode()) setIsLocked(true); };
@@ -257,10 +258,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const unlock = useCallback<AuthContextValue['unlock']>(async code => {
     try {
       const response = await api.auth.unlock(code);
-      if (!response.ok) return { success: false, error: 'Unable to unlock. Check the code or try again later.' };
+      await readApiJson(response);
       await checkAuthStatus();
       return { success: true };
-    } catch { return { success: false, error: 'Unable to connect. Try again.' }; }
+    } catch (caught) {
+      const details = caught instanceof ApiRequestError ? caught.details as { attemptsRemaining?: unknown } | undefined : undefined;
+      const remaining = details?.attemptsRemaining;
+      return { success: false, error: 'Unable to unlock. Try again.',
+        ...(typeof remaining === 'number' && Number.isInteger(remaining) && remaining >= 0 && remaining < 5 ? { attemptsRemaining: remaining } : {}) };
+    }
   }, [checkAuthStatus]);
 
   // Remote tab: the Controller page already signed the user in and handed the
