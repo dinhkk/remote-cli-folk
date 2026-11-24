@@ -649,7 +649,7 @@ test('OpenCode history hides the error of a stopped turn and shows question call
     const history = await new OpenCodeSessionsProvider().fetchHistory('open-session-1');
     const errors = history.messages.filter((message) => message.kind === 'error');
     assert.equal(errors.length, 1, 'only the real failure shows as an error');
-    assert.match(String(errors[0]?.content), /Rate limit exceeded/);
+    assert.equal(errors[0]?.content, 'Rate limit exceeded');
 
     const card = history.messages.find((message) => message.toolId === 'call_q');
     assert.equal(card?.toolName, 'AskUserQuestion');

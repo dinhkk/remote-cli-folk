@@ -667,7 +667,7 @@ export class OpenCodeSessionsProvider implements IProviderSessions {
             timestamp,
             provider: PROVIDER,
             kind: 'error',
-            content: formatToolContent(messageInfo.error),
+            content: readEventError(messageInfo.error) ?? formatToolContent(messageInfo.error),
           }));
         }
       }
