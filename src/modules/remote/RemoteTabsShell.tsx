@@ -44,7 +44,8 @@ export function RemoteTabsShell({
   indicator?: (placement: 'tabbar' | 'overlay') => ReactNode;
 }) {
   const { t } = useTranslation('remote');
-  const { peers, requestTabToken, isLoading, hasLoadError } = useRemoteTabs();
+  const { t: tCommon } = useTranslation('common');
+  const { peers, requestTabToken, isLoading, hasLoadError, refresh } = useRemoteTabs();
 
   // Which tab is in front; falls back to Local when its pairing disappears.
   const [selected, setSelected] = useState<string>(readSelectedRemoteTab);
@@ -57,6 +58,8 @@ export function RemoteTabsShell({
   const selectionPending = isLoading || hasLoadError;
   const selectedExists = peers.some((peer) => peer.peerId === selected);
   const activeId = selectedExists || selectionPending ? selected : LOCAL_TAB;
+  // The saved Host is kept while the list is unknown, so Local stays hidden: say why instead of a blank page.
+  const waitingForSelected = selectionPending && selected !== LOCAL_TAB && !selectedExists;
 
   useEffect(() => {
     if (!selectionPending && selected !== LOCAL_TAB && !selectedExists) {
@@ -192,6 +195,41 @@ export function RemoteTabsShell({
       >
         {children}
       </div>
+
+      {waitingForSelected && (
+        <div
+          data-testid="remote-hosts-pending"
+          className={
+            hasPeers
+              ? 'flex min-h-0 flex-1 items-center justify-center p-6'
+              : 'fixed inset-0 flex items-center justify-center bg-background p-6'
+          }
+        >
+          <div className="flex max-w-sm flex-col items-center gap-3 text-center text-sm text-muted-foreground">
+            <p role={hasLoadError ? 'alert' : 'status'}>
+              {hasLoadError ? tCommon('remoteHosts.loadError') : tCommon('remoteHosts.loading')}
+            </p>
+            {hasLoadError && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { void refresh(); }}
+                  className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {tCommon('remoteHosts.retry')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => select(LOCAL_TAB)}
+                  className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {tCommon('remoteHosts.openLocal')}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {peers.map((peer) => {
         if (!visited.has(peer.peerId)) {

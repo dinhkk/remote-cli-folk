@@ -269,5 +269,11 @@
       "closeSidebar": "Masquer la barre latérale",
       "resizeSidebar": "Redimensionner la barre latérale"
     }
+  },
+  "remoteHosts": {
+    "loading": "Chargement des hôtes…",
+    "loadError": "Impossible de charger la liste des hôtes. L’onglet de l’hôte sélectionné reviendra dès que la liste sera chargée.",
+    "retry": "Réessayer",
+    "openLocal": "Ouvrir Local"
   }
 }
