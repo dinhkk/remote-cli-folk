@@ -558,7 +558,8 @@
     "disable": "Выключить",
     "installAriaLabel": "URL git-репозитория плагина",
     "tab": "вкладка",
-    "runningStatus": "запущен"
+    "runningStatus": "запущен",
+    "disabledByServer": "Плагины отключены конфигурацией этого сервера."
   },
   "sessions": {
     "title": "Sessions",

@@ -669,7 +669,8 @@
     "disable": "Nonaktifkan",
     "installAriaLabel": "URL repositori Git plugin",
     "tab": "tab",
-    "runningStatus": "berjalan"
+    "runningStatus": "berjalan",
+    "disabledByServer": "Plugin dinonaktifkan oleh konfigurasi server ini."
   },
   "skillsPage": {
     "description": "Kelola skill {{provider}} dari file lokal, folder lengkap, dan lokasi yang terkait proyek.",

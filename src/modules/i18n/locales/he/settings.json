@@ -674,7 +674,8 @@
     "disable": "השבתה",
     "installAriaLabel": "כתובת מאגר ה-git של התוסף",
     "tab": "לשונית",
-    "runningStatus": "פועל"
+    "runningStatus": "פועל",
+    "disabledByServer": "התוספים מושבתים על ידי תצורת השרת הזה."
   },
   "skillsPage": {
     "description": "ניהול skills של {{provider}} מקבצים מקומיים, תיקיות שלמות ומיקומים לפי פרויקט.",

@@ -615,7 +615,8 @@
     "disable": "Désactiver",
     "installAriaLabel": "URL du dépôt git du plugin",
     "tab": "onglet",
-    "runningStatus": "en cours"
+    "runningStatus": "en cours",
+    "disabledByServer": "Les plugins sont désactivés par la configuration de ce serveur."
   },
   "sessions": {
     "title": "Sessions",

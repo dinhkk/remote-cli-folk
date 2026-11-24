@@ -558,7 +558,8 @@
     "disable": "Deaktivieren",
     "installAriaLabel": "Git-Repository-URL des Plugins",
     "tab": "Tab",
-    "runningStatus": "läuft"
+    "runningStatus": "läuft",
+    "disabledByServer": "Plugins sind durch die Konfiguration dieses Servers deaktiviert."
   },
   "sessions": {
     "title": "Sessions",

@@ -654,7 +654,8 @@
     "disable": "Vypnout",
     "installAriaLabel": "URL git repozitáře pluginu",
     "tab": "karta",
-    "runningStatus": "běží"
+    "runningStatus": "běží",
+    "disabledByServer": "Pluginy jsou vypnuté konfigurací tohoto serveru."
   },
   "skillsPage": {
     "description": "Spravujte skilly pro {{provider}} z lokálních souborů, celých složek a umístění v projektech.",
