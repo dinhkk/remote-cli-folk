@@ -53,7 +53,7 @@ export default function PluginTabContent({
   const containerRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { isDarkMode } = useTheme();
-  const { plugins } = usePlugins();
+  const { plugins, pluginsDisabled } = usePlugins();
 
   // Stable refs so effects don't need context values in their dep arrays
   const contextRef = useRef<PluginContext>(buildContext(isDarkMode, selectedProject, selectedSession));
@@ -77,7 +77,8 @@ export default function PluginTabContent({
     // Drop any previous plugin's error before this load attempt starts, so a
     // stale overlay never covers a different (or successfully loaded) plugin.
     setLoadError(null);
-    if (!containerRef.current || !plugin?.enabled) return;
+    // Never fetch or run a plugin's code while the server has plugins turned off.
+    if (pluginsDisabled || !containerRef.current || !plugin?.enabled) return;
 
     let active = true;
     const container = containerRef.current;
@@ -135,7 +136,7 @@ export default function PluginTabContent({
       contextCallbacks.clear();
       moduleRef.current = null;
     };
-  }, [pluginName, plugin?.entry, plugin?.enabled]); // re-mount when plugin or enabled state changes
+  }, [pluginName, plugin?.entry, plugin?.enabled, pluginsDisabled]); // re-mount when plugin or enabled state changes
 
   return (
     <div className="relative h-full w-full overflow-auto">

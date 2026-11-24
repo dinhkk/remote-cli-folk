@@ -700,7 +700,8 @@
     "disable": "Disable",
     "installAriaLabel": "Plugin git repository URL",
     "tab": "tab",
-    "runningStatus": "running"
+    "runningStatus": "running",
+    "disabledByServer": "Plugins are turned off by this server's configuration."
   },
   "skillsPage": {
     "description": "Manage {{provider}} skills from local files, complete folders, and project-aware locations.",

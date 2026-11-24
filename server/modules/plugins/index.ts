@@ -7,3 +7,7 @@ export { startEnabledPluginServers } from './plugin-process.service.js';
 export { stopAllPlugins } from './plugin-process.service.js';
 // getPluginPort: used by WebSocket setup in the server entrypoint to proxy plugin connections.
 export { getPluginPort } from './plugin-process.service.js';
+// PLUGINS_DISABLED: used by the server entrypoint to refuse plugin WebSocket connections while plugins are off.
+export { PLUGINS_DISABLED } from './plugins-switch.js';
+// pluginsSwitch: mounted by the server entrypoint between authentication and the plugin router.
+export { pluginsSwitch } from './plugins-switch.js';

@@ -565,7 +565,8 @@
     "disable": "Devre Dışı Bırak",
     "installAriaLabel": "Eklenti git deposu URL'si",
     "tab": "sekme",
-    "runningStatus": "çalışıyor"
+    "runningStatus": "çalışıyor",
+    "disabledByServer": "Eklentiler bu sunucunun yapılandırmasıyla kapatıldı."
   },
   "sessions": {
     "title": "Sessions",

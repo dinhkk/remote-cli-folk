@@ -43,7 +43,9 @@ import notificationRoutes from './modules/notifications/notifications.routes.js'
 import { userRoutes } from './modules/user/index.js';
 import {
     getPluginPort,
+    PLUGINS_DISABLED,
     pluginsRoutes,
+    pluginsSwitch,
     startEnabledPluginServers,
     stopAllPlugins,
 } from './modules/plugins/index.js';
@@ -148,6 +150,7 @@ createWebSocketServer(server, {
         },
     },
     getPluginPort,
+    pluginsDisabled: PLUGINS_DISABLED,
     remote: remote.websocket,
     authEpoch: remote.enabled ? remote.authEpoch : undefined,
 });
@@ -222,7 +225,7 @@ app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/user', authenticateToken, userRoutes);
 
 // Plugins API Routes (protected)
-app.use('/api/plugins', authenticateToken, pluginsRoutes);
+app.use('/api/plugins', authenticateToken, pluginsSwitch, pluginsRoutes);
 
 // Browser MCP bridge API (local token protected)
 app.use('/api/browser-use-mcp', browserUseMcpRoutes);

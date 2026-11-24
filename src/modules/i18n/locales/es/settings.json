@@ -695,7 +695,8 @@
     "disable": "Desactivar",
     "installAriaLabel": "URL del repositorio git del plugin",
     "tab": "pestaña",
-    "runningStatus": "en ejecución"
+    "runningStatus": "en ejecución",
+    "disabledByServer": "Los plugins están desactivados por la configuración de este servidor."
   },
   "skillsPage": {
     "description": "Gestiona las skills de {{provider}} desde archivos locales, carpetas completas y ubicaciones según el proyecto.",

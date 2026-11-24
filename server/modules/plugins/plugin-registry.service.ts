@@ -8,6 +8,7 @@ import { spawn } from 'cross-spawn';
 import {
   createPluginGitError, createPluginGitSpawnError, getPluginGitSpawnOptions, stopPluginGitOnServerExit,
 } from './plugin-git.service.js';
+import { PLUGINS_DISABLED, pluginsDisabledError } from './plugins-switch.js';
 
 const PLUGINS_DIR = path.join(os.homedir(), '.claude-code-ui', 'plugins');
 const PLUGINS_CONFIG_PATH = path.join(os.homedir(), '.claude-code-ui', 'plugins.json');
@@ -255,6 +256,8 @@ export function resolvePluginAssetPath(name, assetPath) {
 
 export function installPluginFromGit(url) {
   return new Promise((resolve, reject) => {
+    // No git or npm runs for a plugin while plugins are off.
+    if (PLUGINS_DISABLED) return reject(pluginsDisabledError());
     if (typeof url !== 'string' || !url.trim()) {
       return reject(new Error('Invalid URL: must be a non-empty string'));
     }
@@ -384,6 +387,7 @@ export function installPluginFromGit(url) {
 
 export function updatePluginFromGit(name) {
   return new Promise((resolve, reject) => {
+    if (PLUGINS_DISABLED) return reject(pluginsDisabledError());
     const pluginDir = getPluginDir(name);
     if (!pluginDir) {
       return reject(new Error(`Plugin "${name}" not found`));

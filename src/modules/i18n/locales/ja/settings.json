@@ -558,7 +558,8 @@
     "disable": "無効にする",
     "installAriaLabel": "プラグインのgitリポジトリURL",
     "tab": "タブ",
-    "runningStatus": "実行中"
+    "runningStatus": "実行中",
+    "disabledByServer": "このサーバーの設定によりプラグインは無効になっています。"
   },
   "sessions": {
     "title": "Sessions",

@@ -20,6 +20,8 @@ type WebSocketServerDependencies = {
   chat: Parameters<typeof handleChatConnection>[2];
   shell: Parameters<typeof handleShellConnection>[1];
   getPluginPort: Parameters<typeof handlePluginWsProxy>[2];
+  /** True when plugins are turned off on this server: every `/plugin-ws/**` connection is refused. */
+  pluginsDisabled?: boolean;
   /** `/r/**` sockets of the Remote Controller; absent when Remote is disabled or unsupported. */
   remote?: RemoteWebSocketGateway;
   /** Lets "log out everywhere" end the regular sockets too (only when the main JWT really changed). */
@@ -212,6 +214,10 @@ export function createWebSocketServer(
     }
 
     if (pathname.startsWith('/plugin-ws/')) {
+      if (dependencies.pluginsDisabled) {
+        ws.close(4403, 'plugins-disabled');
+        return;
+      }
       handlePluginWsProxy(ws, pathname, dependencies.getPluginPort,
         () => typeof sessionId !== 'string' || Boolean(getSessionRuntime().store.getActive(sessionId)));
       return;

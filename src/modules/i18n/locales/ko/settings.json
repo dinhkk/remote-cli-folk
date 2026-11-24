@@ -640,7 +640,8 @@
     "disable": "비활성화",
     "installAriaLabel": "플러그인 git 저장소 URL",
     "tab": "탭",
-    "runningStatus": "실행 중"
+    "runningStatus": "실행 중",
+    "disabledByServer": "이 서버의 구성에 의해 플러그인이 꺼져 있습니다."
   },
   "sessions": {
     "title": "Sessions",

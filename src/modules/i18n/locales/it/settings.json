@@ -564,7 +564,8 @@
     "disable": "Disabilita",
     "installAriaLabel": "URL repository git del plugin",
     "tab": "scheda",
-    "runningStatus": "in esecuzione"
+    "runningStatus": "in esecuzione",
+    "disabledByServer": "I plugin sono disattivati dalla configurazione di questo server."
   },
   "sessions": {
     "title": "Sessions",

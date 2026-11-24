@@ -640,7 +640,8 @@
     "disable": "禁用",
     "installAriaLabel": "插件 git 仓库 URL",
     "tab": "标签",
-    "runningStatus": "运行中"
+    "runningStatus": "运行中",
+    "disabledByServer": "插件已被此服务器的配置关闭。"
   },
   "sessions": {
     "title": "Sessions",
