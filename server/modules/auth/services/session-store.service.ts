@@ -100,6 +100,12 @@ export function migrateAuthSessions(db: Database, now = Date.now()): void {
     )`);
     db.prepare('INSERT OR IGNORE INTO schema_migrations (id, applied_at) VALUES (?, ?)')
       .run('auth-session-idle-policy-v1', now);
+    db.exec(`CREATE TABLE IF NOT EXISTS auth_session_mfa_attempts (
+      session_id TEXT PRIMARY KEY REFERENCES auth_sessions(id) ON DELETE CASCADE,
+      failures INTEGER NOT NULL DEFAULT 0 CHECK(failures BETWEEN 0 AND 4)
+    )`);
+    db.prepare('INSERT OR IGNORE INTO schema_migrations (id, applied_at) VALUES (?, ?)')
+      .run('auth-session-mfa-attempts-v1', now);
     if (db.prepare('SELECT id FROM schema_migrations WHERE id = ?').get(MIGRATION_ID)) return;
     const stored = db.prepare<{ value: string }>('SELECT value FROM app_config WHERE key = ?')
       .get('auth.token_epoch');
@@ -139,6 +145,7 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
       const result = db.prepare('UPDATE auth_sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL')
         .run(at, id);
       if (result.changes !== 1) return false;
+      db.prepare('DELETE FROM auth_session_mfa_attempts WHERE session_id=?').run(id);
       event(session, reason, at);
       return true;
     })();
@@ -236,6 +243,23 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
       activity.set(id, at);
       return true;
     },
+    resetMfaAttempts(id: string) {
+      db.prepare('DELETE FROM auth_session_mfa_attempts WHERE session_id=?').run(id);
+    },
+    failMfaAttempt(id: string, userId: number): number {
+      return db.transaction(() => {
+        const session = getCurrent(id);
+        if (!session || session.userId !== userId) return 0;
+        const failures = (db.prepare<{ failures: number }>('SELECT failures FROM auth_session_mfa_attempts WHERE session_id=?').get(id)?.failures ?? 0) + 1;
+        if (failures >= 5) {
+          if (revoke(id, userId)) event(session, 'mfa-attempts-exceeded', now());
+          return 0;
+        }
+        db.prepare(`INSERT INTO auth_session_mfa_attempts (session_id, failures) VALUES (?, ?)
+          ON CONFLICT(session_id) DO UPDATE SET failures=excluded.failures`).run(id, failures);
+        return 5 - failures;
+      })();
+    },
     markMfa(id: string, at: number | null) {
       db.prepare('UPDATE auth_sessions SET mfa_verified_at=?, locked_at=NULL WHERE id=? AND revoked_at IS NULL').run(at, id);
     },
@@ -272,7 +296,10 @@ export function createSessionStore(db: Database, now: () => number = () => Date.
           .all(userId, exceptId).map(rowToSession);
         const at = now();
         db.prepare('UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL AND id != ?').run(at, userId, exceptId);
-        for (const session of sessions) event(session, 'revoked', at);
+        for (const session of sessions) {
+          db.prepare('DELETE FROM auth_session_mfa_attempts WHERE session_id=?').run(session.id);
+          event(session, 'revoked', at);
+        }
         return sessions.map((session) => session.id);
       })();
       for (const id of ids) notify(id, 'revoked');

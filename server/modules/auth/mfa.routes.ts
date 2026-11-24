@@ -7,7 +7,7 @@ import { getConnection, userDb } from '../database/index.js';
 
 import { getMfaStore, requireRecentMfa } from './services/mfa-runtime.service.js';
 import { getSessionRuntime } from './services/session-runtime.service.js';
-import { sessionCookie } from './services/session-transport.service.js';
+import { clearSessionCookie, sessionCookie } from './services/session-transport.service.js';
 import type { AuthSession } from './services/session-store.service.js';
 import { MIN_PASSWORD_LENGTH } from './auth.service.js';
 
@@ -26,6 +26,10 @@ export function createMfaRouter(verifyPassword: (id: number, password: string, i
       if (error instanceof AppError && error.code === 'AUTH_RATE_LIMITED') {
         const retry = (error.details as { retryAfterSeconds?: number })?.retryAfterSeconds;
         if (retry) res.setHeader('Retry-After', String(retry));
+      }
+      if (error instanceof AppError && error.code === 'MFA_SESSION_REVOKED') {
+        res.setHeader('X-Auth-Error', 'mfa-attempts-exceeded');
+        res.setHeader('Set-Cookie', clearSessionCookie(req));
       }
       next(error);
     }
@@ -71,7 +75,8 @@ export function createMfaRouter(verifyPassword: (id: number, password: string, i
   }));
   router.post('/mfa/reauth', authenticate, handle((req, res) => {
     const { user, session } = credentials(req);
-    getMfaStore().verifyTotp(user.id, req.body?.code);
+    req.releaseAuthConnection?.();
+    getMfaStore().verifySessionTotp(user.id, session.id, req.body?.code, getSessionRuntime().store);
     const verifiedAt = Date.now();
     getSessionRuntime().store.markMfa(session.id, verifiedAt);
     res.json({ success: true, verifiedAt });

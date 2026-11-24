@@ -36,7 +36,7 @@ async function fixture(run: (base: string) => Promise<void>) {
       app.post('/api/remote/peers/join', (_req, res) => res.json({ ok: true }));
       app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
         const known = error instanceof AppError;
-        res.status(known ? error.statusCode : 500).json({ code: known ? error.code : 'INTERNAL' });
+        res.status(known ? error.statusCode : 500).json({ code: known ? error.code : 'INTERNAL', ...(known ? { details: error.details } : {}) });
       });
       const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
       try { await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`); }
@@ -238,5 +238,45 @@ test('R7-02: increasing hours needs recent TOTP, decreasing does not; invalid in
     assert.equal((await request(base, '/auth/auto-lock', { idleHours: 48, enabled: false }, cookie, 'PUT')).status, 200);
     const saved = await (await request(base, '/auth/session-status', undefined, cookie)).json();
     assert.equal(saved.idleHours, 48); assert.equal(saved.autoLock, false);
+  });
+});
+
+
+test('TH-01/02/05/06/08: unlock and reauth share five attempts only within the caller session', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const a=cookieOf(await login(base))!; const e=await enroll(base,a);
+    t.mock.timers.tick(30_000);
+    const challenge=await (await login(base)).json();
+    const b=cookieOf(await request(base,'/auth/mfa/verify',{challenge:challenge.challenge,code:otp(e.secret)}))!;
+    for(let n=1;n<=3;n++) {
+      const response=await request(base,'/auth/mfa/reauth',{code:'bad'},a);
+      assert.equal(response.status,403);assert.equal((await response.json()).details.attemptsRemaining,5-n);
+    }
+    assert.equal((await request(base,'/auth/lock',{},a)).status,200);
+    const fourth=await request(base,'/auth/unlock',{code:'bad'},a);
+    assert.equal(fourth.status,403);assert.equal((await fourth.json()).details.attemptsRemaining,1);
+    const last=await request(base,'/auth/unlock',{code:'bad'},a);
+    assert.equal(last.status,401);assert.equal((await last.json()).code,'MFA_SESSION_REVOKED');
+    assert.equal(last.headers.get('X-Auth-Error'),'mfa-attempts-exceeded');
+    assert.match(last.headers.get('Set-Cookie')! ,/Max-Age=0/);
+    assert.equal((await request(base,'/private',undefined,a)).status,401);
+    t.mock.timers.tick(30_000);
+    assert.equal((await request(base,'/auth/mfa/reauth',{code:otp(e.secret)},b)).status,200);
+    await request(base,'/auth/lock',{},b);t.mock.timers.tick(30_000);
+    assert.equal((await request(base,'/auth/unlock',{code:otp(e.secret)},b)).status,200);
+    t.mock.timers.tick(30_000);
+    const fresh=await (await login(base)).json();
+    assert.equal((await request(base,'/auth/mfa/verify',{challenge:fresh.challenge,code:otp(e.secret)})).status,200);
+  });
+});
+
+test('TH-02: fifth reauth response survives revoking its own HTTP connection', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const a=cookieOf(await login(base))!;await enroll(base,a);
+    for(let n=0;n<4;n++) assert.equal((await request(base,'/auth/mfa/reauth',{code:'bad'},a)).status,403);
+    const last=await request(base,'/auth/mfa/reauth',{code:'bad'},a);
+    assert.equal(last.status,401);assert.equal(last.headers.get('X-Auth-Error'),'mfa-attempts-exceeded');
   });
 });

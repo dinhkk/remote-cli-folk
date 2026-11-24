@@ -3,8 +3,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Secret, TOTP } from 'otpauth';
 
 import type { Database } from '../../database/index.js';
+
 import { AppError } from '../../../shared/utils.js';
 import { secretAad, type SecretBox } from '../../remote/index.js';
+import type { createSessionStore } from './session-store.service.js';
 
 export const MFA_FRESH_MS = 10 * 60 * 1000;
 export const MFA_CHALLENGE_MS = 5 * 60 * 1000;
@@ -71,8 +73,12 @@ export function createTotpStore(db: Database, getBox: () => SecretBox, now: () =
     for (const code of codes) db.prepare('INSERT INTO auth_recovery_codes (user_id, code_hash) VALUES (?, ?)').run(id, hash(code));
     return codes;
   };
-  const verify = (id: number, code: unknown, recovery: boolean): boolean => {
-    checkThrottle(id);
+  const verify = (id: number, code: unknown, recovery: boolean, session?: { id: string; store: ReturnType<typeof createSessionStore> }): boolean => {
+    if (session) {
+      const current = session.store.getCurrent(session.id);
+      if (!current || current.userId !== id) throw new AppError('Please sign in again', { code: 'AUTH_TOKEN_INVALID', statusCode: 401 });
+    } else checkThrottle(id);
+    let attemptsRemaining: number | undefined;
     const valid = db.transaction(() => {
       const stored = row(id);
       if (!stored?.enabled || !stored.seed_sealed) return false;
@@ -88,11 +94,20 @@ export function createTotpStore(db: Database, getBox: () => SecretBox, now: () =
           WHERE user_id = ? AND enabled = 1 AND generation = ? AND last_used_step < ?`)
           .run(matched, id, stored.generation, matched).changes === 1;
       }
-      if (accepted) db.prepare('DELETE FROM auth_throttle WHERE user_id = ?').run(id);
+      if (session) {
+        if (accepted) session.store.resetMfaAttempts(session.id);
+        else attemptsRemaining = session.store.failMfaAttempt(session.id, id);
+      } else if (accepted) db.prepare('DELETE FROM auth_throttle WHERE user_id = ?').run(id);
       else failure(id);
       return accepted;
     })();
-    if (!valid) throw invalid();
+    if (!valid) {
+      if (attemptsRemaining !== undefined) throw new AppError(
+        attemptsRemaining === 0 ? 'Session ended after too many incorrect authenticator codes' : 'Invalid or already used verification code',
+        { code: attemptsRemaining === 0 ? 'MFA_SESSION_REVOKED' : 'MFA_CODE_INVALID', statusCode: attemptsRemaining === 0 ? 401 : 403, details: { attemptsRemaining } },
+      );
+      throw invalid();
+    }
     return true;
   };
   return {
@@ -154,6 +169,10 @@ export function createTotpStore(db: Database, getBox: () => SecretBox, now: () =
       for (const [key, pending] of challenges) if (pending.userId === id) challenges.delete(key);
     },
     verifyTotp(id: number, code: unknown) { verify(id, code, false); },
+    verifySessionTotp(id: number, sessionId: string, code: unknown, sessions: ReturnType<typeof createSessionStore>) {
+      if (!enabled(id)) throw new AppError('Enable TOTP first', { code: 'MFA_DISABLED', statusCode: 409 });
+      verify(id, code, false, { id: sessionId, store: sessions });
+    },
     regenerateRecovery(id: number) { return db.transaction(() => recoveryCodes(id))(); },
     disable(id: number) {
       db.transaction(() => {

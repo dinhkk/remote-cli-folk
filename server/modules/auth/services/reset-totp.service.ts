@@ -11,6 +11,7 @@ export function resetTotp(databasePath: string): void {
         db.prepare('DELETE FROM auth_recovery_codes').run();
         db.prepare('DELETE FROM auth_throttle').run();
       }
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auth_session_mfa_attempts'").get()) db.prepare('DELETE FROM auth_session_mfa_attempts').run();
       if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='auth_sessions'").get()) {
         db.prepare('UPDATE auth_sessions SET revoked_at=? WHERE revoked_at IS NULL').run(Date.now());
       }
