@@ -31,3 +31,6 @@ export { assertAuthModeCompatible } from './services/auth-mode.service.js';
 export { secretsMatch } from './auth.middleware.js';
 
 export { resetTotp } from './services/reset-totp.service.js';
+
+export { requireRecentMfa } from './services/mfa-runtime.service.js';
+export type { AuthSession } from './services/session-store.service.js';

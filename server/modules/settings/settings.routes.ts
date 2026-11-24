@@ -1,8 +1,10 @@
 import express from 'express';
 
+import { requireRecentMfa, type AuthSession } from '@/modules/auth/index.js';
+
 import type { createSettingsService } from './settings.service.js';
 
-type AuthenticatedRequest = express.Request & { user?: { id?: number | string } };
+type AuthenticatedRequest = express.Request & { user?: { id?: number | string }; authSession?: AuthSession };
 
 function userId(req: express.Request): number {
   return Number((req as AuthenticatedRequest).user?.id);
@@ -25,9 +27,12 @@ export function createSettingsRouter(
   router.get('/api-keys', respond((req) => service.listApiKeys(userId(req))));
   router.post('/api-keys', respond((req) => service.createApiKey(userId(req), req.body?.keyName)));
   router.delete('/api-keys/:keyId', respond((req) => service.deleteApiKey(userId(req), Number(req.params.keyId))));
-  router.patch('/api-keys/:keyId/toggle', respond((req) => service.toggleApiKey(
-    userId(req), Number(req.params.keyId), req.body?.isActive,
-  )));
+  router.patch('/api-keys/:keyId/toggle', respond((req) => {
+    if (req.body?.isActive === true) {
+      requireRecentMfa(userId(req), (req as AuthenticatedRequest).authSession);
+    }
+    return service.toggleApiKey(userId(req), Number(req.params.keyId), req.body?.isActive);
+  }));
   router.get('/credentials', respond((req) => service.listCredentials(
     userId(req), queryString(req.query.type),
   )));
