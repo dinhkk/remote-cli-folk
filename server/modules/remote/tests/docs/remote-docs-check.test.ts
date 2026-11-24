@@ -20,6 +20,15 @@ const DOC_FILES = [
   `${FORK_RELATIVE}/relay/README.md`,
 ];
 
+// These integration fixtures belong to the parent workspace, not the public checkout.
+// A partially present workspace must still fail its checks rather than hide missing docs.
+const missingDocs = DOC_FILES.filter((relative) => !fs.existsSync(path.join(repoRoot, relative)));
+const docsOptions = {
+  skip: missingDocs.length === DOC_FILES.length
+    ? `Parent workspace docs are unavailable: ${missingDocs.map((relative) => path.join(repoRoot, relative)).join(', ')}`
+    : false,
+};
+
 const runChecker = (root?: string): CheckResult => {
   const args = [scriptPath, ...(root ? [root] : []), '--json'];
   const run = spawnSync(process.execPath, args, { encoding: 'utf8' });
@@ -51,17 +60,17 @@ const edit = (file: string, change: (text: string) => string): void => {
   fs.writeFileSync(file, change(fs.readFileSync(file, 'utf8')));
 };
 
-test('the real Remote docs pass every check', () => {
+test('the real Remote docs pass every check', docsOptions, () => {
   const result = runChecker();
   assert.deepEqual(result.problems, []);
   assert.equal(result.ok, true);
 });
 
-test('a copy of the real docs passes, so the cases below fail only because of their own change', () => {
+test('a copy of the real docs passes, so the cases below fail only because of their own change', docsOptions, () => {
   withTempRepo((repo) => assert.deepEqual(runChecker(repo.root).problems, []));
 });
 
-test('a missing required file is reported', () => {
+test('a missing required file is reported', docsOptions, () => {
   withTempRepo((repo) => {
     fs.rmSync(repo.file('docs/project-roadmap.md'));
     const result = runChecker(repo.root);
@@ -70,7 +79,7 @@ test('a missing required file is reported', () => {
   });
 });
 
-test('a missing required section and a missing keyword are reported', () => {
+test('a missing required section and a missing keyword are reported', docsOptions, () => {
   withTempRepo((repo) => {
     edit(repo.file('docs/deployment-guide.md'), (text) =>
       text.replace('## Security headers', '## Headers').replaceAll('TRUST_PROXY', 'TRUSTED_HOPS'),
@@ -82,7 +91,7 @@ test('a missing required section and a missing keyword are reported', () => {
   });
 });
 
-test('a broken file link and a broken anchor are reported, a good anchor is not', () => {
+test('a broken file link and a broken anchor are reported, a good anchor is not', docsOptions, () => {
   withTempRepo((repo) => {
     edit(repo.file('docs/system-architecture.md'), (text) =>
       `${text}\n[gone](./does-not-exist.md)\n[bad anchor](deployment-guide.md#no-such-heading)\n[good anchor](deployment-guide.md#security-headers)\n`,
@@ -94,14 +103,14 @@ test('a broken file link and a broken anchor are reported, a good anchor is not'
   });
 });
 
-test('links inside code blocks and inline code are ignored', () => {
+test('links inside code blocks and inline code are ignored', docsOptions, () => {
   withTempRepo((repo) => {
     edit(repo.file('docs/system-architecture.md'), (text) => `${text}\n\`[x](./nope.md)\`\n\n\`\`\`\n[y](./nope.md)\n\`\`\`\n`);
     assert.deepEqual(runChecker(repo.root).problems, []);
   });
 });
 
-test('an environment variable used in server or relay code but absent from the guide is reported', () => {
+test('an environment variable used in server or relay code but absent from the guide is reported', docsOptions, () => {
   withTempRepo((repo) => {
     const serverFile = repo.file(`${FORK_RELATIVE}/server/modules/remote/example-setting.ts`);
     fs.mkdirSync(path.dirname(serverFile), { recursive: true });
@@ -125,7 +134,7 @@ test('an environment variable used in server or relay code but absent from the g
   });
 });
 
-test('a default in the guide that differs from the constant in the code is reported; the real defaults agree', () => {
+test('a default in the guide that differs from the constant in the code is reported; the real defaults agree', docsOptions, () => {
   assert.deepEqual(runChecker().problems, [], 'the real guide and the real code agree on every checked default');
   withTempRepo((repo) => {
     const source = repo.file(`${FORK_RELATIVE}/server/modules/remote/quota/pairing-quota.service.ts`);
@@ -143,7 +152,7 @@ test('a default in the guide that differs from the constant in the code is repor
   });
 });
 
-test('a default whose pattern no longer matches the code is reported instead of silently skipped', () => {
+test('a default whose pattern no longer matches the code is reported instead of silently skipped', docsOptions, () => {
   withTempRepo((repo) => {
     const source = repo.file(`${FORK_RELATIVE}/server/modules/remote/pairing/pairing-expiry.service.ts`);
     fs.mkdirSync(path.dirname(source), { recursive: true });
@@ -153,7 +162,7 @@ test('a default whose pattern no longer matches the code is reported instead of 
   });
 });
 
-test('a longer variable name does not count as documenting a shorter one', () => {
+test('a longer variable name does not count as documenting a shorter one', docsOptions, () => {
   withTempRepo((repo) => {
     const serverFile = repo.file(`${FORK_RELATIVE}/server/modules/remote/short-name.ts`);
     fs.mkdirSync(path.dirname(serverFile), { recursive: true });
@@ -163,7 +172,7 @@ test('a longer variable name does not count as documenting a shorter one', () =>
   });
 });
 
-test('a document of 800 lines or more is reported', () => {
+test('a document of 800 lines or more is reported', docsOptions, () => {
   withTempRepo((repo) => {
     edit(repo.file('docs/project-roadmap.md'), (text) => `${text}${'filler\n'.repeat(800)}`);
     const { problems } = runChecker(repo.root);
@@ -171,7 +180,7 @@ test('a document of 800 lines or more is reported', () => {
   });
 });
 
-test('the command line exits 1 and lists the problems when something is wrong, 0 when all is well', () => {
+test('the command line exits 1 and lists the problems when something is wrong, 0 when all is well', docsOptions, () => {
   withTempRepo((repo) => {
     fs.rmSync(repo.file('docs/system-architecture.md'));
     const failing = spawnSync(process.execPath, [scriptPath, repo.root], { encoding: 'utf8' });
