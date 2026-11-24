@@ -1,7 +1,7 @@
 {
   "projectOrganization": {
-    "pinned": "Pinned projects",
-    "other": "Other projects ({{count}})"
+    "pinned": "Projets épinglés",
+    "other": "Autres projets ({{count}})"
   },
   "projects": {
     "title": "Projets",
