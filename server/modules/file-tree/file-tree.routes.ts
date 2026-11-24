@@ -34,6 +34,9 @@ const HTML_PREVIEW_CSP = [
   "frame-ancestors 'self'",
 ].join('; ');
 
+/** Largest file the HTML preview page serves: a document loaded into a frame, not a download. */
+const HTML_PREVIEW_MAXIMUM_BYTES = 10 * 1024 * 1024;
+
 function readBody(request: Request): Record<string, unknown> {
   return typeof request.body === 'object' && request.body !== null
     ? request.body as Record<string, unknown>
@@ -172,7 +175,7 @@ export function createFileTreeRouter(
       throw new AppError('The preview needs a browser session', { code: 'HTML_PREVIEW_SESSION_REQUIRED', statusCode: 401 });
     }
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
-    const file = await services.openHtmlPreview(readProjectId(request), filePath, uploadLimits.maximumFileSizeMegabytes * 1024 * 1024);
+    const file = await services.openHtmlPreview(readProjectId(request), filePath, HTML_PREVIEW_MAXIMUM_BYTES);
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
     response.setHeader('Content-Security-Policy', HTML_PREVIEW_CSP);
     response.setHeader('Referrer-Policy', 'no-referrer');

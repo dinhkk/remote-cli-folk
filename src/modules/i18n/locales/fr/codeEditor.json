@@ -38,5 +38,12 @@
   "unsavedChanges": {
     "confirmClose": "Vous avez des modifications non enregistrées. Fermer ce fichier et les abandonner ?",
     "indicator": "Modifications non enregistrées"
+  },
+  "htmlPreview": {
+    "untrustedLocal": "Contenu non fiable. Les scripts du fichier s'exécutent dans un cadre isolé, sans réseau et sans accès à cette application. Les fichiers liés (CDN, autres fichiers du projet) ne se chargent pas.",
+    "untrustedRemote": "Contenu non fiable. Les scripts du fichier ne s'exécutent pas dans un onglet distant.",
+    "unsavedChanges": "Le fichier enregistré est affiché. Enregistrez pour voir vos modifications non enregistrées.",
+    "scriptsDisabled": "Contenu non fiable. Les scripts du fichier ne s'exécutent pas ici.",
+    "tooLarge": "Le fichier dépasse 10 Mo, ses scripts ne s'exécutent donc pas."
   }
 }

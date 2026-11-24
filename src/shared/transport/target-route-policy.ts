@@ -38,6 +38,9 @@ const PROJECT_TASKMASTER = /^\/api\/projects\/[^/]+\/taskmaster(\/|$)/;
 // configuration and the Claude settings-file rules are Host administration. The Host answers 403 to
 // all of them; refusing here keeps the settings panels from producing a wall of refused requests
 // (the agent login panel would otherwise poll the Host's auth status for every provider).
+// The Local HTML preview page runs the file's script; a tab only displays HTML and never loads it.
+const HTML_PREVIEW = /^\/api\/file-tree\/projects\/[^/]+\/files\/html-preview(\/|$)/;
+
 const PROVIDER_ADMIN = /^\/api\/providers\/[^/]+\/(auth|cli|mcp|settings-permissions)(\/|$)/;
 
 const stripQuery = (path: string): string => {
@@ -65,5 +68,5 @@ export const isBlockedInTargetMode = (path: string): boolean => {
   if (BLOCKED_PREFIXES.some((prefix) => lowered === prefix || lowered.startsWith(`${prefix}/`))) {
     return true;
   }
-  return PROJECT_TASKMASTER.test(lowered) || PROVIDER_ADMIN.test(lowered);
+  return PROJECT_TASKMASTER.test(lowered) || PROVIDER_ADMIN.test(lowered) || HTML_PREVIEW.test(lowered);
 };

@@ -7,7 +7,7 @@ import type { Extension } from '@codemirror/state';
 import type { CodeEditorGotoTarget } from '@/shared/types';
 
 import MarkdownPreview from '@/modules/code-editor/markdown/MarkdownPreview';
-import { HtmlPreview } from '@/modules/code-editor/preview/HtmlPreview';
+import { HtmlPreview, type HtmlPreviewSource } from '@/modules/code-editor/preview/HtmlPreview';
 import { MermaidFilePreview } from '@/modules/code-editor/preview/MermaidFilePreview';
 
 type CodeEditorSurfaceProps = {
@@ -16,6 +16,10 @@ type CodeEditorSurfaceProps = {
   markdownPreview: boolean;
   isMarkdownFile: boolean;
   isHtmlPreviewFile?: boolean;
+  /** The saved file behind the HTML preview, its unsaved state, and a key that changes after each save. */
+  htmlPreviewSource?: HtmlPreviewSource | null;
+  hasUnsavedChanges?: boolean;
+  previewReloadKey?: number;
   isMermaidFile?: boolean;
   isDarkMode: boolean;
   fontSize: number;
@@ -32,6 +36,9 @@ export default function CodeEditorSurface({
   markdownPreview,
   isMarkdownFile,
   isHtmlPreviewFile = false,
+  htmlPreviewSource = null,
+  hasUnsavedChanges = false,
+  previewReloadKey = 0,
   isMermaidFile = false,
   isDarkMode,
   fontSize,
@@ -75,7 +82,14 @@ export default function CodeEditorSurface({
     }
 
     if (isHtmlPreviewFile) {
-      return <HtmlPreview content={content} />;
+      return (
+        <HtmlPreview
+          content={content}
+          source={htmlPreviewSource}
+          hasUnsavedChanges={hasUnsavedChanges}
+          reloadKey={previewReloadKey}
+        />
+      );
     }
 
     if (isMermaidFile) {

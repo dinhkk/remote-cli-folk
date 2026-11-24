@@ -221,7 +221,7 @@ test('HP-04/HP-10a: the HTML preview page is the saved file under a sandbox poli
     await withFileTreeServer(createFakeServices({
       openHtmlPreview: async (projectId, filePath, maximumBytes) => {
         inputs.push([projectId, filePath]);
-        assert.equal(maximumBytes, 200 * 1024 * 1024, 'the file tree size limit');
+        assert.equal(maximumBytes, 10 * 1024 * 1024, 'the preview size limit');
         return { stream: Readable.from([Buffer.from(html)]) };
       },
     }), async (baseUrl) => {
