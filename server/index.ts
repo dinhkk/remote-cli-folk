@@ -43,6 +43,7 @@ import notificationRoutes from './modules/notifications/notifications.routes.js'
 import { userRoutes } from './modules/user/index.js';
 import {
     getPluginPort,
+    PLUGINS_DISABLED,
     pluginsRoutes,
     startEnabledPluginServers,
     stopAllPlugins,
@@ -148,6 +149,7 @@ createWebSocketServer(server, {
         },
     },
     getPluginPort,
+    pluginsDisabled: PLUGINS_DISABLED,
     remote: remote.websocket,
     authEpoch: remote.enabled ? remote.authEpoch : undefined,
 });
