@@ -6,7 +6,9 @@
     <title>RemoteCLI - API Documentation</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    
+    <!-- Prism (syntax highlighting) from this origin: the client build copies it from the installed prismjs package. -->
+    <link rel="stylesheet" href="/vendor/prism-1.30.0/prism-tomorrow.min.css">
+
     <style>
         * {
             margin: 0;
@@ -356,7 +358,7 @@
             display: block;
         }
 
-        /* Code samples: plain dark blocks (no syntax highlighting; the page loads nothing from another host). */
+        /* Code samples stay readable without Prism (when its files or scripts do not load). */
         pre {
             margin: 0 0 1.5rem 0;
             padding: 1em;
@@ -903,5 +905,13 @@ data: {"type":"done"}</code></pre>
         });
     </script>
 
+    <script src="/vendor/prism-1.30.0/prism-core.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-clike.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-javascript.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-bash.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-python.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-json.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-yaml.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-http.min.js"></script>
 </body>
 </html>

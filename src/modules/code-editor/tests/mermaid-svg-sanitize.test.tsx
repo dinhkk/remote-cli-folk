@@ -18,7 +18,8 @@ vi.mock('mermaid', () => ({
 }));
 vi.mock('@/shared/context/ThemeContext', () => ({ useTheme: () => ({ isDarkMode: false }) }));
 
-const { default: MermaidDiagram, sanitizeMermaidSvg } = await import('@/modules/code-editor/markdown/MermaidDiagram');
+const { default: MermaidDiagram } = await import('@/modules/code-editor/markdown/MermaidDiagram');
+const { sanitizeMermaidSvg } = await import('@/modules/code-editor/markdown/sanitizeMermaidSvg');
 
 afterEach(() => { cleanup(); delete (window as { __mermaidXss?: number }).__mermaidXss; });
 

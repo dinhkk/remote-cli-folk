@@ -1,8 +1,8 @@
 import { useEffect, useId, useState } from 'react';
-import DOMPurify from 'dompurify';
 // Type-only: erased at build time, so it does not pull mermaid into the main chunk.
 import type mermaid from 'mermaid';
 
+import { sanitizeMermaidSvg } from '@/modules/code-editor/markdown/sanitizeMermaidSvg';
 import { useTheme } from '@/shared/context/ThemeContext';
 
 // Mermaid is ~1.5MB minified, so it is loaded on demand the first time a
@@ -12,17 +12,6 @@ const loadMermaid = () => {
   mermaidPromise ??= import('mermaid').then((module) => module.default);
   return mermaidPromise;
 };
-
-/**
- * Cleans the SVG mermaid produced before it is inserted as HTML: no script, no event-handler attribute, no
- * `javascript:` URL. Labels drawn inside `foreignObject` keep their HTML, as mermaid draws them.
- */
-export const sanitizeMermaidSvg = (svg: string): string =>
-  DOMPurify.sanitize(svg, {
-    ADD_TAGS: ['foreignObject'],
-    ADD_ATTR: ['dominant-baseline'],
-    HTML_INTEGRATION_POINTS: { foreignobject: true },
-  });
 
 type MermaidDiagramProps = {
   /** Raw mermaid source, i.e. the body of a ```mermaid fenced block. */

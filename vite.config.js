@@ -1,13 +1,37 @@
+import fs from 'node:fs'
 import { createRequire } from 'node:module'
+import path from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts.js'
+import { API_DOCS_PRISM_DIR, API_DOCS_PRISM_FILES, API_DOCS_PRISM_VERSION } from './shared/apiDocsPrismAssets.js'
 
 // The client shows the installed package version so it can be compared against the
 // version the server process is actually running. Reading package.json here and
 // injecting it keeps the frontend free of imports that reach outside src/.
 const pkg = createRequire(import.meta.url)('./package.json')
+
+// Copies the Prism files of public/api-docs.html from the installed `prismjs` package into the client output,
+// so the page highlights code without loading anything from another host.
+const apiDocsPrism = () => ({
+  name: 'api-docs-prism',
+  apply: 'build',
+  generateBundle() {
+    const prismPackage = createRequire(import.meta.url).resolve('prismjs/package.json')
+    const { version } = JSON.parse(fs.readFileSync(prismPackage, 'utf8'))
+    if (version !== API_DOCS_PRISM_VERSION) {
+      this.error(`prismjs ${version} is installed; public/api-docs.html expects ${API_DOCS_PRISM_VERSION} (shared/apiDocsPrismAssets.js)`)
+    }
+    for (const [source, name] of API_DOCS_PRISM_FILES) {
+      this.emitFile({
+        type: 'asset',
+        fileName: `${API_DOCS_PRISM_DIR}/${name}`,
+        source: fs.readFileSync(path.join(path.dirname(prismPackage), source)),
+      })
+    }
+  },
+})
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
@@ -25,7 +49,7 @@ export default defineConfig(({ mode }) => {
   const serverPort = env.SERVER_PORT || env.PORT || 3001
 
   return {
-    plugins: [react()],
+    plugins: [react(), apiDocsPrism()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },

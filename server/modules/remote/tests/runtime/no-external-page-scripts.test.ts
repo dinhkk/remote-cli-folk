@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { it } from 'node:test';
 
@@ -43,4 +44,26 @@ it('CS-07: no shipped page uses an inline event handler (the page CSP allows inl
     const handler = /<[a-z][^>]*\son[a-z]+\s*=/i.exec(html);
     assert.equal(handler, null, `${page}: ${handler?.[0]}`);
   }
+});
+
+it('CS-07: every Prism file api-docs.html loads is copied by the client build from the installed prismjs', async () => {
+  const { API_DOCS_PRISM_DIR, API_DOCS_PRISM_FILES, API_DOCS_PRISM_VERSION } = await import('../../../../../shared/apiDocsPrismAssets.js');
+  const html = fs.readFileSync(path.join(ROOT, 'public', 'api-docs.html'), 'utf8');
+  const referenced = [...html.matchAll(/\b(?:src|href)="\/(vendor\/[^"]+)"/g)].map(([, file]) => file);
+  const copied = new Map(API_DOCS_PRISM_FILES.map(([source, name]) => [`${API_DOCS_PRISM_DIR}/${name}`, source]));
+  assert.equal(referenced.length, API_DOCS_PRISM_FILES.length - 1, referenced.join(', ')); // all but the licence
+  const prismRoot = path.dirname(createRequire(import.meta.url).resolve('prismjs/package.json'));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(prismRoot, 'package.json'), 'utf8')).version, API_DOCS_PRISM_VERSION);
+  const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.packages['node_modules/prismjs']?.version, API_DOCS_PRISM_VERSION, 'the served version is the locked one');
+  // When the client has been built, the served files are there and equal to the package's.
+  const built = path.join(ROOT, 'dist');
+  const hasBuild = fs.existsSync(path.join(built, 'index.html'));
+  for (const file of referenced) {
+    const source = copied.get(file);
+    assert.ok(source, `${file} is not copied by the build`);
+    assert.ok(fs.existsSync(path.join(prismRoot, source)), source);
+    if (hasBuild) assert.deepEqual(fs.readFileSync(path.join(built, file)), fs.readFileSync(path.join(prismRoot, source)), file);
+  }
+  if (hasBuild) assert.ok(fs.existsSync(path.join(built, API_DOCS_PRISM_DIR, 'LICENSE')));
 });
