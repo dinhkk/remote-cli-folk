@@ -213,14 +213,15 @@ test('create route rejects invalid entry types without calling the service', asy
 });
 
 const HTML_PREVIEW_CSP = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-  + "img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";
+  + "img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'; frame-ancestors 'self'";
 
 test('HP-04/HP-10a: the HTML preview page is the saved file under a sandbox policy with no network source', async () => {
   for (const html of ['<p>plain</p>', '<script>document.title = "ran"</script><p>with script</p>']) {
     const inputs: string[][] = [];
     await withFileTreeServer(createFakeServices({
-      openHtmlPreview: async (projectId, filePath) => {
+      openHtmlPreview: async (projectId, filePath, maximumBytes) => {
         inputs.push([projectId, filePath]);
+        assert.equal(maximumBytes, 200 * 1024 * 1024, 'the file tree size limit');
         return { stream: Readable.from([Buffer.from(html)]) };
       },
     }), async (baseUrl) => {
@@ -232,13 +233,17 @@ test('HP-04/HP-10a: the HTML preview page is the saved file under a sandbox poli
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
       assert.equal(response.headers.get('cache-control'), 'no-store');
       assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+      assert.equal(response.headers.get('cross-origin-resource-policy'), 'same-origin');
     });
     assert.deepEqual(inputs, [['p1', 'site/index.html']]);
   }
   const sandbox = HTML_PREVIEW_CSP.split('; ')[0].split(' ').slice(1);
   assert.deepEqual(sandbox, ['allow-scripts']);
+  // No source the document could fetch from (frame-ancestors only says who may frame it).
+  const fetchSources = HTML_PREVIEW_CSP.split('; ').filter((directive) => !directive.startsWith('frame-ancestors') && !directive.startsWith('sandbox'))
+    .flatMap((directive) => directive.split(' ').slice(1));
   for (const network of ['http:', 'https:', 'ws:', 'wss:', "'self'", '*']) {
-    assert.ok(!HTML_PREVIEW_CSP.split(/[ ;]+/).includes(network), network);
+    assert.ok(!fetchSources.includes(network), network);
   }
 });
 

@@ -31,6 +31,7 @@ const HTML_PREVIEW_CSP = [
   'media-src data: blob:',
   "form-action 'none'",
   "base-uri 'none'",
+  "frame-ancestors 'self'",
 ].join('; ');
 
 function readBody(request: Request): Record<string, unknown> {
@@ -171,10 +172,11 @@ export function createFileTreeRouter(
       throw new AppError('The preview needs a browser session', { code: 'HTML_PREVIEW_SESSION_REQUIRED', statusCode: 401 });
     }
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
-    const file = await services.openHtmlPreview(readProjectId(request), filePath);
+    const file = await services.openHtmlPreview(readProjectId(request), filePath, uploadLimits.maximumFileSizeMegabytes * 1024 * 1024);
     response.setHeader('Content-Type', 'text/html; charset=utf-8');
     response.setHeader('Content-Security-Policy', HTML_PREVIEW_CSP);
     response.setHeader('Referrer-Policy', 'no-referrer');
+    response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     file.stream.pipe(response);
     file.stream.on('error', (error) => {
       logger.error('Error streaming the HTML preview', error);

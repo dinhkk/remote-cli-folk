@@ -87,6 +87,25 @@ export function isSessionOriginAllowed(req: SessionRequest, config: AuthTranspor
     && [config.serverPort, config.vitePort].includes(Number(url.port || '80'));
 }
 
+// The exact path of the Local HTML preview page as the request spelled it (no decoding, no case folding, no
+// trailing slash): a project id is a UUID, so an encoded slash or any other spelling never matches.
+const HTML_PREVIEW_PATH = /^\/api\/file-tree\/projects\/[A-Za-z0-9-]+\/files\/html-preview$/;
+
+/**
+ * The browser loading the HTML preview page into a frame of the app itself: a same-origin iframe navigation
+ * (all three Fetch Metadata headers required) to exactly that path, with no Origin or the server's own. Such a
+ * load cannot carry the request header, so the caller skips only that check for it; a request without the
+ * Fetch Metadata headers never qualifies.
+ */
+export function isHtmlPreviewDocumentRequest(req: SessionRequest & { method: string }, rawPath: string): boolean {
+  if (req.method !== 'GET' || !HTML_PREVIEW_PATH.test(rawPath)) return false;
+  if (header(req, 'sec-fetch-site') !== 'same-origin' || header(req, 'sec-fetch-mode') !== 'navigate'
+    || header(req, 'sec-fetch-dest') !== 'iframe') return false;
+  if (req.headers.origin === undefined) return true;
+  const current = requestOrigin(req);
+  return current !== null && header(req, 'origin') === current;
+}
+
 /** HTTP browser guard; loopback bridge authentication is classified separately by the caller. */
 export function isSessionHttpRequestAllowed(req: SessionRequest, config: AuthTransportConfig): boolean {
   if (header(req, SESSION_HEADER_NAME) !== SESSION_HEADER_VALUE) return false;

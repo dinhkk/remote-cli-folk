@@ -1476,7 +1476,7 @@ export type FileTreeServices = {
   readTextFile(projectId: string, filePath: string): Promise<{ content: string; path: string }>;
   openFile(projectId: string, filePath: string): Promise<{ contentType: string; stream: Readable }>;
   /** An `.html`/`.htm` file inside the project root (never outside it), for the isolated preview. */
-  openHtmlPreview(projectId: string, filePath: string): Promise<{ stream: Readable }>;
+  openHtmlPreview(projectId: string, filePath: string, maximumBytes: number): Promise<{ stream: Readable }>;
   saveTextFile(projectId: string, filePath: string, content: string): Promise<{
     success: true;
     path: string;
