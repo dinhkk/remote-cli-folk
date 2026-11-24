@@ -10,6 +10,7 @@ import {
 import {
   getPluginPort, isPluginRunning, startPluginServer, stopPluginServer,
 } from './plugin-process.service.js';
+import { PLUGINS_DISABLED } from './plugins-switch.js';
 import { createPluginsRouter } from './plugins.routes.js';
 import { createPluginsService } from './plugins.service.js';
 
@@ -30,4 +31,4 @@ const pluginsService = createPluginsService({
 });
 
 /** Plugin router assembled with filesystem, loader, and process adapters. */
-export const pluginsRoutes = createPluginsRouter(pluginsService);
+export const pluginsRoutes = createPluginsRouter(pluginsService, { disabled: PLUGINS_DISABLED });
