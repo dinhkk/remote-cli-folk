@@ -110,7 +110,9 @@ describe('tab token isolation (hostile iframe simulation)', () => {
     // The Local page carries the main-page policy (own-origin scripts and connections), never the tab policy.
     const host = new URL(world.controller.baseUrl).host;
     const plainCsp = plain.headers.get('content-security-policy') ?? '';
-    assert.match(plainCsp, /(^|; )script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')*(;|$)/, 'the Local page allows only its own and hashed scripts');
+    // blob: only while plugins are on (a Local plugin's module is imported from a blob URL).
+    const pluginBlob = process.env.REMOTECLI_PLUGINS_DISABLED === '1' ? '' : ' blob:';
+    assert.match(plainCsp, new RegExp(`(^|; )script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')*${pluginBlob}(;|$)`), 'the Local page allows only its own and hashed scripts');
     assert.ok(plainCsp.includes(`connect-src 'self' ws://${host} wss://${host}`), plainCsp);
     assert.ok(!/default-src|form-action/.test(plainCsp), 'the Local page does not get the tab policy');
     const target = await fetch(`${world.controller.baseUrl}/?target=${world.peerId}`);
@@ -121,6 +123,7 @@ describe('tab token isolation (hostile iframe simulation)', () => {
     assert.ok(!/connect-src[^;]*(https?:|wss?:)(\s|;|$)/.test(csp), 'no open scheme in connect-src');
     assert.match(csp, /form-action 'none'/);
     assert.ok(!/script-src[^;]*unsafe-inline/.test(csp), 'inline scripts are allowed by hash, never by unsafe-inline');
+    assert.ok(!/script-src[^;]*blob:/.test(csp), 'the tab page never allows blob: scripts');
     assert.match(csp, /frame-ancestors 'self'/);
     assert.match(csp, /base-uri 'self'/);
     assert.match(csp, /object-src 'none'/);
