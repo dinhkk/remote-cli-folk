@@ -64,6 +64,8 @@ export type RemoteModuleOptions = {
   env?: NodeJS.ProcessEnv;
   /** Built `index.html`: its inline scripts are allowed by hash in the CSP of `?target=` pages. */
   indexHtmlPath?: string;
+  /** Plugins are on (not `REMOTECLI_PLUGINS_DISABLED=1`): the main app pages may import `blob:` scripts. */
+  pluginScripts?: boolean;
   /** Test seams of the running parts (relay sockets, clock, accept persistence). */
   runtime?: Pick<RemoteRuntimeOptions, 'socketFactory' | 'pairConnector' | 'clock' | 'settings' | 'hostName' | 'auditRepository'>;
 };
@@ -191,7 +193,10 @@ export function createRemoteModule(options: RemoteModuleOptions): RemoteModule {
 
   const websocket = controllerAvailable ? createRemoteWebSocketGateway({ tabs, registry }) : undefined;
 
-  const mainPageHeaders = createMainPageSecurityHeaders(resolveMainPageHeaderOptions(env), options.indexHtmlPath);
+  const mainPageHeaders = createMainPageSecurityHeaders(
+    { ...resolveMainPageHeaderOptions(env), pluginScripts: options.pluginScripts === true },
+    options.indexHtmlPath,
+  );
   const targetPageCsp = createTargetPageCsp(options.indexHtmlPath);
   const targetPageCspMiddleware = (req: Request, res: Response, next: NextFunction): void => {
     // `target` present in any form (`?target=`, repeated): the page may run with a Remote tab token.

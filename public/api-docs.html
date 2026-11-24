@@ -7,9 +7,6 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     
-    <!-- Prism.js for syntax highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-    
     <style>
         * {
             margin: 0;
@@ -359,10 +356,23 @@
             display: block;
         }
 
-        pre[class*="language-"] {
+        /* Code samples: plain dark blocks (no syntax highlighting; the page loads nothing from another host). */
+        pre {
             margin: 0 0 1.5rem 0;
+            padding: 1em;
+            overflow: auto;
+            background: #2d2d2d;
             border-radius: 6px;
             font-size: 0.8125rem;
+            line-height: 1.5;
+        }
+
+        pre code {
+            display: block;
+            padding: 0;
+            background: none;
+            color: #ccc;
+            white-space: pre;
         }
 
         .example-block {
@@ -605,9 +615,9 @@
                     <div class="example-block">
                         <h4>Basic Request</h4>
                         <div class="tab-buttons">
-                            <button class="tab-button active" onclick="showTab('curl-basic')">cURL</button>
-                            <button class="tab-button" onclick="showTab('js-basic')">JavaScript</button>
-                            <button class="tab-button" onclick="showTab('python-basic')">Python</button>
+                            <button class="tab-button active" data-tab="curl-basic">cURL</button>
+                            <button class="tab-button" data-tab="js-basic">JavaScript</button>
+                            <button class="tab-button" data-tab="python-basic">Python</button>
                         </div>
 
                         <div class="tab-content active" id="curl-basic">
@@ -870,9 +880,12 @@ data: {"type":"done"}</code></pre>
 
         document.addEventListener('DOMContentLoaded', populateModels);
 
-        // Tab switching
-        window.showTab = function(tabName) {
-            const parentBlock = event.target.closest('.example-block');
+        // Tab switching (a listener: the page allows no inline event handler)
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('.tab-button[data-tab]');
+            if (!button) return;
+            const tabName = button.dataset.tab;
+            const parentBlock = button.closest('.example-block');
             if (!parentBlock) return;
 
             parentBlock.querySelectorAll('.tab-content').forEach(tab => {
@@ -885,18 +898,10 @@ data: {"type":"done"}</code></pre>
             const targetTab = parentBlock.querySelector('#' + tabName);
             if (targetTab) {
                 targetTab.classList.add('active');
-                event.target.classList.add('active');
+                button.classList.add('active');
             }
-        };
+        });
     </script>
 
-    <!-- Prism.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-http.min.js"></script>
 </body>
 </html>

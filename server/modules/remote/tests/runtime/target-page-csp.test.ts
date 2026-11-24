@@ -142,3 +142,95 @@ describe('target page CSP in the module', () => {
     });
   });
 });
+
+const scriptSrc = (policy: string): string[] =>
+  policy.split('; ').find((directive) => directive.startsWith('script-src'))!.split(' ').slice(1);
+
+describe('blob: scripts follow the plugin switch, on the main app pages only', () => {
+  it('CS-11a: plugins on: the main page allows blob: scripts, the ?target= page does not', async () => {
+    await withHtml(PAGE, async (file) => {
+      await withModuleRig({ moduleOptions: { indexHtmlPath: file, pluginScripts: true } }, async (rig) => {
+        const main = scriptSrc((await send(rig.port, { path: '/' })).headers['content-security-policy'] as string);
+        assert.ok(main.includes('blob:'), main.join(' '));
+        assert.ok(main.every((source) => ["'self'", 'blob:'].includes(source) || /^'sha256-/.test(source)), main.join(' '));
+        const target = (await send(rig.port, { path: '/?target=peer-1' })).headers['content-security-policy'] as string;
+        assert.ok(!scriptSrc(target).includes('blob:'), target);
+      });
+    });
+  });
+
+  it('CS-11b: plugins off: neither page allows blob: scripts', async () => {
+    await withHtml(PAGE, async (file) => {
+      for (const moduleOptions of [{ indexHtmlPath: file, pluginScripts: false }, { indexHtmlPath: file }]) {
+        await withModuleRig({ moduleOptions }, async (rig) => {
+          for (const page of ['/', '/settings', '/?target=peer-1']) {
+            const policy = (await send(rig.port, { path: page })).headers['content-security-policy'] as string;
+            assert.ok(!scriptSrc(policy).includes('blob:'), `${page}: ${policy}`);
+          }
+        });
+      }
+    });
+  });
+
+  it('CS-11: blob: is the only addition: no data:, no unsafe-inline, no unsafe-eval anywhere in script-src', () => {
+    const policy = buildMainPageCsp({ frameAncestors: true, scriptHashes: ["'sha256-AAA'"], blobScripts: true });
+    assert.deepEqual(scriptSrc(policy), ["'self'", "'sha256-AAA'", 'blob:']);
+  });
+});
+
+describe('static pages of the build carry their own script hashes', () => {
+  const API_DOCS_SCRIPT = "\n  document.querySelectorAll('.api-url');\n";
+  const withBuild = async (run: (indexHtml: string) => Promise<void>): Promise<void> => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-page-csp-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'index.html'), PAGE);
+      fs.writeFileSync(path.join(dir, 'api-docs.html'), `<!doctype html><body><script>${API_DOCS_SCRIPT}</script></body>`);
+      fs.writeFileSync(path.join(dir, 'plain.html'), '<!doctype html><body>no script</body>');
+      await run(path.join(dir, 'index.html'));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('CS-07: a static page allows only its own inline scripts, never blob:; other routes keep the app hashes', async () => {
+    await withBuild(async (indexHtml) => {
+      await withModuleRig({ moduleOptions: { indexHtmlPath: indexHtml, pluginScripts: true } }, async (rig) => {
+        const policyOf = async (page: string) => (await send(rig.port, { path: page })).headers['content-security-policy'] as string;
+        assert.deepEqual(scriptSrc(await policyOf('/api-docs.html')), ["'self'", sha(API_DOCS_SCRIPT)]);
+        assert.deepEqual(scriptSrc(await policyOf('/plain.html')), ["'self'"]);
+        const app = scriptSrc(await policyOf('/'));
+        assert.deepEqual(app, ["'self'", ...readInlineScriptHashes(indexHtml), 'blob:']);
+        // A name that is not a file of the build gets the app policy, never a policy read from elsewhere.
+        assert.deepEqual(scriptSrc(await policyOf('/missing.html')), app);
+        assert.deepEqual(scriptSrc(await policyOf('/index.html')), app);
+      });
+    });
+  });
+});
+
+describe('the Host header never adds anything but its own WebSocket sources', () => {
+  const HOSTILE_HOSTS = [
+    'ctl.example.test evil.test', 'ctl.example.test;script-src *', 'ctl.example.test,evil.test', 'ctl.example.test\nX: y',
+    'ctl.example.test\r\n', 'ctl.exämple.test', 'ctl.example.test:3001 ', 'ctl.example.test/path', '*', "'self'", '',
+  ];
+
+  it('CS-03: an invalid Host is left out; the page keeps connect-src \'self\'', () => {
+    for (const host of HOSTILE_HOSTS) {
+      assert.deepEqual(sameHostSocketSources(host), [], JSON.stringify(host));
+      const middleware = createMainPageSecurityHeaders({ frameAncestors: true, referrerPolicy: true });
+      const headers: Record<string, string> = {};
+      const req = { method: 'GET', path: '/', query: {}, headers: { host } };
+      middleware(req as never, { setHeader: (name: string, value: string) => { headers[name] = value; } } as never, () => undefined);
+      assert.ok(headers['Content-Security-Policy'].includes("connect-src 'self'; "), JSON.stringify(host));
+      assert.ok(!/connect-src[^;]*ws/.test(headers['Content-Security-Policy']), JSON.stringify(host));
+      assert.equal(createTargetPageCsp()(host), buildTargetPageCsp([]), JSON.stringify(host));
+    }
+    assert.equal(sameHostSocketSources(undefined).length, 0);
+  });
+
+  it('CS-03: a plain host, host:port and [ipv6]:port are listed as ws:// and wss://', () => {
+    for (const host of ['ctl.example.test', 'ctl.example.test:3001', '127.0.0.1:3001', '[::1]:3001', 'localhost']) {
+      assert.deepEqual(sameHostSocketSources(host), [`ws://${host}`, `wss://${host}`]);
+    }
+  });
+});

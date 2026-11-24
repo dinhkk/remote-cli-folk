@@ -308,8 +308,11 @@ describe('server/index.ts with Remote', () => {
     assert.equal(target.headers['content-security-policy'], expected);
     assert.ok(expected.startsWith("default-src 'self'"));
     const plain = await send(child.port, { path: '/', headers: { accept: 'text/html' } });
-    assert.equal(plain.headers['content-security-policy'], buildMainPageCsp({ frameAncestors: true, scriptHashes: hashes, socketSources: sockets }),
+    // The child inherits this environment: plugins are on (blob: scripts allowed) unless the switch is set.
+    const blobScripts = process.env.REMOTECLI_PLUGINS_DISABLED !== '1';
+    assert.equal(plain.headers['content-security-policy'], buildMainPageCsp({ frameAncestors: true, scriptHashes: hashes, socketSources: sockets, blobScripts }),
       'the plain page has the main-page policy with the same inline-script hashes');
+    assert.ok(!/script-src[^;]*blob:/.test(target.headers['content-security-policy'] as string), 'the ?target= page never allows blob: scripts');
   });
 
   it('upgrades /r/<peer>/ws with the tab-token subprotocol, echoes only the marker, and reaches the Host', async () => {
