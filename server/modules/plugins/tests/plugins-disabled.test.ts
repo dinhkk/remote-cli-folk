@@ -17,7 +17,9 @@ const home = mkdtempSync(path.join(tmpdir(), 'plugins-disabled-test-'));
 const previousHome = process.env.HOME;
 process.env.HOME = home;
 process.env.REMOTECLI_PLUGINS_DISABLED = '1';
+const previousDatabasePath = process.env.DATABASE_PATH;
 after(() => {
+  if (previousDatabasePath === undefined) delete process.env.DATABASE_PATH; else process.env.DATABASE_PATH = previousDatabasePath;
   if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
   rmSync(home, { recursive: true, force: true });
 });
@@ -33,33 +35,34 @@ writeFileSync(path.join(pluginDir, 'index.js'), 'export function mount() {}\n');
 writeFileSync(path.join(pluginDir, 'server.js'), `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started');\n`);
 writeFileSync(path.join(home, '.claude-code-ui', 'plugins.json'), JSON.stringify({ 'synthetic-plugin': { enabled: true } }));
 
-const { getConnection } = await import('../../database/index.js');
-const { authRoutes } = await import('../../auth/auth.module.js');
-const { authenticateToken, validateApiKey } = await import('../../auth/auth.middleware.js');
-const { createApiSessionGuard } = await import('../../auth/services/api-session-guard.service.js');
-const { withIsolatedAuthDatabase } = await import('../../auth/tests/with-isolated-auth-database.js');
-const { pluginsRoutes, startEnabledPluginServers, getPluginPort, PLUGINS_DISABLED } = await import('../index.js');
+process.env.DATABASE_PATH = path.join(home, 'auth.db');
+writeFileSync(process.env.DATABASE_PATH, ''); // never import a checkout's legacy database
+
+const { closeConnection, getConnection, initializeDatabase, userDb } = await import('@/modules/database/index.js');
+const { authRoutes, authenticateToken, createApiSessionGuard, validateApiKey } = await import('@/modules/auth/index.js');
 const { createWebSocketServer } = await import('@/modules/websocket/index.js');
+const { pluginsRoutes, pluginsSwitch, startEnabledPluginServers, getPluginPort, PLUGINS_DISABLED } = await import('../index.js');
 
 const bcrypt = createRequire(import.meta.url)('bcryptjs');
 const password = 'synthetic-password-for-test';
 
 async function withServer(run: (base: string) => Promise<void>) {
-  await withIsolatedAuthDatabase(async (user) => {
-    getConnection().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await bcrypt.hash(password, 4), user.id);
-    const app = express();
-    app.use('/api', validateApiKey, createApiSessionGuard(authenticateToken));
-    app.use(express.json());
-    app.use('/api/auth', authRoutes);
-    app.use('/api/plugins', authenticateToken, pluginsRoutes);
-    app.use((err: { statusCode?: number; code?: string; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      res.status(err.statusCode ?? 500).json({ success: false, error: { code: err.code, message: err.message } });
-    });
-    const server = app.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    try { await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`); }
-    finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); }
+  await initializeDatabase();
+  const user = userDb.createUser('alice', 'unused-hash');
+  getConnection().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await bcrypt.hash(password, 4), user.id);
+  const app = express();
+  app.use('/api', validateApiKey, createApiSessionGuard(authenticateToken));
+  app.use(express.json());
+  app.use('/api/auth', authRoutes);
+  // Mounted exactly as the server entrypoint does.
+  app.use('/api/plugins', authenticateToken, pluginsSwitch, pluginsRoutes);
+  app.use((err: { statusCode?: number; code?: string; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    res.status(err.statusCode ?? 500).json({ success: false, error: { code: err.code, message: err.message } });
   });
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try { await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`); }
+  finally { server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); closeConnection(); }
 }
 
 const headers = (base: string, cookie?: string): Record<string, string> => ({

@@ -1,10 +1,11 @@
-import { i18n } from '@/modules/i18n';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { PluginsProvider } from '@/modules/plugins/context/PluginsContext';
+import { i18n } from '@/modules/i18n';
+import { PluginsProvider, usePlugins } from '@/modules/plugins/context/PluginsContext';
 import PluginSettingsTab from '@/modules/plugins/PluginSettingsTab';
-import WorkspaceTabs from '@/modules/project-workspace/WorkspaceTabs';
+import PluginTabContent from '@/modules/plugins/PluginTabContent';
+import { ThemeProvider } from '@/shared/context/ThemeContext';
 import type { Plugin } from '@/shared/types';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -25,6 +26,13 @@ function stubList(body: unknown) {
   return fetchMock;
 }
 
+// What the workspace tab bar builds its plugin tabs from (enabled plugins of the context).
+function PluginTabNames() {
+  const { plugins, loading } = usePlugins();
+  if (loading) return null;
+  return <ul aria-label="plugin tabs">{plugins.filter((plugin) => plugin.enabled).map((plugin) => <li key={plugin.name}>{plugin.displayName}</li>)}</ul>;
+}
+
 const NOTICE = "Plugins are turned off by this server's configuration.";
 
 it('PD-05/PD-10e: Settings shows only the notice when the server turned plugins off', async () => {
@@ -37,18 +45,26 @@ it('PD-05/PD-10e: Settings shows only the notice when the server turned plugins 
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/plugins']);
 });
 
-it('PD-05/PD-06/PD-10e: the workspace has no plugin tab and loads no plugin code when plugins are off', async () => {
+it('PD-05/PD-06/PD-10e: no plugin tab and no plugin code is fetched when plugins are off', async () => {
   const fetchMock = stubList({ plugins: [installed], disabled: true });
-  render(<PluginsProvider><WorkspaceTabs activeTab="chat" setActiveTab={() => undefined} shouldShowTasksTab={false} shouldShowBrowserTab={false} /></PluginsProvider>);
+  render(
+    <ThemeProvider>
+      <PluginsProvider>
+        <PluginTabNames />
+        <PluginTabContent pluginName="synthetic-plugin" selectedProject={null} selectedSession={null} />
+      </PluginsProvider>
+    </ThemeProvider>,
+  );
+  const list = await screen.findByRole('list', { name: 'plugin tabs' });
   await waitFor(() => expect(fetchMock).toHaveBeenCalled());
   await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(screen.queryByText('Synthetic Plugin')).toBeNull();
+  expect(list.children.length).toBe(0);
   expect(fetchMock.mock.calls.every(([url]) => url === '/api/plugins')).toBe(true);
 });
 
 it('PD-05: a server that sends no `disabled` field keeps plugins on, as before', async () => {
   stubList({ plugins: [installed] });
-  render(<PluginsProvider><WorkspaceTabs activeTab="chat" setActiveTab={() => undefined} shouldShowTasksTab={false} shouldShowBrowserTab={false} /></PluginsProvider>);
+  render(<PluginsProvider><PluginTabNames /></PluginsProvider>);
   expect(await screen.findByText('Synthetic Plugin')).toBeTruthy();
 });
 
