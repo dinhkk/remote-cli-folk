@@ -144,3 +144,10 @@ test('a stream tick re-renders the growing row, not the collapsed tool groups ab
     `only the streaming row may re-render per flush; got ${JSON.stringify(perFlush)}`,
   );
 });
+
+test('EH-05/EH-07: recorded provider error markup is rendered as literal text', () => {
+  const content = '<script data-provider-payload>synthetic()</script><img data-provider-payload src=x onerror="synthetic()">';
+  const view = render(pane([{ type: 'error', content, timestamp: '2026-01-01T00:00:01.000Z' }]));
+  assert.ok(view.container.textContent?.includes(content));
+  assert.equal(view.container.querySelector('[data-provider-payload]'), null);
+});

@@ -1276,6 +1276,20 @@ const CODEX_COLLABORATION_CONTROL_TOOLS = new Set([
   'wait_agent',
 ]);
 
+/** Extract a provider's textual error without interpreting it as markup. */
+function readCodexErrorMessage(error: unknown): string {
+  const message = readObjectRecord(error)?.message;
+  if (typeof message !== 'string') return 'Turn failed';
+  try {
+    const parsed = readObjectRecord(JSON.parse(message));
+    if (typeof parsed?.message === 'string') return parsed.message;
+    const nested = readObjectRecord(parsed?.error);
+    return typeof nested?.message === 'string' ? nested.message : message;
+  } catch {
+    return message;
+  }
+}
+
 // ─── Transcript reader ──────────────────────────────────────────────────────
 
 /**
@@ -1323,6 +1337,7 @@ async function getCodexSessionMessages(sessionId: string): Promise<CodexHistoryR
   const turns = createCodexTurnTracker();
   /** Turns whose prompt already carries the anchor, so only the first does. */
   const anchoredTurnIds = new Set<string>();
+  const emittedErrorTurns = new Set<string>();
 
   /** Emits a tool_result row unless the call already produced one. */
   const pushToolResult = (callId: string, timestamp: string, output: string, isError: boolean) => {
@@ -1357,6 +1372,19 @@ async function getCodexSessionMessages(sessionId: string): Promise<CodexHistoryR
 
     // ── event_msg ──────────────────────────────────────────────────────────
     if (entry.type === 'event_msg') {
+      if (payload.type === 'task_complete' && payload.error != null) {
+        const turnId = readNonEmptyString(payload.turn_id) ?? turns.getCurrentTurnId()
+          ?? `prompt-${messages.filter(row => row.message?.role === 'user').length}`;
+        if (!emittedErrorTurns.has(turnId)) {
+          emittedErrorTurns.add(turnId);
+          messages.push({
+            type: 'error', timestamp,
+            uuid: `codex-error-${sessionId}-${turnId}`,
+            content: readCodexErrorMessage(payload.error),
+          });
+        }
+        continue;
+      }
       if (payload.type === 'token_count' && payload.info) {
         const info = payload.info as AnyRecord;
         if (info.total_token_usage) {
@@ -2034,6 +2062,13 @@ export class CodexSessionsProvider implements IProviderSessions {
   private normalizeHistoryEntry(raw: AnyRecord, sessionId: string | null): NormalizedMessage[] {
     const ts = raw.timestamp || new Date().toISOString();
     const baseId = raw.uuid || generateMessageId('codex');
+
+    if (raw.type === 'error' && typeof raw.content === 'string') {
+      return [createNormalizedMessage({
+        id: baseId, sessionId, timestamp: ts, provider: PROVIDER,
+        kind: 'error', content: raw.content,
+      })];
+    }
 
     if (raw.type === 'status_note' && typeof raw.content === 'string') {
       return [createNormalizedMessage({

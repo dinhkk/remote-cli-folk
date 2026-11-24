@@ -287,6 +287,43 @@ function dedupeAdjacentAssistantEchoes(merged: NormalizedMessage[]): NormalizedM
   return out;
 }
 
+function errorText(content: string | undefined, provider: LLMProvider): string | undefined {
+  if (!content) return content;
+  // Only this documented Claude runtime wrapper is equivalent to its recorded error.
+  if (provider === 'claude') content = content.replace(/^Claude Code returned an error result: /, '');
+  try {
+    const parsed: unknown = JSON.parse(content);
+    if (parsed && typeof parsed === 'object' && 'message' in parsed && typeof parsed.message === 'string') {
+      return parsed.message;
+    }
+    if (parsed && typeof parsed === 'object' && 'error' in parsed
+      && parsed.error && typeof parsed.error === 'object' && 'message' in parsed.error
+      && typeof parsed.error.message === 'string') return parsed.error.message;
+  } catch { /* Plain error text is already canonical. */ }
+  return content;
+}
+
+/** Match an on-disk error only within the same prompt interval, not across turns. */
+function isErrorEchoedOnServer(message: NormalizedMessage, server: NormalizedMessage[]): boolean {
+  if (message.kind !== 'error') return false;
+  const matches = (row: NormalizedMessage) => row.kind === 'error'
+    && row.sessionId === message.sessionId && row.provider === message.provider
+    && errorText(row.content, row.provider) === errorText(message.content, message.provider);
+  if (server.some(row => matches(row) && row.timestamp === message.timestamp)) return true;
+  const time = readMessageTime(message);
+  if (time === null) return false;
+  let start = -1;
+  for (let index = 0; index < server.length; index++) {
+    const row = server[index];
+    const rowTime = readMessageTime(row);
+    if (row.kind === 'text' && row.role === 'user' && rowTime !== null && rowTime <= time) start = index;
+  }
+  if (start < 0) return false;
+  let end = start + 1;
+  while (end < server.length && !(server[end].kind === 'text' && server[end].role === 'user')) end++;
+  return server.slice(start + 1, end).some(matches);
+}
+
 /**
  * After a server refresh, drop only the realtime rows the persisted transcript
  * already owns. Anything not yet on disk (common right after `complete`, while
@@ -305,8 +342,7 @@ function pruneRealtimeSupersededByServer(
   const reconciledRealtimeMessages = removeOptimisticUserEchoes(serverMessages, realtimeMessages);
 
   return reconciledRealtimeMessages.filter((message) => {
-    if (serverIds.has(message.id) || (message.kind === 'error' && serverMessages.some(row =>
-      row.kind === 'error' && row.timestamp === message.timestamp && row.content === message.content))) {
+    if (serverIds.has(message.id) || isErrorEchoedOnServer(message, serverMessages)) {
       return false;
     }
 
@@ -349,8 +385,7 @@ function computeMerged(server: NormalizedMessage[], realtime: NormalizedMessage[
   const serverIds = new Set(server.map((message) => message.id));
   const reconciledRealtime = removeOptimisticUserEchoes(server, realtime);
   const extra = reconciledRealtime.filter((message) => {
-    if (serverIds.has(message.id) || (message.kind === 'error' && server.some(row =>
-      row.kind === 'error' && row.timestamp === message.timestamp && row.content === message.content))) {
+    if (serverIds.has(message.id) || isErrorEchoedOnServer(message, server)) {
       return false;
     }
     return true;
@@ -771,8 +806,11 @@ export function useSessionStore() {
         ? msg
         : { ...msg, sessionId };
     // Replay can race the live error or a second subscription on reconnect.
-    if (normalizedMessage.kind === 'error' && slot.realtimeMessages.some(row =>
-      row.kind === 'error' && row.id === normalizedMessage.id)) return;
+    if (normalizedMessage.kind === 'error' && (
+      slot.realtimeMessages.some(row => row.kind === 'error' && row.id === normalizedMessage.id)
+      || isErrorEchoedOnServer(normalizedMessage,
+        [...slot.serverMessages, ...slot.realtimeMessages].sort(compareMessagesChronologically))
+    )) return;
     let updated = [...slot.realtimeMessages, normalizedMessage];
     if (updated.length > MAX_REALTIME_MESSAGES) {
       updated = updated.slice(-MAX_REALTIME_MESSAGES);
