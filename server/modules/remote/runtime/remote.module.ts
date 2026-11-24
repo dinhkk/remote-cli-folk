@@ -191,12 +191,12 @@ export function createRemoteModule(options: RemoteModuleOptions): RemoteModule {
 
   const websocket = controllerAvailable ? createRemoteWebSocketGateway({ tabs, registry }) : undefined;
 
-  const mainPageHeaders = createMainPageSecurityHeaders(resolveMainPageHeaderOptions(env));
+  const mainPageHeaders = createMainPageSecurityHeaders(resolveMainPageHeaderOptions(env), options.indexHtmlPath);
   const targetPageCsp = createTargetPageCsp(options.indexHtmlPath);
   const targetPageCspMiddleware = (req: Request, res: Response, next: NextFunction): void => {
     // `target` present in any form (`?target=`, repeated): the page may run with a Remote tab token.
     if ((req.method === 'GET' || req.method === 'HEAD') && req.query.target !== undefined && !/\.[a-z0-9]+$/i.test(req.path.replace(/\.html$/i, ''))) {
-      res.setHeader('Content-Security-Policy', targetPageCsp());
+      res.setHeader('Content-Security-Policy', targetPageCsp(req.headers.host));
     }
     next();
   };

@@ -107,17 +107,18 @@ describe('tab token isolation (hostile iframe simulation)', () => {
 
   it('serves the target page with a CSP that limits what its scripts may talk to (contracts section 3)', async () => {
     const plain = await fetch(`${world.controller.baseUrl}/`);
-    // The Local page carries only the small main-page policy (no script/connect restriction), never the tab policy.
-    assert.equal(
-      plain.headers.get('content-security-policy'),
-      "frame-ancestors 'self'; base-uri 'self'; object-src 'none'",
-      'the Local page has only the main-page policy',
-    );
+    // The Local page carries the main-page policy (own-origin scripts and connections), never the tab policy.
+    const host = new URL(world.controller.baseUrl).host;
+    const plainCsp = plain.headers.get('content-security-policy') ?? '';
+    assert.match(plainCsp, /(^|; )script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')*(;|$)/, 'the Local page allows only its own and hashed scripts');
+    assert.ok(plainCsp.includes(`connect-src 'self' ws://${host} wss://${host}`), plainCsp);
+    assert.ok(!/default-src|form-action/.test(plainCsp), 'the Local page does not get the tab policy');
     const target = await fetch(`${world.controller.baseUrl}/?target=${world.peerId}`);
     assert.equal(target.status, 200);
     const csp = target.headers.get('content-security-policy') ?? '';
     assert.match(csp, /default-src 'self'/);
-    assert.match(csp, /connect-src 'self'/);
+    assert.ok(csp.includes(`connect-src 'self' ws://${host} wss://${host}`), csp);
+    assert.ok(!/connect-src[^;]*(https?:|wss?:)(\s|;|$)/.test(csp), 'no open scheme in connect-src');
     assert.match(csp, /form-action 'none'/);
     assert.ok(!/script-src[^;]*unsafe-inline/.test(csp), 'inline scripts are allowed by hash, never by unsafe-inline');
     assert.match(csp, /frame-ancestors 'self'/);
