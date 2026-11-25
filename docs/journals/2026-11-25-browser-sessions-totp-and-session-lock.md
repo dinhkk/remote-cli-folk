@@ -30,6 +30,7 @@ People often open RemoteCLI from a phone or another laptop, over a LAN, a mesh n
 - **Two-Step Sign-In:** If TOTP is on, `POST /api/auth/login` returns a challenge that expires after 5 minutes. `POST /api/auth/mfa/verify` then creates the session (`MfaLoginForm.tsx`).
 - **Sealed Seeds, No Replay:** The existing Remote master key (`getMasterSecret`) encrypts each seed. The server accepts each 30-second code step once (`last_used_step`).
 - **Recent-Code Rule for Sensitive Actions:** `requireRecentMfa` requires a code verified in the last 10 minutes for these actions: disable TOTP, replace recovery codes, change the password, sign out all devices, create API keys, change Remote pairings. If the code is older, `MfaReauthDialog.tsx` asks for a new one and the client sends the request again.
+- **Step-Up for Weakening Changes:** Disabling TOTP and replacing recovery codes also need the password and a new authenticator code in the same request (`stepUp` in `mfa.routes.ts`). A recovery code is not accepted. A wrong code counts toward the session's 5 attempts. `TotpStepUpDialog.tsx` asks for both. The session records each change as `mfa-disabled` or `recovery-codes-replaced`.
 - **Throttling:** After 5 wrong sign-in codes, the user is blocked for 5 minutes. Each later block doubles, up to 24 hours. After 5 wrong codes on an open session, the server revokes that session.
 - **Offline Recovery:** `remotecli reset-totp` (`reset-totp.service.ts`) turns TOTP off and revokes every session. It writes to the database file directly. No HTTP route calls it.
 

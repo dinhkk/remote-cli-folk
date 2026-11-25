@@ -148,7 +148,7 @@ or is malformed, the server stops at startup.
 | Absolute lifetime | 7 days from sign-in | `SESSION_MAX_AGE_MS` |
 | Idle lock | 24 hours by default, settable from 1 to 168 hours; only while TOTP is on | `DEFAULT_SESSION_IDLE_HOURS`, `setIdleLockHours` |
 | Automatic lock default | On | `DEFAULT_SESSION_AUTO_LOCK` |
-| Wrong codes on one session (unlock or re-verify) | 5, then the session is revoked: `401 MFA_SESSION_REVOKED`, header `X-Auth-Error: mfa-attempts-exceeded` | `failMfaAttempt` |
+| Wrong codes on one session (unlock, re-verify, disable TOTP, replace recovery codes) | 5, then the session is revoked: `401 MFA_SESSION_REVOKED`, header `X-Auth-Error: mfa-attempts-exceeded` | `failMfaAttempt` |
 | Recent verification window | 10 minutes | `MFA_FRESH_MS` |
 | Expiry sweep | Every second. Closes the transports of expired and newly locked sessions | `startSessionExpiry` |
 
@@ -159,7 +159,7 @@ To turn automatic lock off or to raise the idle hours, the session needs a recen
 code. Lowering the hours needs no code.
 
 The store records each state change in `auth_events` (`locked`, `unlocked`, `logout`, `revoked`,
-`expired`, `mfa-attempts-exceeded`).
+`expired`, `mfa-attempts-exceeded`, `mfa-disabled`, `recovery-codes-replaced`).
 
 ---
 
@@ -171,11 +171,21 @@ The store records each state change in `auth_events` (`locked`, `unlocked`, `log
 | Replay | A step is accepted once: `last_used_step` must increase |
 | Enrollment | Needs the password. If TOTP is already on, also needs a recent code. The pending seed expires after 10 minutes and belongs to the enrolling session |
 | Activation | Needs the first valid code. Returns 10 recovery codes once. Signs out every other session |
-| Recovery codes | 10 codes of 32 hex characters, stored as hashes. Each code works once. Regenerating replaces all 10 |
+| Recovery codes | 10 codes of 32 hex characters, stored as hashes. Each code works once. Regenerating replaces all 10 and needs a step-up (below) |
 | Failure throttle (sign-in and activation) | After 5 failures, the user is blocked for 5 minutes. Each later block doubles, up to 24 hours. Answer: `429 AUTH_RATE_LIMITED` with `Retry-After` |
 | Storage | Seeds sealed with the master key; `auth_totp`, `auth_recovery_codes`, `auth_throttle` |
-| Disable | Needs a recent code. Signs out every other session |
+| Disable | Needs a step-up (below). Signs out every other session |
 | Platform mode | Not supported. Enrollment answers `409 MFA_PLATFORM_UNSUPPORTED`. If a user already has TOTP on, startup fails |
+
+**Step-up for disabling TOTP and replacing recovery codes.** These two actions weaken the second
+factor, so a recent code is not enough. `stepUp` in `mfa.routes.ts` runs these checks in order:
+
+1. TOTP is on. Otherwise: `409 MFA_DISABLED`.
+2. The body has the account password (`password`). Otherwise: `403 AUTH_INVALID_CREDENTIALS`.
+3. The session has a recent code (`requireRecentMfa`). Otherwise: `403 MFA_REAUTH_REQUIRED`.
+4. The body has a new authenticator code (`code`). A recovery code is not accepted. The code goes
+   through the same replay guard and per-session attempt counter as `POST /mfa/reauth`. If it is the
+   fifth wrong code, the session is revoked.
 
 **Lost authenticator.** Stop the server, then run `remotecli reset-totp` on the host. The command
 turns TOTP off for every user, deletes recovery codes and throttle rows, and revokes every browser
@@ -204,7 +214,8 @@ routes and are not listed.
 | `POST /mfa/enroll` | Session, password | Pending seed, `otpauth` URI, expiry |
 | `POST /mfa/activate` | Session | `{ code }`; returns recovery codes |
 | `POST /mfa/reauth` | Session | `{ code }`; refreshes the ten-minute window |
-| `POST /mfa/disable`, `POST /mfa/recovery-codes` | Session, recent code | Turns TOTP off; replaces recovery codes |
+| `POST /mfa/disable` | Session, TOTP on, recent code | `{ password, code }`: the password and a new authenticator code. Turns TOTP off |
+| `POST /mfa/recovery-codes` | Session, TOTP on, recent code | `{ password, code }`: the password and a new authenticator code. Returns 10 new recovery codes |
 | `POST /password` | Session, password, recent code | Changes the password (12 characters to 72 bytes); signs out other sessions |
 
 ---
@@ -219,6 +230,7 @@ routes and are not listed.
 | `src/modules/auth/QuickSessionLockButton.tsx` | Header button that calls `POST /lock`. The server locks the session; the UI follows |
 | `src/modules/settings/tabs/SessionsSettingsTab.tsx` | Settings → Sessions: signed-in browsers, sign out one or all |
 | `src/modules/settings/tabs/TotpSettings.tsx`, `SessionLockSettings.tsx` | Set up, replace or disable TOTP; recovery codes; idle hours and automatic lock |
+| `src/modules/settings/tabs/TotpStepUpDialog.tsx` | Asks for the password and a new authenticator code before TOTP is disabled or recovery codes are replaced |
 
 ---
 
