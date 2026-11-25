@@ -44,6 +44,7 @@
   "htmlPreview": {
     "untrustedLocal": "Nedůvěryhodný obsah. Skripty souboru běží v izolovaném rámci bez sítě a bez přístupu k této aplikaci. Odkazované soubory (CDN, jiné soubory projektu) se nenačtou.",
     "untrustedRemote": "Nedůvěryhodný obsah. Skripty v souboru se ve vzdálené kartě nespouštějí.",
+    "untrustedRemoteIsolated": "Nedůvěryhodný obsah z hostitele Remote. Skripty souboru běží v izolovaném rámci bez sítě a bez přístupu k této aplikaci. Odkazované soubory (CDN, jiné soubory projektu) se nenačtou.",
     "unsavedChanges": "Zobrazuje se uložený soubor. Uložte, abyste viděli neuložené změny.",
     "scriptsDisabled": "Nedůvěryhodný obsah. Skripty v souboru se zde nespouštějí.",
     "tooLarge": "Soubor je větší než 10 MB, proto se jeho skripty nespouštějí."

@@ -235,8 +235,9 @@ const fileContentPath = (projectId: string, filePath: string) =>
   `/api/file-tree/projects/${projectId}/files/content${query({ path: filePath })}`;
 
 /**
- * The Local HTML preview page of a saved `.html`/`.htm` file. The preview iframe loads it by `src` (the
- * server answers it with a sandbox policy), so it is a plain same-origin path, never a Remote tab URL.
+ * The HTML preview page of a saved `.html`/`.htm` file. The preview iframe loads it by `src` (the server
+ * answers it with a sandbox policy), so it is a plain same-origin path; a Remote tab adds its `/r/<peerId>`
+ * prefix with `httpUrl` before it is used as a `src`.
  */
 export const htmlPreviewPath = (projectId: string, filePath: string) =>
   `/api/file-tree/projects/${encodeURIComponent(projectId)}/files/html-preview${query({ path: filePath })}`;

@@ -42,6 +42,7 @@
   "htmlPreview": {
     "untrustedLocal": "Nicht vertrauenswürdiger Inhalt. Die Skripte der Datei laufen in einem isolierten Rahmen ohne Netzwerk und ohne Zugriff auf diese App. Verlinkte Dateien (CDN, andere Projektdateien) werden nicht geladen.",
     "untrustedRemote": "Nicht vertrauenswürdiger Inhalt. Skripte in der Datei laufen in einem Remote-Tab nicht.",
+    "untrustedRemoteIsolated": "Nicht vertrauenswürdiger Inhalt vom Remote-Host. Die Skripte der Datei laufen in einem isolierten Rahmen ohne Netzwerk und ohne Zugriff auf diese App. Verlinkte Dateien (CDN, andere Projektdateien) werden nicht geladen.",
     "unsavedChanges": "Angezeigt wird die gespeicherte Datei. Speichern Sie, um ungespeicherte Änderungen zu sehen.",
     "scriptsDisabled": "Nicht vertrauenswürdiger Inhalt. Skripte in der Datei laufen hier nicht.",
     "tooLarge": "Die Datei ist größer als 10 MB, daher laufen ihre Skripte nicht."
