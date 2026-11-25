@@ -16,17 +16,20 @@ import { authenticateToken } from '../auth.middleware.js';
 import { createApiSessionGuard } from '../services/api-session-guard.service.js';
 import { getSessionRuntime } from '../services/session-runtime.service.js';
 
+import { testLoginPhrase } from './test-login.js';
 import { withIsolatedAuthDatabase } from './with-isolated-auth-database.js';
 
 const bcrypt = createRequire(import.meta.url)('bcryptjs');
-const password = 'synthetic-owner-password';
+const phrase = testLoginPhrase('owner');
+const otherPhrase = testLoginPhrase('owner-new');
+const wrongPhrase = testLoginPhrase('wrong');
 const otp = (secret: string) => new TOTP({ secret }).generate({ timestamp: Date.now() });
 async function fixture(run: (base: string) => Promise<void>) {
   const old = process.env.REMOTECLI_MASTER_KEY;
   try {
     process.env.REMOTECLI_MASTER_KEY = randomBytes(32).toString('base64');
     await withIsolatedAuthDatabase(async (user) => {
-      getConnection().prepare('UPDATE users SET password_hash=? WHERE id=?').run(await bcrypt.hash(password, 4), user.id);
+      getConnection().prepare('UPDATE users SET password_hash=? WHERE id=?').run(await bcrypt.hash(phrase, 4), user.id);
       const app = express();
       app.use('/api', createApiSessionGuard(authenticateToken)); app.use(express.json());
       app.use('/api/auth', authRoutes);
@@ -54,11 +57,11 @@ function request(base: string, path: string, body?: unknown, cookie?: string, me
 }
 const cookieOf = (response: Response) => response.headers.get('set-cookie')?.split(';', 1)[0];
 async function login(base: string) {
-  const response = await request(base, '/auth/login', { username: 'alice', password });
+  const response = await request(base, '/auth/login', { username: 'alice', password: phrase });
   assert.equal(response.status, 200); return response;
 }
 async function enroll(base: string, cookie: string) {
-  const response = await request(base, '/auth/mfa/enroll', { password }, cookie);
+  const response = await request(base, '/auth/mfa/enroll', { password: phrase }, cookie);
   assert.equal(response.status, 200);
   const enrollment = await response.json();
   const activation = await request(base, '/auth/mfa/activate', { code: otp(enrollment.secret) }, cookie);
@@ -102,7 +105,7 @@ test('C-09/K-10: sensitive operations require reauthentication at ten minutes; a
   t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
   await fixture(async base => {
     const a = cookieOf(await login(base))!;
-    assert.equal((await request(base, '/auth/mfa/enroll', { password: 'wrong' }, a)).status, 403);
+    assert.equal((await request(base, '/auth/mfa/enroll', { password: wrongPhrase }, a)).status, 403);
     const e = await enroll(base, a);
     t.mock.timers.tick(599_999);
     assert.equal((await request(base, '/settings/api-keys', {}, a)).status, 200);
@@ -123,17 +126,18 @@ test('T-08/T-10/K-24: password change and disabling MFA preserve this session an
     const a = cookieOf(await login(base))!; const e = await enroll(base, a); t.mock.timers.tick(30_000);
     const challenge = await (await login(base)).json();
     const b = cookieOf(await request(base, '/auth/mfa/verify', { challenge: challenge.challenge, code: otp(e.secret) }))!;
-    const changed = await request(base, '/auth/password', { password, newPassword: 'synthetic-new-owner-password' }, a);
+    const changed = await request(base, '/auth/password', { password: phrase, newPassword: otherPhrase }, a);
     assert.equal(changed.status, 200);
     assert.equal((await request(base, '/private', undefined, a)).status, 200);
     assert.equal((await request(base, '/private', undefined, b)).status, 401);
     const { store } = getSessionRuntime();
     const other = store.create(1, '', Date.now());
     getConnection().prepare('UPDATE auth_sessions SET locked_at=1 WHERE id=?').run(other.session.id);
-    assert.equal((await request(base, '/auth/mfa/disable', {}, a)).status, 200);
+    t.mock.timers.tick(30_000);
+    assert.equal((await request(base, '/auth/mfa/disable', { password: otherPhrase, code: otp(e.secret) }, a)).status, 200);
     assert.equal(store.authenticate(other.secret), null);
     assert.equal((await request(base, '/private', undefined, a)).status, 200);
-    const newLogin = await request(base, '/auth/login', { username: 'alice', password: 'synthetic-new-owner-password' });
+    const newLogin = await request(base, '/auth/login', { username: 'alice', password: otherPhrase });
     assert.ok(cookieOf(newLogin));
   });
 });
@@ -151,7 +155,7 @@ test('G-04/L-02/L-09/L-11: locked cookie can only inspect, unlock with TOTP, or 
     assert.equal(locked.status, 200, 'lock response must survive closing the other transports');
     assert.equal(cookieOf(locked), undefined, 'locking does not replace or clear the cookie');
     for (const [path, body] of [
-      ['/private', undefined], ['/auth/user', undefined], ['/auth/login', { username: 'alice', password }],
+      ['/private', undefined], ['/auth/user', undefined], ['/auth/login', { username: 'alice', password: phrase }],
       ['/auth/mfa/verify', { challenge: 'fake', code: '000000' }], ['/auth/auto-lock', { enabled: false }],
     ] as const) {
       const response = await request(base, path, body, cookie, path === '/auth/auto-lock' ? 'PUT' : body === undefined ? 'GET' : 'POST');
@@ -278,5 +282,88 @@ test('TH-02: fifth reauth response survives revoking its own HTTP connection', a
     for(let n=0;n<4;n++) assert.equal((await request(base,'/auth/mfa/reauth',{code:'bad'},a)).status,403);
     const last=await request(base,'/auth/mfa/reauth',{code:'bad'},a);
     assert.equal(last.status,401);assert.equal(last.headers.get('X-Auth-Error'),'mfa-attempts-exceeded');
+  });
+});
+
+
+const totpRow = () => getConnection().prepare('SELECT enabled, seed_sealed, last_used_step FROM auth_totp WHERE user_id = 1').get() as { enabled: number; seed_sealed: Buffer | null };
+const recoveryRows = () => getConnection().prepare('SELECT code_hash FROM auth_recovery_codes WHERE user_id = 1 ORDER BY code_hash').all();
+
+for (const path of ['/auth/mfa/recovery-codes', '/auth/mfa/disable'] as const) {
+  test(`MR-01/MR-02/MR-04/MR-07: ${path} needs the password, a recent verification and a new authenticator code`, async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+    await fixture(async base => {
+      const cookie = cookieOf(await login(base))!; const e = await enroll(base, cookie);
+      const before = { totp: totpRow(), codes: recoveryRows() };
+      const unchanged = () => { assert.deepEqual(totpRow().enabled, 1); assert.deepEqual(recoveryRows(), before.codes); };
+      t.mock.timers.tick(30_000);
+      const refuse = async (body: unknown, code: string) => {
+        const response = await request(base, path, body, cookie);
+        assert.equal(response.status, 403, JSON.stringify(body)); assert.equal((await response.json()).code, code); unchanged();
+      };
+      // (a) missing or wrong password, even with a valid code; the code is not consumed.
+      await refuse({ code: otp(e.secret) }, 'AUTH_INVALID_CREDENTIALS');
+      await refuse({ password: wrongPhrase, code: otp(e.secret) }, 'AUTH_INVALID_CREDENTIALS');
+      // (b) missing or wrong code.
+      await refuse({ password: phrase }, 'MFA_CODE_INVALID');
+      await refuse({ password: phrase, code: '000000' }, 'MFA_CODE_INVALID');
+      // (f) a recovery code is not an authenticator code.
+      await refuse({ password: phrase, code: e.recoveryCodes[0] }, 'MFA_CODE_INVALID');
+      // (c) a code already used by /mfa/reauth in this step is a replay.
+      t.mock.timers.tick(30_000);
+      const used = otp(e.secret);
+      assert.equal((await request(base, '/auth/mfa/reauth', { code: used }, cookie)).status, 200);
+      await refuse({ password: phrase, code: used }, 'MFA_CODE_INVALID');
+      // (d) outside the ten-minute window, before the code is checked.
+      t.mock.timers.tick(600_000);
+      await refuse({ password: phrase, code: otp(e.secret) }, 'MFA_REAUTH_REQUIRED');
+      assert.equal((await request(base, '/auth/mfa/reauth', { code: otp(e.secret) }, cookie)).status, 200);
+      // (g)/(h) all three conditions met.
+      t.mock.timers.tick(30_000);
+      const response = await request(base, path, { password: phrase, code: otp(e.secret) }, cookie);
+      assert.equal(response.status, 200);
+      if (path === '/auth/mfa/recovery-codes') {
+        const { recoveryCodes } = await response.json() as { recoveryCodes: string[] };
+        assert.equal(recoveryCodes.length, 10);
+        assert.notDeepEqual(recoveryRows(), before.codes);
+        t.mock.timers.tick(30_000);
+        const old = await request(base, '/auth/mfa/verify', { challenge: (await (await login(base)).json()).challenge, code: e.recoveryCodes[1], recovery: true });
+        assert.equal(old.status, 403, 'an old recovery code no longer signs in');
+        const fresh = await request(base, '/auth/mfa/verify', { challenge: (await (await login(base)).json()).challenge, code: recoveryCodes[0], recovery: true });
+        assert.equal(fresh.status, 200);
+      } else {
+        assert.deepEqual(await response.json(), { enabled: false });
+        assert.equal(totpRow().enabled, 0); assert.equal(totpRow().seed_sealed, null); assert.equal(recoveryRows().length, 0);
+      }
+    });
+  });
+
+  test(`MR-03/MR-07: ${path} refuses a session signed in with a recovery code`, async t => {
+    t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+    await fixture(async base => {
+      const e = await enroll(base, cookieOf(await login(base))!);
+      const challenge = (await (await login(base)).json()).challenge;
+      const recovered = cookieOf(await request(base, '/auth/mfa/verify', { challenge, code: e.recoveryCodes[0], recovery: true }))!;
+      t.mock.timers.tick(30_000);
+      const response = await request(base, path, { password: phrase, code: otp(e.secret) }, recovered);
+      assert.equal(response.status, 403); assert.equal((await response.json()).code, 'MFA_REAUTH_REQUIRED');
+      assert.equal(totpRow().enabled, 1);
+    });
+  });
+}
+
+test('MR-04: wrong codes on a weakening action share the session attempt limit and end the session', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const cookie = cookieOf(await login(base))!; await enroll(base, cookie);
+    for (let n = 1; n <= 4; n++) {
+      const response = await request(base, n % 2 ? '/auth/mfa/disable' : '/auth/mfa/recovery-codes', { password: phrase, code: '000000' }, cookie);
+      assert.equal(response.status, 403); assert.equal((await response.json()).details.attemptsRemaining, 5 - n);
+    }
+    const last = await request(base, '/auth/mfa/disable', { password: phrase, code: '000000' }, cookie);
+    assert.equal(last.status, 401); assert.equal((await last.json()).code, 'MFA_SESSION_REVOKED');
+    assert.equal(last.headers.get('X-Auth-Error'), 'mfa-attempts-exceeded');
+    assert.equal((await request(base, '/private', undefined, cookie)).status, 401);
+    assert.equal(totpRow().enabled, 1);
   });
 });
