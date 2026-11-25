@@ -34,3 +34,8 @@ export { resetTotp } from './services/reset-totp.service.js';
 
 export { requireRecentMfa } from './services/mfa-runtime.service.js';
 export type { AuthSession } from './services/session-store.service.js';
+
+// authenticatePreviewFrame: used by the Remote Controller proxy for the one request it accepts with the session cookie
+// (the browser loading the HTML preview page into a frame); every other `/r` route keeps the tab token.
+export { authenticatePreviewFrame } from './services/preview-frame-auth.service.js';
+export type { PreviewFrameAuth } from './services/preview-frame-auth.service.js';
