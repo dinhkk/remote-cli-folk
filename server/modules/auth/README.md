@@ -1,14 +1,15 @@
 # Auth Module
 
-This guide covers four parts of the auth module:
+This guide covers five parts of the auth module:
 
 1. Browser sessions carried in an `HttpOnly` cookie, with expiry, revocation and an idle lock
 2. Optional second factor: TOTP authenticator codes plus single-use recovery codes
 3. The session lock
 4. The request guard in front of every `/api` router
+5. The one Remote proxy request that the session cookie authenticates: the HTML preview frame load
 
 Password sign-in, the login limiter, `TRUST_PROXY`, `REMOTECLI_SETUP_TOKEN`, `API_KEY` and the Remote
-tab tokens are older parts of the module. This guide names them only where the four parts above use
+tab tokens are older parts of the module. This guide names them only where the five parts above use
 them.
 
 It is structured like the other backend modules: **small services** under `services/`, two route
@@ -55,6 +56,7 @@ symbol has moved, grep for it.
 | `isSessionOriginAllowed`, `readAuthTransportConfig` | The websocket upgrade check |
 | `assertAuthModeCompatible` | Startup: platform mode refuses to run while any user has TOTP enabled |
 | `requireRecentMfa` | Other modules guarding a sensitive action |
+| `authenticatePreviewFrame`, `PreviewFrameAuth` (type) | The Remote Controller proxy: the one request it authenticates with the session cookie, see [The Remote preview frame load](#the-remote-preview-frame-load) |
 | `secretsMatch` | Constant-time comparison of two secrets |
 | `resetTotp` | The `remotecli reset-totp` CLI command only |
 | `AuthSession` (type) | Code that reads `req.authSession` |
@@ -72,6 +74,7 @@ symbol has moved, grep for it.
 | `auth.middleware.ts` | `authenticateToken` (loopback bearer, platform mode, or session cookie), `authenticateWebSocket`, `validateApiKey` |
 | `services/session-transport.service.ts` | Cookie names and attributes, the request header, origin rules, `readAuthTransportConfig` |
 | `services/api-session-guard.service.ts` | The `/api` guard: header and origin, content type, locked sessions, sensitive actions |
+| `services/preview-frame-auth.service.ts` | `authenticatePreviewFrame`: cookie authentication of the HTML preview frame load for the Remote Controller proxy |
 | `services/session-store.service.ts` | The `auth_sessions` table and its policy: create, authenticate, touch, lock, unlock, revoke, expire, idle hours |
 | `services/session-runtime.service.ts` | One store per database plus the per-session connection registry; the one-second expiry timer |
 | `services/session-lock-policy.service.ts` | `isLockedSessionRouteAllowed`: the four routes a locked session may still call |
@@ -138,6 +141,26 @@ present. For that request, the guard skips only the header check.
 explicit origins. If a request arrives on a loopback address and `TRUST_PROXY` is unset, the guard
 also accepts the Vite dev server origin (`http://localhost:<VITE_PORT>`). If an entry is a wildcard
 or is malformed, the server stops at startup.
+
+---
+
+## The Remote preview frame load
+
+The Remote Controller proxy (`/r/<peerId>/**` in `server/modules/remote`) authenticates every request with a tab token in the
+`Authorization` header. One request cannot carry a header: the browser loading the HTML preview page into an `iframe`.
+`authenticatePreviewFrame` in `services/preview-frame-auth.service.ts` authenticates that request with the session cookie.
+
+| Step | Rule | Answer if it fails |
+| --- | --- | --- |
+| 1 | `isHtmlPreviewDocumentRequest` matches: the method is `GET`, the path is exactly `/api/file-tree/projects/<id>/files/html-preview`, all three Fetch Metadata headers are `same-origin`, `navigate`, `iframe`, and `Origin` is absent or the server's own | The function returns `null` and the proxy keeps its tab token path |
+| 2 | The request has no `Authorization` header | `401 AUTH_TOKEN_INVALID` |
+| 3 | The cookie names a session that exists, has not expired and has not been revoked | `401 AUTH_TOKEN_INVALID` |
+| 4 | The account of the session still exists | `401 AUTH_TOKEN_INVALID` |
+| 5 | The session is not locked | `423 AUTH_SESSION_LOCKED` |
+
+The function reads the cookie only. It reads nothing from the URL and sets no cookie.
+After step 5 the proxy registers the response with `createSessionConnections`, so a lock, a revoke or a sign-out closes the response.
+A locked session cannot use this exception: step 5 refuses it.
 
 ---
 
@@ -260,6 +283,9 @@ outside loopback, the server logs a warning.
   paths. A locked screen can reach every entry. Add a route only if the lock screen calls it.
 - **Register every new multipart upload route in `MULTIPART_UPLOAD_ROUTES`.** If you skip it, the
   route answers `415`.
+- **Keep the preview frame exception to one request.** `authenticatePreviewFrame` reuses
+  `isHtmlPreviewDocumentRequest`, the predicate of the Local preview page. If you change that predicate,
+  both the Local guard and the Remote proxy change with it.
 
 ---
 
