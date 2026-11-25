@@ -3,6 +3,16 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.2.0-beta](https://github.com/tunghuynh/remote-cli/compare/v1.1.0...v1.2.0-beta) (2026-11-25)
+
+### New Features
+
+* **agent-profiles:** agent orchestration, agent monitor, models settings and message times ([be26ec8](https://github.com/tunghuynh/remote-cli/commit/be26ec809cec5c303da848e89737cac00e24ffba))
+
+### Maintenance
+
+* **video:** remove the promo video generator and its rendered assets ([f54338e](https://github.com/tunghuynh/remote-cli/commit/f54338e26f7e8f435db0646747e37692eee1f679))
+
 ## [1.1.0](https://github.com/tunghuynh/remote-cli/compare/v1.0.12...v1.1.0) (2026-11-25)
 
 ### New Features
