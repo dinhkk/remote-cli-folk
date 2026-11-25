@@ -8,6 +8,8 @@ import type {
 } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
+import { HTML_PREVIEW_CSP } from './html-preview-csp.js';
+
 type FileTreeUploadLimits = {
   maximumFileSizeMegabytes: number;
   maximumFileCount: number;
@@ -16,23 +18,6 @@ type FileTreeUploadLimits = {
 type UploadedRequest = Request & {
   files?: Express.Multer.File[];
 };
-
-/**
- * Policy of the HTML preview document: a sandbox without `allow-same-origin` (opaque origin: no cookie, no
- * storage, no access to the app), inline script and style only, no network source of any kind.
- */
-const HTML_PREVIEW_CSP = [
-  'sandbox allow-scripts',
-  "default-src 'none'",
-  "script-src 'unsafe-inline'",
-  "style-src 'unsafe-inline'",
-  'img-src data: blob:',
-  'font-src data:',
-  'media-src data: blob:',
-  "form-action 'none'",
-  "base-uri 'none'",
-  "frame-ancestors 'self'",
-].join('; ');
 
 /** Largest file the HTML preview page serves: a document loaded into a frame, not a download. */
 const HTML_PREVIEW_MAXIMUM_BYTES = 10 * 1024 * 1024;
