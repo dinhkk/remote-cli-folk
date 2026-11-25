@@ -180,28 +180,3 @@ export function findNodeInTree(nodes: AgentTreeNode[], id: string): AgentTreeNod
   }
   return null;
 }
-
-export function countTreeStats(nodes: AgentTreeNode[]) {
-  let totalTasks = 0;
-  let running = 0;
-  let completed = 0;
-  let failed = 0;
-  let stopped = 0;
-  let totalActivities = 0;
-
-  function traverse(node: AgentTreeNode) {
-    if (node.type === 'subagent' || node.type === 'workflow' || node.type === 'background_task') {
-      totalTasks++;
-      if (node.status === 'running') running++;
-      else if (node.status === 'completed') completed++;
-      else if (node.status === 'failed') failed++;
-      else if (node.status === 'stopped') stopped++;
-    } else if (node.type === 'activity') {
-      totalActivities++;
-    }
-    node.children.forEach(traverse);
-  }
-
-  nodes.forEach(traverse);
-  return { totalTasks, running, completed, failed, stopped, totalActivities };
-}

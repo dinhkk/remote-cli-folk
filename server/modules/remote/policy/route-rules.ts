@@ -45,6 +45,11 @@ export const REMOTE_DENY_RULES: readonly RouteRule[] = [
   { pattern: '/api/settings/**', note: 'API keys, stored credentials, push subscriptions: Host administration with secrets' },
   { pattern: '/api/notifications/**', note: 'notification endpoints of the Host user' },
   { pattern: '/api/plugins/**', note: 'plugin install/update/RPC run code on the Host outside the UI contract' },
+  // One rule per collection, not `/api/agent-profiles/**`: a deny rule beats every allow rule, and `GET /scope-options` must stay reachable.
+  { pattern: '/api/agent-profiles/templates/**', note: 'agent templates carry the prompts agents run with: managed on the Host only' },
+  { pattern: '/api/agent-profiles/generate/**', note: 'Generate writes agent files into a project folder or ~/.claude/agents and reads the values remembered per folder: managed on the Host only' },
+  { pattern: '/api/agent-profiles/claude-agents/**', note: 'lists Claude agents with their prompts and edits the hide list: Host configuration' },
+  { pattern: '/api/agent-profiles/memory-blocks/**', note: 'memory blocks are text agents read and write across chats (an agent may have written anything into one): listing and editing them is Host-only, so a Controller can neither read nor plant that content through the API' },
   { pattern: '/plugin-ws/**', note: 'plugin WebSocket proxy' },
   { pattern: '/desktop-notifications', note: 'desktop notification socket of the Host' },
   { pattern: '/api/system/**', note: 'self-update of the Host installation' },
@@ -177,6 +182,10 @@ export const REMOTE_ALLOW_RULES: ReadonlyArray<RouteRule & { methods: readonly s
   allow('GET', '/api/providers/sessions/*/messages', PROVIDER_SESSIONS),
   allow('GET', '/api/providers/sessions/*/workflows/*/agents/*', PROVIDER_SESSIONS),
   allow('GET', '/api/providers/search/sessions', 'conversation search (SSE)'),
+  allow('GET', '/api/agent-profiles/scope-options', 'scope picker of a new chat: the sidebar project id (`?projectId=`, the same id `GET /api/projects` returns) in, the main agent names of that project and of ~/.claude/agents out (name, project/user source, orchestrator flag, the group label of the generating template if any); the folder is resolved on the Host, never a directory, path, description, prompt or value in the answer'),
+  allow('GET', '/api/agent-monitor/snapshot', 'read-only live picture of every Claude session on the Host (app chats and terminal sessions), grouped by project. It NAMES Host folders, session names, process names and CPU/RAM to every paired Controller: an explicit owner decision (a phone must be able to monitor everything). Reads only (the only monitor route that changes anything is POST /kill below); each call also keeps the Host sampler and transcript reading alive for a few seconds'),
+  allow('GET', '/api/agent-monitor/summary', 'the header badge numbers (running sessions, waiting sessions, running projects): counts only, no names, starts no sampler'),
+  allow('POST', '/api/agent-monitor/kill', 'stops one agent or KILLS OS processes of a Claude session on the Host (the main node, a process group, or the whole tree). It changes the Host, but within the full-trust a Controller already has (it holds a shell as the Host user): it grants nothing new. The body names a session and a node, never a pid; the server checks the node against its own picture and the process against the CLI registry. Every call through the bridge leaves one `host-write` audit row (node, mode, HTTP outcome)'),
 
   allow('GET', '/api/user/drafts', 'chat drafts'),
   allow('PUT', '/api/user/drafts', 'chat drafts'),

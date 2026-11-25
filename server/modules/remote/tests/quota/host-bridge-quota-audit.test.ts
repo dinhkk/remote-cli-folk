@@ -226,6 +226,18 @@ test('git writes, a clone (with a note when a stored GitHub token is spent, neve
   });
 });
 
+test('a kill through the bridge leaves one host-write row with the node and mode and the HTTP outcome; a monitor read leaves none', async () => {
+  await withBridge(async ({ loop, events }) => {
+    await callThroughBridge(loop, { method: 'POST', path: '/api/agent-monitor/kill', ...json({ sessionId: 's1', nodeId: 'orch:s1', mode: 'kill' }) });
+    await callThroughBridge(loop, { method: 'GET', path: '/api/agent-monitor/snapshot' });
+    const rows = events.filter((event) => event.event === 'host-write');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].target, 'POST /api/agent-monitor/kill');
+    assert.equal(rows[0].result, 'error', 'the fake Host answers 404, which is an outcome the row reports');
+    assert.deepEqual(rows[0].detail, { status: 404, node: 'orch:s1', mode: 'kill', session: 's1' });
+  });
+});
+
 test('a flood of policy denials beyond the report rate limit is counted for the auto-disconnect', async () => {
   const forbidden = Array.from({ length: 8 }, () => ({ path: '/api/auth/logout-all' }));
   await withBridge(

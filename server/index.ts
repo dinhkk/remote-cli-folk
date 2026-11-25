@@ -49,6 +49,8 @@ import {
     startEnabledPluginServers,
     stopAllPlugins,
 } from './modules/plugins/index.js';
+import { agentProfilesRoutes } from './modules/agent-profiles/index.js';
+import { agentMonitorRoutes, stopAgentMonitor } from './modules/agent-monitor/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
 import {
@@ -228,6 +230,12 @@ app.use('/api/user', authenticateToken, userRoutes);
 
 // Plugins API Routes (protected)
 app.use('/api/plugins', authenticateToken, pluginsSwitch, pluginsRoutes);
+
+// Agent profiles: templates, projects, agents, Claude agent listing (protected)
+app.use('/api/agent-profiles', authenticateToken, agentProfilesRoutes);
+
+// Agent monitor: live picture of the agents and the CPU/RAM of their sessions, plus POST /kill (protected; a Remote controller may use both, the bridge audits the kill)
+app.use('/api/agent-monitor', authenticateToken, agentMonitorRoutes);
 
 // Browser MCP bridge API (local token protected)
 app.use('/api/browser-use-mcp', browserUseMcpRoutes);
@@ -464,6 +472,7 @@ async function startServer() {
         const shutdownRuntimeServices = async () => {
             stopSessionExpiry();
             remote.stop();
+            stopAgentMonitor();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

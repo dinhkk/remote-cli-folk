@@ -1,4 +1,4 @@
-import { Bell, Bot, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, Radio } from 'lucide-react';
+import { Bell, Bot, Cpu, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Network, Palette, Puzzle, Radio } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
@@ -19,6 +19,8 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'agents', labelKey: 'mainTabs.agents', icon: Bot },
+  { id: 'agentProfiles', labelKey: 'mainTabs.agentProfiles', icon: Network },
+  { id: 'models', labelKey: 'mainTabs.models', icon: Cpu },
   { id: 'appearance', labelKey: 'mainTabs.appearance', icon: Palette },
   { id: 'git', labelKey: 'mainTabs.git', icon: GitBranch },
   { id: 'api', labelKey: 'mainTabs.apiTokens', icon: Key },
@@ -35,8 +37,9 @@ const NAV_ITEMS: NavItem[] = [
 /** Rendered by Settings to switch between the settings dialog's main sections. */
 export default function SettingsSidebar({ activeTab, onChange }: SettingsSidebarProps) {
   const { t } = useTranslation('settings');
-  // A Remote tab frame has no management API (it is the Host's app, not the Controller page), so it offers no Remote work entry.
-  const navItems = isTargetMode() ? NAV_ITEMS.filter((item) => item.id !== 'remote' && item.id !== 'sessions') : NAV_ITEMS;
+  // A Remote tab frame has no management API (it is the Host's app, not the Controller page), so it offers no Remote work entry;
+  // Agent Profiles management and the Agent Monitor are Host-only for the same reason (the Host denies those routes to a Remote tab).
+  const navItems = isTargetMode() ? NAV_ITEMS.filter((item) => item.id !== 'remote' && item.id !== 'sessions' && item.id !== 'agentProfiles') : NAV_ITEMS;
 
   return (
     <>

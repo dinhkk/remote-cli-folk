@@ -142,6 +142,11 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- normally. Informational only: a fork is a fully independent provider
     -- session, and deleting the source does not affect it.
     forked_from_session_id TEXT,
+    -- Agent-profile scope of a session opened with one: the profile Project id
+    -- (NULL for the "no project" scope) and the frozen JSON snapshot of the
+    -- orchestrator + agents it runs with. Both NULL for a plain chat.
+    agent_scope_project_id TEXT,
+    agent_profile_snapshot TEXT,
     isArchived BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

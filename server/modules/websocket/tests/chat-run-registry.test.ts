@@ -311,3 +311,35 @@ test('startRun rejects a second concurrent run for the same session', async () =
     assert.ok(third);
   });
 });
+
+test('observers hear a run start and every live event with the app id and seq, and a throwing observer cannot disturb the run', async () => {
+  await withIsolatedDatabase(() => {
+    sessionsDb.createAppSession('app-run-7', 'claude', '/workspace/demo');
+    const connection = new FakeConnection();
+    const heard: Array<{ type: string; kind?: string; sessionId?: string; seq?: number }> = [];
+    const remove = chatRunRegistry.addObserver((event) => {
+      heard.push(event.type === 'message'
+        ? { type: event.type, kind: event.message.kind, sessionId: event.message.sessionId, seq: event.message.seq }
+        : { type: event.type });
+    });
+    const removeBroken = chatRunRegistry.addObserver(() => { throw new Error('observer bug'); });
+
+    const run = chatRunRegistry.startRun({ appSessionId: 'app-run-7', provider: 'claude', providerSessionId: null, connection, userId: null });
+    assert.ok(run);
+    run.writer.send({ id: 'e1', sessionId: 'provider-native', timestamp: '', provider: 'claude', kind: 'text', role: 'assistant', content: 'hi' });
+    chatRunRegistry.completeRun('app-run-7', { exitCode: 0 });
+
+    assert.deepEqual(heard, [
+      { type: 'run-started' },
+      { type: 'message', kind: 'text', sessionId: 'app-run-7', seq: 1 },
+      { type: 'message', kind: 'complete', sessionId: 'app-run-7', seq: 2 },
+    ]);
+    assert.equal(connection.frames.length, 2, 'the sockets still got both events');
+
+    remove();
+    removeBroken();
+    sessionsDb.createAppSession('app-run-8', 'claude', '/workspace/demo');
+    chatRunRegistry.startRun({ appSessionId: 'app-run-8', provider: 'claude', providerSessionId: null, connection, userId: null });
+    assert.equal(heard.length, 3, 'a removed observer hears nothing more');
+  });
+});

@@ -79,6 +79,12 @@ describe('the tab mirror of the Host deny list', () => {
       '/api/user/git-config',
       '/api/user/preferences',
       '/api/providers/mcp/servers/global',
+      '/api/agent-profiles/templates',
+      '/api/agent-profiles/generate',
+      '/api/agent-profiles/generate/values',
+      '/api/agent-profiles/claude-agents/hidden',
+      '/api/agent-profiles/memory-blocks',
+      '/api/agent-profiles/memory-blocks/b1',
       '/api/providers/claude/auth/status',
       '/api/providers/claude/cli',
       '/api/providers/claude/cli/update',
@@ -102,6 +108,10 @@ describe('the tab mirror of the Host deny list', () => {
       '/api/projects/p1/sessions',
       '/api/user/drafts',
       '/api/user/onboarding-status',
+      '/api/agent-profiles/scope-options',
+      // The monitor (its snapshot and its kill button) is open to a Remote controller (the owner's decision); its tab mirror must not block it.
+      '/api/agent-monitor/snapshot',
+      '/api/agent-monitor/summary',
       '/api/git/status',
       '/api/file-tree/projects/p1/files',
     ]) {

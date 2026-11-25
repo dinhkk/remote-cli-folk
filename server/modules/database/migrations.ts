@@ -458,6 +458,19 @@ const addSessionEffortColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the agent-profile columns of `sessions`: the scope project id and the frozen
+ * JSON snapshot of the orchestrator + agents a scoped session runs with.
+ *
+ * Both stay NULL for existing rows and for plain chats, which keeps their behavior
+ * exactly as before. Idempotent: each column is only added when missing.
+ */
+const addSessionAgentProfileColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'agent_scope_project_id', 'TEXT');
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'agent_profile_snapshot', 'TEXT');
+};
+
+/**
  * Adds the reasoning-effort metadata columns to the custom-model library.
  *
  * Existing rows stay NULL on purpose: no effort levels were ever declared for
@@ -546,6 +559,7 @@ export const runMigrations = (db: Database) => {
     addSessionModelColumn(db);
     addSessionEffortColumn(db);
     addForkedFromSessionIdColumn(db);
+    addSessionAgentProfileColumns(db);
     addRemotePairingAliasColumn(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);

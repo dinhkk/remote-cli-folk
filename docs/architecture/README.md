@@ -2,8 +2,9 @@
 
 *How a message gets from the composer to a provider CLI and back onto the screen.*
 
-Six documents covering the websocket transport, the realtime stream, conversation
-handoff, the message store and lazy loading, scrolling, and tool views.
+Seven documents covering the websocket transport, the realtime stream, conversation
+handoff, the message store and lazy loading, scrolling, tool views, and agent profiles
+(the team of specialist agents a chat can run with).
 
 These subsystems are hard to read from the source alone, because in every case the
 behaviour lives in the *interaction between files* rather than in any one of them. Each
@@ -48,7 +49,9 @@ one of those two paths disagreeing with the other.
 | 3 | [Conversation handoff](./03-conversation-handoff.md) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
 | 4 | [The message store and lazy loading](./04-message-store-and-lazy-loading.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
 | 5 | [Scrolling](./05-scrolling.md) | Where the view sits, and why five different pieces of code move it. |
-| 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Last, because it needs the message model from 2 and 4. |
+| 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
+| 7 | [Agent profiles and orchestrated chats](./07-agent-profiles.md) | How templates are generated into native `.claude/agents` files, how a chat picks a main agent that the Claude run starts with, and the app-owned memory blocks agents read and write. Last, because it builds on the run model of 2. |
+| 8 | [The agent monitor](./08-agent-monitor.md) | The sidebar's Running tab as a monitoring centre: a Project → Session → Agent tree beside an overview or graph pane, across projects (app and terminal), with agents, tokens and per-session CPU/RAM. Last; builds on 2 and 7. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
@@ -162,6 +165,8 @@ unrelated to the change that caused them.
 | Transcript opens part-way up, or jumps while reading | [5](./05-scrolling.md) |
 | Old messages never load, or loading is slow | [4](./04-message-store-and-lazy-loading.md) |
 | A tool renders wrong, or a group collapses oddly | [6](./06-tool-view.md) |
+| An orchestrated chat delegates to the wrong agent, an edit to an agent file does not show up, a resumed chat lost its main agent, or an agent cannot see or update a memory block | [7](./07-agent-profiles.md) |
+| The agent monitor shows a wrong tree, state, token count or CPU/RAM, or its sampler runs with the screen closed, a terminal session is missing or wrong, the Running tab's tree, focus or graph pane misbehaves | [8](./08-agent-monitor.md) |
 | Nothing arrives at all after a network blip | [1](./01-websocket-transport.md) — reconnect and `lastSeq` |
 
 ---
@@ -174,3 +179,4 @@ how the pieces fit together.
 - `server/modules/websocket/README.md` — the gateway's service map.
 - `server/modules/providers/README.md` — the provider abstraction.
 - `src/modules/chat/tools/README.md` — the tool config registry, from the module's side.
+- `server/modules/agent-profiles/` and `src/modules/agent-profiles/` — the agent-profiles module; its barrel `index.ts` lists what the rest of the app may use.

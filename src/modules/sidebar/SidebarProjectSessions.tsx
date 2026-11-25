@@ -1,6 +1,7 @@
 import { CheckSquare, Plus, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { RunningSessionFrame, RunningTerminalSessions } from '@/modules/agent-monitor';
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider, SidebarSessionSelection } from '@/shared/types';
@@ -218,32 +219,40 @@ export default function SidebarProjectSessions({
         </div>
       ) : (
         <>
+          {/* In the Running tab the frame adds the session's tree (main agent, sub-agents, processes) around the row; elsewhere it is the row itself. */}
           {sessions.map((session) => (
-            <SidebarSessionItem
+            <RunningSessionFrame
               key={session.id}
-              project={project}
-              session={session}
-              selectedSession={selectedSession}
-              isProcessing={isSessionRunning(session)}
-              hasBackgroundWork={backgroundSessionIds.has(session.id)}
-              needsAttention={attentionSessionIds.has(session.id)}
-              currentTime={currentTime}
-              onRenameDraftChange={onRenameDraftChange}
-              isEditing={session.id === sessionRenameId}
-              renameDraft={session.id === sessionRenameId ? sessionRenameDraft : ''}
-              onStartEditingSession={onStartEditingSession}
-              onCancelEditingSession={onCancelEditingSession}
-              onSaveEditingSession={onSaveEditingSession}
-              onProjectSelect={onProjectSelect}
-              onSessionSelect={onSessionSelect}
-              onDeleteSession={onDeleteSession}
-              onForkSession={onForkSession}
-              isSelecting={isSelecting}
-              isChecked={checkedSessionIds.has(session.id)}
-              onToggleSessionSelected={onToggleSessionSelected}
-              t={t}
+              sessionId={session.id}
+              row={(
+                <SidebarSessionItem
+                  project={project}
+                  session={session}
+                  selectedSession={selectedSession}
+                  isProcessing={isSessionRunning(session)}
+                  hasBackgroundWork={backgroundSessionIds.has(session.id)}
+                  needsAttention={attentionSessionIds.has(session.id)}
+                  currentTime={currentTime}
+                  onRenameDraftChange={onRenameDraftChange}
+                  isEditing={session.id === sessionRenameId}
+                  renameDraft={session.id === sessionRenameId ? sessionRenameDraft : ''}
+                  onStartEditingSession={onStartEditingSession}
+                  onCancelEditingSession={onCancelEditingSession}
+                  onSaveEditingSession={onSaveEditingSession}
+                  onProjectSelect={onProjectSelect}
+                  onSessionSelect={onSessionSelect}
+                  onDeleteSession={onDeleteSession}
+                  onForkSession={onForkSession}
+                  isSelecting={isSelecting}
+                  isChecked={checkedSessionIds.has(session.id)}
+                  onToggleSessionSelected={onToggleSessionSelected}
+                  t={t}
+                />
+              )}
             />
           ))}
+
+          <RunningTerminalSessions projectId={project.projectId} />
 
           {hasMoreSessions && (
             <Button

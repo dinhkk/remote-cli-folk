@@ -1,0 +1,135 @@
+{
+  "pane": {
+    "overviewTitle": "Monitoring",
+    "graphTitle": "Graph: {{name}}",
+    "summary": "{{sessions}} running · {{agents}} agents",
+    "sessionGone": "This session is gone."
+  },
+  "agentActivity": {
+    "title": "Activity",
+    "open": "Activity",
+    "back": "Back to the graph",
+    "loading": "Loading the agent's activity…",
+    "notFound": "No recorded activity for this agent.",
+    "error": "Could not load the agent's activity."
+  },
+  "tree": {
+    "terminal": "terminal",
+    "expand": "Expand {{name}}",
+    "collapse": "Collapse {{name}}",
+    "focusSession": "Session {{name}} ({{state}}): show it",
+    "focusMain": "Main agent {{name}} of {{session}}: show it in the graph",
+    "focusAgent": "Agent {{name}} ({{state}}): show it in the graph",
+    "focusProcess": "Processes {{name}}, {{count}} running, {{memory}} of memory: show them in the graph",
+    "tokens": "{{tokens}} tok",
+    "tokensApprox": "~{{tokens}} tok"
+  },
+  "state": {
+    "loading": "Loading…",
+    "error": "Could not load the monitor: {{message}}",
+    "unreachable": "Cannot reach the monitor API. The server may be outdated.",
+    "stale": "Not updating right now. Showing the last picture. {{message}}",
+    "retry": "Try again",
+    "running": "Working",
+    "waiting": "Waiting for permission",
+    "done": "Done",
+    "failed": "Failed",
+    "stopped": "Stopped",
+    "idle": "Idle"
+  },
+  "kpi": {
+    "runningAgents": "Agents working",
+    "tokensPerMinute": "Agent tokens / min",
+    "tokensToday": "Agent tokens today",
+    "sparkline": "{{label}}, last 60 seconds"
+  },
+  "graph": {
+    "title": "Live graph",
+    "empty": "Nothing is running.",
+    "noProject": "no folder",
+    "orchestrator": "orchestrator",
+    "mainAgent": "main agent",
+    "stat": {
+      "elapsed": "Elapsed {{value}}",
+      "cpu": "CPU {{value}}",
+      "memory": "Memory {{value}}",
+      "context": "Context {{value}}",
+      "tokens": "Tokens {{value}}",
+      "tools": "Tool calls {{value}}",
+      "processes": "Processes {{value}}"
+    },
+    "selectSession": "Session {{name}}: show it",
+    "selectMain": "Main agent {{name}}: focus it",
+    "selectAgent": "Agent {{name}} ({{state}}): focus it",
+    "finishedFolded": "+{{count}} finished",
+    "omitted": "{{count}} more agents not shown.",
+    "processCount": "×{{count}}",
+    "processLabel": "Child processes {{name}}: {{count}} running, {{memory}} of memory",
+    "processOther": "other processes",
+    "omittedProcesses": "{{count}} more process groups not shown.",
+    "processes": {
+      "show": "Show child processes",
+      "hide": "Hide child processes"
+    },
+    "kill": {
+      "label": "Stop or kill {{name}}",
+      "confirm": "Stop agent?",
+      "confirmSession": "Kill whole session?",
+      "confirmProcesses": "Kill {{count}} {{name}} processes?",
+      "pending": "Working…",
+      "stopSent": "Stopping…",
+      "killing": "Killing…",
+      "force": "Force kill session",
+      "forceConfirm": "Kill whole session?",
+      "killSession": "Kill session",
+      "result": {
+        "killed": "Killed.",
+        "stopped": "Stop sent: the agent should end shortly.",
+        "gone": "Already gone.",
+        "noHandle": "This agent cannot be stopped on its own: kill the session instead.",
+        "unavailable": "The process could not be found right now. Try again.",
+        "refused": "Not allowed: that is not something the monitor may kill.",
+        "error": "The kill did not work."
+      }
+    },
+    "controls": "Graph view controls",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitView": "Fit the graph to the view",
+    "resetLayout": "Reset layout"
+  },
+  "machine": {
+    "title": "Machine",
+    "memoryOf": "{{used}} / {{total}}",
+    "warnMemory": "Memory over {{limit}}%"
+  },
+  "usage": {
+    "measuring": "Measuring…",
+    "sampleError": "Measurement failed: {{message}}",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "cpuSparkline": "CPU of {{label}}, last 60 seconds",
+    "memorySparkline": "Memory of {{label}}, last 60 seconds",
+    "warnCpu": "CPU over {{limit}}%",
+    "warnMemory": "Memory over {{limit}}",
+    "byAgent": "Tokens by agent",
+    "noTokens": "—"
+  },
+  "detail": {
+    "state": "State",
+    "elapsed": "Elapsed",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "processes": "Processes",
+    "context": "Context",
+    "cache": "Cache hit",
+    "tokens": "Tokens",
+    "tools": "Tool calls",
+    "rate": "Rate",
+    "perSecond": "{{value}} / s",
+    "model": "Model",
+    "tool": "Current tool",
+    "description": "Task",
+    "count": "Processes"
+  }
+}

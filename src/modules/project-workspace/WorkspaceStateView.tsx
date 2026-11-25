@@ -19,6 +19,7 @@ export default function WorkspaceStateView({ mode, isMobile, onMenuClick }: Work
 
   return (
     <div className="flex h-full flex-col">
+      {/* On a phone the sidebar is a drawer, so the menu button must be reachable before any project is open. */}
       {(isMobile || !isLoading) && (
         <div className="pwa-header-safe flex flex-shrink-0 items-center justify-between border-b border-border/50 bg-background/80 p-2 backdrop-blur-sm sm:p-3">
           {isMobile ? <MobileMenuButton onMenuClick={onMenuClick} compact /> : <span />}

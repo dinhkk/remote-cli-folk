@@ -114,7 +114,7 @@ export default function WorkspaceHeader({
             <WorkspaceConnectionStatus />
           </div>
 
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center gap-0.5">
             <WorkspaceTabsDropdown
               activeTab={activeTab}
               setActiveTab={setActiveTab}

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePlugins, PluginIcon } from '@/modules/plugins';
-import { useOptionalProcessingSessions } from '@/shared/context/SessionProtectionContext';
 import { cn } from '@/shared/utils';
 import {
   BASE_TABS,
@@ -14,7 +13,7 @@ import {
 } from '@/modules/project-workspace/workspaceTabsTypes';
 
 /**
- * Mobile-friendly dropdown menu for switching workspace views (Chat, Agents, Shell, Files, Git, etc.).
+ * Mobile-friendly dropdown menu for switching workspace views (Chat, Shell, Files, Git, etc.).
  * Placed on the right side of WorkspaceHeader on mobile screens to save vertical real estate.
  */
 export default function WorkspaceTabsDropdown({
@@ -25,20 +24,10 @@ export default function WorkspaceTabsDropdown({
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
   const { plugins } = usePlugins();
-  const processingSessions = useOptionalProcessingSessions();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-
-  let runningTasksCount = 0;
-  if (processingSessions) {
-    for (const activity of processingSessions.values()) {
-      if (activity.tasks) {
-        runningTasksCount += activity.tasks.length;
-      }
-    }
-  }
 
   const builtInTabs = [
     ...BASE_TABS,
@@ -129,12 +118,6 @@ export default function WorkspaceTabsDropdown({
 
         <span className="max-w-[70px] truncate font-medium text-foreground">{activeLabel}</span>
 
-        {activeTab === 'agents' && runningTasksCount > 0 && (
-          <span className="flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-bold text-white">
-            {runningTasksCount}
-          </span>
-        )}
-
         <ChevronDown
           className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-150', isOpen && 'rotate-180')}
         />
@@ -188,11 +171,6 @@ export default function WorkspaceTabsDropdown({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {tab.id === 'agents' && runningTasksCount > 0 && (
-                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-bold text-white">
-                        {runningTasksCount}
-                      </span>
-                    )}
                     {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
                   </div>
                 </button>

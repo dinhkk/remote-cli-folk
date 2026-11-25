@@ -57,6 +57,13 @@ function readResultText(content: unknown): string {
   return text;
 }
 
+/**
+ * Claude Code wraps the answer of a background agent: a `<tools-used-before-summary>…</tools-used-before-summary>`
+ * bookkeeping block and a one-line `[Subagent hand-back] … The report follows:` frame in front of it. Neither is
+ * part of what the agent said, so the one-line summary skips both.
+ */
+const AGENT_ANSWER_WRAPPING = /<tools-used-before-summary>[\s\S]*?<\/tools-used-before-summary>|\[Subagent hand-back\][^\n]*/g;
+
 const STATUS_STYLES: Record<SubagentInfo['status'], string> = {
   running: 'text-purple-600 dark:text-purple-300',
   completed: 'text-muted-foreground',
@@ -112,6 +119,11 @@ export const SubagentPanel = memo(({
   const nickname = subagent?.name && subagent.name !== subagent.type ? subagent.name : '';
   const description = subagent?.description ?? String(parsedInput.description ?? '');
   const prompt = String(parsedInput.prompt ?? '');
+  // The first line of the agent's answer, shown on the collapsed row once it has reported: an orchestrator that
+  // delegates to several agents reads as a list of "agent, task, outcome" without opening each card.
+  const resultSummary = status === 'completed' || status === 'failed'
+    ? (resultText.replace(AGENT_ANSWER_WRAPPING, '').split('\n').map((line) => line.replace(/^[\s#>*-]+/, '').trim()).find(Boolean) ?? '')
+    : '';
 
   return (
     <div className="my-1 border-l-2 border-l-purple-500 py-0.5 pl-3 dark:border-l-purple-400">
@@ -159,6 +171,10 @@ export const SubagentPanel = memo(({
           )}
         </span>
       </button>
+
+      {!showTimeline && resultSummary && (
+        <p className="line-clamp-1 break-words pl-[18px] text-[11px] text-muted-foreground/80">{resultSummary}</p>
+      )}
 
       {showTimeline && (
         <div className="mt-1.5 space-y-2 pl-[18px]">

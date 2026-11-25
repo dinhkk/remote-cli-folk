@@ -259,3 +259,25 @@ export const TARGET_LINK_ERROR_AUTOHIDE_MS = 8_000;
 export const REMOTE_FRAME_REISSUE_MIN_INTERVAL_MS = 3_000;
 
 // ---------------------------
+
+//----------------- AGENT PROFILES ------------
+
+/**
+ * Tool names of Claude Code 0.3.x (measured on SDK 0.3.165, Windows). Offered by the tool pickers of the
+ * template and agent forms so tool names are never typed by hand. The set depends on the CLI version and OS;
+ * the pickers still accept a name that is not listed. `Agent` is the delegation tool (alias `Task`).
+ */
+export const CLAUDE_CODE_TOOL_NAMES: readonly string[] = [
+  'Agent', 'AskUserQuestion', 'Bash', 'CronCreate', 'CronDelete', 'CronList', 'DesignSync', 'Edit',
+  'EnterPlanMode', 'EnterWorktree', 'ExitPlanMode', 'ExitWorktree', 'Glob', 'Grep', 'Monitor',
+  'NotebookEdit', 'PowerShell', 'PushNotification', 'Read', 'ScheduleWakeup', 'Skill', 'TaskCreate',
+  'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate', 'WebFetch', 'WebSearch', 'Workflow', 'Write',
+];
+
+/** Names of the tool an orchestrator delegates with (`Task` is the older alias of `Agent`); an orchestrator template that excludes both cannot hand work to agents. */
+export const AGENT_DELEGATION_TOOL_NAMES: readonly string[] = ['Agent', 'Task'];
+
+/** Placeholder keys the project record fills by itself; a template may use them without declaring a parameter and may not declare a parameter with one of these keys. Mirrors the server's `RESERVED_PARAM_KEYS`. */
+export const AGENT_PROFILE_RESERVED_KEYS: readonly string[] = ['project_name', 'project_directory'];
+
+// ---------------------------

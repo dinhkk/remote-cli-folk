@@ -1533,3 +1533,73 @@ export function findApplicationRoot(startDirectory: string): string {
     ? path.dirname(parentDirectory)
     : parentDirectory;
 }
+
+// ---------------------------
+//----------------- AGENT PROFILE NAME UTILITIES ------------
+/**
+ * Tells whether `name` can identify an app agent to Claude Code: 1-64 ASCII
+ * letters, digits, hyphens or underscores, starting with a letter or digit. The
+ * name is the agent's file name (`<name>.md`), its `--agent` value and appears in
+ * `Task(<name>)` tool rules, so spaces, dots and path separators are refused.
+ *
+ * Used by the session scope (`POST /sessions` agentName), the Generate planner (template
+ * slug to file name) and the main-agent picker list (only names a session can start with).
+ */
+export function isValidAgentProfileName(name: unknown): name is string {
+  return typeof name === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name);
+}
+
+// ---------------------------
+//----------------- AGENT PROFILE ID AND PLACEHOLDER UTILITIES ------------
+/**
+ * Throws a 400 `INVALID_PROFILE_ID` unless `id` is 1-64 ASCII letters, digits, `_` or `-`.
+ * Profile ids become file names in the store, so anything that could form a path
+ * (`..`, separators, dots, empty, too long) must be refused before any file access.
+ *
+ * Used by the profile store (every read/write/delete, and to skip stray file names
+ * when listing), the profiles service (ids from routes and query strings) and the
+ * input validation (ids inside bodies).
+ */
+export function assertValidProfileId(id: unknown): asserts id is string {
+  if (!isValidProfileId(id)) {
+    throw new AppError('Invalid profile id', { code: 'INVALID_PROFILE_ID', statusCode: 400 });
+  }
+}
+
+/**
+ * Boolean form of {@link assertValidProfileId}: true for 1-64 ASCII letters, digits,
+ * `_` or `-`. Used by the profile store to ignore file names that are not profile ids.
+ */
+export function isValidProfileId(id: unknown): id is string {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+}
+
+/**
+ * Parameter keys filled from the project record itself. A template may write
+ * `{{project_name}}` or `{{project_directory}}` without declaring a parameter, and
+ * may not declare a parameter with one of these keys.
+ *
+ * Used by the input validation (placeholder and key checks) and by the value
+ * resolution, which fills exactly these keys from the project.
+ */
+export const RESERVED_PARAM_KEYS: readonly string[] = ['project_name', 'project_directory'];
+
+/**
+ * Matches `{{key}}` placeholders in template instructions (spaces inside the braces
+ * allowed; the key starts with a letter and has letters, digits or `_`). The
+ * expression is global: use it with `replace` or `matchAll`, which restart from the
+ * beginning, never with `test` or `exec`.
+ *
+ * Used by the renderer (to substitute values) and by {@link extractPlaceholderKeys}.
+ */
+export const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z][A-Za-z0-9_]*)\s*\}\}/g;
+
+/**
+ * Keys referenced as `{{key}}` in `text`, in first-seen order without repeats.
+ *
+ * Used by the template input validation, which requires every referenced key to be a
+ * declared parameter or a reserved project key.
+ */
+export function extractPlaceholderKeys(text: string): string[] {
+  return [...new Set([...text.matchAll(PLACEHOLDER_PATTERN)].map((match) => match[1]))];
+}

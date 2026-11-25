@@ -1,0 +1,72 @@
+/*
+ * The live graph's look, on top of React Flow's own `@xyflow/react/dist/style.css`. React Flow's rules sit in a CSS layer, so
+ * anything here wins without specificity tricks. The colours come from the app's own tokens (`--card`, `--border` ... which
+ * the `dark` class on <html> switches), so the graph, its controls and the attribution follow the app theme and not the
+ * operating system's.
+ */
+.monitor-flow {
+  --xy-background-color: hsl(var(--card));
+  --xy-handle-background-color: hsl(var(--muted-foreground));
+  --xy-handle-border-color: hsl(var(--card));
+  --xy-controls-button-background-color: hsl(var(--card));
+  --xy-controls-button-background-color-hover: hsl(var(--accent));
+  --xy-controls-button-color: hsl(var(--foreground));
+  --xy-controls-button-color-hover: hsl(var(--foreground));
+  --xy-controls-button-border-color: hsl(var(--border));
+  --xy-controls-box-shadow: 0 0 0 1px hsl(var(--border));
+  --xy-attribution-background-color: hsl(var(--card) / 0.8);
+  --xy-background-pattern-color: hsl(var(--border));
+  border-radius: 0.375rem;
+}
+
+/* The connectors: small dots on the box edges, drawn only (the graph never lets the user connect anything). */
+.monitor-flow .react-flow__handle {
+  width: 8px;
+  height: 8px;
+}
+
+/* The attribution stays, small and in the corner, out of the way of the controls (bottom-left). */
+.monitor-flow .react-flow__attribution {
+  opacity: 0.7;
+  border-radius: 3px;
+}
+
+/* Zoom buttons: a comfortable touch target on a phone, compact with a mouse. */
+.monitor-flow .react-flow__controls-button {
+  width: 32px;
+  height: 32px;
+}
+@media (pointer: coarse) {
+  .monitor-flow .react-flow__controls-button {
+    width: 44px;
+    height: 44px;
+  }
+  .monitor-flow .react-flow__controls-button svg {
+    max-width: 16px;
+    max-height: 16px;
+  }
+}
+
+/* The kill button of a focused box: compact with a mouse, a real touch target on a phone (the box's corner is the hit area). */
+@media (pointer: coarse) {
+  .monitor-flow .monitor-kill-button {
+    min-height: 44px;
+    min-width: 44px;
+    top: -22px;
+    justify-content: center;
+  }
+}
+
+/* React Flow fills control icons (`fill: currentColor`); the reset icon is a line drawing. */
+.monitor-flow .react-flow__controls-button svg.monitor-reset-icon {
+  fill: none;
+  stroke: currentColor;
+}
+
+/* A working edge: dashes run from the parent to the child. Gated by `.monitor-anim` like every other monitor animation, so
+   reduced motion (which index.css switches off for that class) and a hidden tab leave it still. */
+@keyframes monitor-edge-dash { to { stroke-dashoffset: -14; } }
+.monitor-anim .monitor-edge-flow {
+  stroke-dasharray: 6 8;
+  animation: monitor-edge-dash 0.9s linear infinite;
+}

@@ -125,6 +125,8 @@
   "mainTabs": {
     "label": "Settings",
     "agents": "Agents",
+    "agentProfiles": "Agent Profiles",
+    "models": "Models",
     "appearance": "Appearance",
     "git": "Git",
     "apiTokens": "API & Tokens",
@@ -136,6 +138,11 @@
     "remote": "Remote work",
     "about": "About",
     "sessions": "Sessions"
+  },
+  "models": {
+    "title": "Models",
+    "description": "Add, edit and remove the custom models each provider offers in the model picker.",
+    "loading": "Loading models…"
   },
   "notifications": {
     "title": "Notifications",

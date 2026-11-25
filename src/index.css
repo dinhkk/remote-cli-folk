@@ -1014,3 +1014,45 @@
     }
   }
 }
+
+/* Agent Monitor motion. Only transform and opacity animate. Every rule lives under `.monitor-anim`, a class the panel
+   drops when the user prefers reduced motion or the tab is hidden, so the picture then falls back to colour changes only. */
+@keyframes monitor-spin { to { transform: rotate(360deg); } }
+@keyframes monitor-pulse { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(1.07, 1.2); opacity: 0; } }
+@keyframes monitor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes monitor-enter { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes monitor-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes monitor-done { 0% { transform: scale(1); } 40% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes monitor-flow { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+@keyframes monitor-burst { 0% { transform: translate(0, 0) scale(0.6); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; } }
+
+.monitor-root [data-node-id]:focus-visible rect:first-of-type { stroke-width: 3.5; }
+.monitor-anim .monitor-node { transition: transform 450ms ease; }
+.monitor-anim .monitor-enter,
+.monitor-anim .monitor-spin,
+.monitor-anim .monitor-pulse,
+.monitor-anim .monitor-blink,
+.monitor-anim .monitor-shake,
+.monitor-anim .monitor-done { transform-box: fill-box; transform-origin: center; }
+.monitor-anim .monitor-enter { animation: monitor-enter 0.35s ease-out both; }
+.monitor-anim .monitor-spin { animation: monitor-spin 0.9s linear infinite; }
+.monitor-anim .monitor-pulse { animation: monitor-pulse 1.6s ease-out infinite; }
+.monitor-anim .monitor-blink { animation: monitor-blink 1s ease-in-out infinite; }
+.monitor-anim .monitor-shake { animation: monitor-enter 0.35s ease-out both, monitor-shake 0.4s ease-in-out 0.35s 2; }
+.monitor-anim .monitor-done { animation: monitor-enter 0.35s ease-out both, monitor-done 0.5s ease-out 0.35s 1; }
+.monitor-anim .monitor-flow-dot { animation: monitor-flow 1.4s linear infinite; }
+.monitor-anim .monitor-burst { animation: monitor-burst 1.4s ease-in-out both; }
+.monitor-anim[data-paused="true"] * { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .monitor-anim *, .monitor-anim { animation: none !important; transition: none !important; }
+}
+
+/* Activity drawer (the header icon's sheet): slides in from the right (full screen on a phone) and the badge dot pulses.
+   Both are transform/opacity only and removed when the user prefers reduced motion. */
+@keyframes monitor-sheet-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes monitor-badge-ping { 0% { transform: scale(1); opacity: 0.6; } 80%, 100% { transform: scale(2.2); opacity: 0; } }
+.monitor-sheet-in { animation: monitor-sheet-in 0.22s ease-out both; }
+.monitor-badge-ping { animation: monitor-badge-ping 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .monitor-sheet-in, .monitor-badge-ping { animation: none !important; }
+}

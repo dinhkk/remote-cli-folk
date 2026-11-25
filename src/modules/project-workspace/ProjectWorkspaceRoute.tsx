@@ -11,6 +11,7 @@ import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import { useVisualViewportKeyboardOffset } from '@/modules/project-workspace/hooks/useVisualViewportKeyboardOffset';
 import ProjectWorkspaceShell from '@/modules/project-workspace/ProjectWorkspaceShell';
+import RunningFocusBoundary from '@/modules/project-workspace/RunningFocusBoundary';
 
 const MemoizedProjectWorkspaceRouteContent = memo(ProjectWorkspaceRouteContent);
 
@@ -42,12 +43,14 @@ function ProjectWorkspaceRouteContent() {
       isMobile={isMobile}
       isSessionProcessing={isSessionProcessing}
     >
-      <ProjectWorkspaceShell
-        isMobile={isMobile}
-        ws={ws}
-        sendMessage={sendMessage}
-        navigate={navigate}
-      />
+      <RunningFocusBoundary isMobile={isMobile} navigate={navigate}>
+        <ProjectWorkspaceShell
+          isMobile={isMobile}
+          ws={ws}
+          sendMessage={sendMessage}
+          navigate={navigate}
+        />
+      </RunningFocusBoundary>
     </ProjectsStateProvider>
   );
 }

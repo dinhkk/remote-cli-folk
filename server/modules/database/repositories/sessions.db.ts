@@ -1,6 +1,7 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
-import { normalizeProjectPath } from '@/shared/utils.js';
+import type { SessionAgentSnapshot } from '@/shared/types.js';
+import { AppError, normalizeProjectPath } from '@/shared/utils.js';
 
 type SessionRow = {
   session_id: string;
@@ -62,6 +63,26 @@ function normalizeSessionRow<T extends SessionRow | null | undefined>(row: T): T
 
 function normalizeSessionRows(rows: SessionRow[]): SessionRow[] {
   return rows.map((row) => normalizeSessionRow(row) as SessionRow);
+}
+
+/**
+ * Reads a stored agent record as a `SessionAgentSnapshot`: `{ agentName: string | null, hiddenClaudeAgents }`.
+ * A row written before the agents became native files (`orchestratorName` + `agents` + `scope`) is
+ * read as `{ agentName: null, hiddenClaudeAgents }`: it keeps its hide rules and stays a scoped
+ * session, but no longer forces an agent (the old name is not a file). Anything else is not a
+ * valid record and returns null.
+ */
+function readSessionAgentSnapshot(value: unknown): SessionAgentSnapshot | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  const hidden = record.hiddenClaudeAgents;
+  if (!Array.isArray(hidden) || !hidden.every((name) => typeof name === 'string')) return null;
+  if (typeof record.agentName === 'string' || record.agentName === null) {
+    return { agentName: record.agentName, hiddenClaudeAgents: hidden };
+  }
+  const isLegacy = record.agentName === undefined && typeof record.orchestratorName === 'string'
+    && typeof record.agents === 'object' && record.agents !== null;
+  return isLegacy ? { agentName: null, hiddenClaudeAgents: hidden } : null;
 }
 
 function normalizeProjectPathForProvider(provider: string, projectPath: string): string {
@@ -180,11 +201,29 @@ export const sessionsDb = {
     provider: string,
     projectPath: string,
     customName?: string,
+    // Agent-profile touchpoint: present only for a scoped session, written in the
+    // same INSERT as the row so a scoped session never exists without its agent record.
+    // `agent_scope_project_id` is no longer written (NULL); the old column stays for old rows.
+    agentSnapshot?: SessionAgentSnapshot,
   ): string {
     const db = getConnection();
     const normalizedProjectPath = normalizeProjectPathForProvider(provider, projectPath);
 
     projectsDb.createProjectPath(normalizedProjectPath);
+
+    if (agentSnapshot) {
+      db.prepare(
+        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, agent_profile_snapshot, isArchived, created_at, updated_at)
+         VALUES (?, ?, NULL, ?, ?, NULL, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      ).run(
+        sessionId,
+        provider,
+        customName ?? null,
+        normalizedProjectPath,
+        JSON.stringify(agentSnapshot),
+      );
+      return sessionId;
+    }
 
     db.prepare(
       `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, isArchived, created_at, updated_at)
@@ -192,6 +231,40 @@ export const sessionsDb = {
     ).run(sessionId, provider, customName ?? null, normalizedProjectPath);
 
     return sessionId;
+  },
+
+  /**
+   * Reads the agent record (`{ agentName, hiddenClaudeAgents }`) a scoped session was created with.
+   *
+   * Returns null for a plain chat (nothing stored, including every session
+   * that predates the column). A stored value that is not a valid record throws
+   * instead of returning null: silently running a scoped session as a plain chat
+   * would drop its main agent without anyone noticing. Rows in the old snapshot
+   * shape are converted (see `readSessionAgentSnapshot`) rather than refused. Kept out of
+   * `SESSION_ROW_COLUMNS` on purpose so it never rides along in session listings sent to clients.
+   */
+  getAgentSnapshot(sessionId: string): SessionAgentSnapshot | null {
+    const row = getConnection()
+      .prepare('SELECT agent_profile_snapshot FROM sessions WHERE session_id = ?')
+      .get(sessionId) as { agent_profile_snapshot: string | null } | undefined;
+    if (!row || row.agent_profile_snapshot === null) {
+      return null;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.agent_profile_snapshot);
+    } catch {
+      parsed = null;
+    }
+    const snapshot = readSessionAgentSnapshot(parsed);
+    if (!snapshot) {
+      throw new AppError(`The agent snapshot of session "${sessionId}" is unreadable.`, {
+        code: 'AGENT_SNAPSHOT_INVALID',
+        statusCode: 500,
+      });
+    }
+    return snapshot;
   },
 
   /**
@@ -224,9 +297,15 @@ export const sessionsDb = {
     db.transaction(() => {
       db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
         .run(input.providerSessionId, input.sessionId);
+      // Agent-profile touchpoint: a fork of a scoped session stays scoped. The scope and snapshot are
+      // copied byte for byte from the source row in the same INSERT (NULL for a plain source), so
+      // the fork keeps the same main agent and hide rules.
       db.prepare(
-        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, isArchived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, agent_scope_project_id, agent_profile_snapshot, isArchived, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
+           (SELECT agent_scope_project_id FROM sessions WHERE session_id = ?),
+           (SELECT agent_profile_snapshot FROM sessions WHERE session_id = ?),
+           0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       ).run(
         input.sessionId,
         input.provider,
@@ -236,6 +315,8 @@ export const sessionsDb = {
         input.jsonlPath,
         input.model,
         input.effort,
+        input.forkedFromSessionId,
+        input.forkedFromSessionId,
         input.forkedFromSessionId,
       );
     })();

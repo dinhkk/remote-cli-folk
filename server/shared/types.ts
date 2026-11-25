@@ -2515,3 +2515,541 @@ export type RemoteStreamQuota = {
   /** Counts one violation that is not a stream refusal (a policy denial beyond the audit rate limit); too many in a minute disconnect the pairing. */
   noteViolation?(): void;
 };
+
+// ---------------------------
+//----------------- AGENT PROFILE TYPES (templates) ------------
+/**
+ * Role family of an agent template. An `orchestrator` template becomes the main
+ * thread agent of a chat session and delegates; a `worker` template becomes a
+ * sub-agent the orchestrator can call. Either way Generate renders it into a
+ * native Claude Code agent file (`<project>/.claude/agents/<slug>.md`).
+ *
+ * Used by the Agent Profiles module (store, validation, service, routes) and,
+ * through its barrel, by session wiring.
+ */
+export type AgentProfileFamily = 'orchestrator' | 'worker';
+
+/**
+ * Kind of value a template parameter takes. Only a UI hint (folder picker, file
+ * picker, link); the server stores and renders every value as text.
+ */
+export type AgentProfileParamType = 'text' | 'dir' | 'file' | 'url';
+
+/**
+ * One fill-in field of a template. `key` is what `{{key}}` in the template
+ * instructions refers to; it must be unique inside the template and must not use
+ * a reserved key (`project_name`, `project_directory`). A `required` parameter
+ * needs a value typed at Generate time, or `default`.
+ */
+export type AgentProfileParam = {
+  key: string;
+  type: AgentProfileParamType;
+  title: string;
+  description: string;
+  required: boolean;
+  default?: string;
+};
+
+/**
+ * Parameter values keyed by parameter key. Always plain text; rendering escapes
+ * and length-caps them before they reach a prompt.
+ */
+export type AgentProfileValues = Record<string, string>;
+
+/**
+ * Bookkeeping every stored profile record carries. `rev` starts at 1 and grows by
+ * one on every write; a `PUT` must send the `rev` it read, and a stale `rev` is
+ * refused with HTTP 409 so a newer edit is never overwritten silently.
+ */
+export type AgentProfileMeta = {
+  id: string;
+  rev: number;
+  /** ISO timestamp of the last write. */
+  updatedAt: string;
+};
+
+/**
+ * Level-1 profile: the reusable recipe an agent is built from. `instructions` may
+ * hold `{{key}}` placeholders. `bindings.project` is active (the template takes
+ * values from a project); `bindings.knowledge` is reserved for a later RAG
+ * feature and has no effect yet. Stored files written by older versions may carry
+ * `isDefaultOrchestrator` / `origin`: they are ignored and never returned.
+ */
+export type AgentProfileTemplate = AgentProfileMeta & {
+  slug: string;
+  family: AgentProfileFamily;
+  name: string;
+  /** When the orchestrator should pick agents made from this template. */
+  description: string;
+  instructions: string;
+  params: AgentProfileParam[];
+  bindings: { project: boolean; knowledge: boolean };
+  tools?: string[];
+  disallowedTools?: string[];
+  mcpServers?: string[];
+  skills?: string[];
+  model?: string;
+  /**
+   * Optional Claude Code agent memory scope, written as `memory:` into the generated agent file. Off when
+   * absent (no sample template sets it). A generated agent whose `tools` list is restricted gets
+   * Read/Write/Edit added so it can keep its memory files.
+   */
+  memory?: AgentProfileMemoryScope;
+  /**
+   * Optional (absent = false): the generated agent works with the app-owned memory blocks (MCP server `blocks`).
+   * A restricted `tools:` list then gains the three `mcp__blocks__*` tools and the agent body a short instruction
+   * paragraph. Independent of the native `memory` field.
+   */
+  usesBlocks?: boolean;
+  /**
+   * Optional heading the agents made from this template are listed under in the new-chat main-agent dropdown (at most
+   * 40 characters). Absent = the dropdown's built-in "System" group. Read live from the template, never written into the
+   * agent file, so editing it needs no regenerate.
+   */
+  group?: string;
+};
+
+/** Claude Code agent `memory:` scopes: `project` (`.claude/agent-memory/`), `user` (`~/.claude/agent-memory/`), `local` (`.claude/agent-memory-local/`). */
+export type AgentProfileMemoryScope = 'project' | 'user' | 'local';
+
+/** Editable part of a template: what a create or update request carries (no id/rev bookkeeping). */
+export type AgentProfileTemplateInput = Omit<AgentProfileTemplate, keyof AgentProfileMeta>;
+
+/** Which collection a stored profile record belongs to; also its sub-directory name. */
+export type AgentProfileKind = 'templates' | 'memory-blocks';
+
+// ---------------------------
+//----------------- MEMORY BLOCK TYPES (app-owned, served to agents by the `blocks` MCP server) ------------
+/** `read-only`: agents cannot write the block (only the user can); `writable`: agents may replace or append to it. */
+export type MemoryBlockMode = 'read-only' | 'writable';
+
+/** Where a block is visible to agents: every agent run (`global`) or only runs in that project folder (`project`). */
+export type MemoryBlockScope = { kind: 'global' } | { kind: 'project'; directory: string };
+
+/** Who wrote the content last: the user (UI/API), an agent (`agent:<main agent name>`), or nobody yet. */
+export type MemoryBlockWriter = 'user' | `agent:${string}` | null;
+
+/**
+ * A named piece of persistent text shared by agents. `name` is a slug, unique inside its scope. Content an agent
+ * wrote is untrusted data: it is only ever returned inside tool results (escaped), never put in a system prompt.
+ * `maxChars` (default 2000, hard cap 20000) bounds `content`.
+ */
+export type MemoryBlock = AgentProfileMeta & {
+  name: string;
+  description: string;
+  mode: MemoryBlockMode;
+  scope: MemoryBlockScope;
+  content: string;
+  maxChars: number;
+  lastWriter: MemoryBlockWriter;
+};
+
+/** Editable part of a block: what a create request carries (a PUT adds `expectedRev`). */
+export type MemoryBlockInput = Omit<MemoryBlock, keyof AgentProfileMeta | 'lastWriter'>;
+
+/**
+ * A stored file that could not be read as a profile (invalid JSON or wrong shape).
+ * Listings skip it, report it here, and never overwrite it.
+ */
+export type AgentProfileCorruptEntry = { id: string; error: string };
+
+/** Listing result of one collection: the readable records plus the files that were skipped. */
+export type AgentProfileList<T> = { items: T[]; corrupt: AgentProfileCorruptEntry[] };
+
+/**
+ * Module settings stored in `settings.json`: the Claude agents the user hid (by
+ * name, same for every scope). `rev`/`updatedAt` follow the same stale-write rule as
+ * profile records.
+ */
+export type AgentProfileSettings = {
+  rev: number;
+  updatedAt: string;
+  hiddenClaudeAgents: string[];
+};
+
+// ---------------------------
+//----------------- CLAUDE-PROVIDED AGENT TYPES ------------
+/**
+ * Where a Claude agent comes from: `builtin` (shipped inside Claude Code, only
+ * name/description/model known), `user` (`~/.claude/agents`) or `project`
+ * (`<project directory>/.claude/agents`). Both file sources expose the full prompt.
+ */
+export type ClaudeAgentSource = 'builtin' | 'user' | 'project';
+
+/**
+ * Listing entry of an agent Claude Code provides: the single source of the Agents
+ * list. `hidden` mirrors the saved hide list; `error` is set when the source file
+ * could not be parsed (the entry still appears so the user can find and fix the file).
+ * File sources also carry `path` (absolute) and `generated`: true when the file holds the
+ * RemoteCLI marker comment (it was rendered from a template; `generatedFrom` is that
+ * template's slug), false for a handmade file. Built-ins are never generated and have no path.
+ */
+export type ClaudeAgentEntry = {
+  source: ClaudeAgentSource;
+  name: string;
+  description: string;
+  tools?: string[];
+  model?: string;
+  prompt?: string;
+  hidden: boolean;
+  generated: boolean;
+  generatedFrom?: string;
+  path?: string;
+  error?: string;
+};
+
+/**
+ * Minimal shape of an agent the Claude SDK reports from `supportedAgents()`.
+ * The built-in list adapter returns these; the listing service turns them into
+ * `ClaudeAgentEntry` items.
+ */
+export type ClaudeSdkAgentInfo = {
+  name: string;
+  description: string;
+  model?: string;
+};
+
+// ---------------------------
+//----------------- AGENT PROFILE STORE, SEED AND GENERATOR CONTRACTS ------------
+/**
+ * Structural check of a record read from disk: returns null when `value` has the
+ * shape a record of `kind` must have, otherwise a short reason. Records that fail
+ * are reported as corrupt and never overwritten.
+ *
+ * Implemented by the validation code and handed to the file store by the module
+ * wiring, so the store stays free of per-kind field knowledge.
+ */
+export type StoredShapeCheck = (kind: AgentProfileKind, value: unknown) => string | null;
+
+/**
+ * One agent file the generator would write. `name` is the template slug (also the file
+ * name without `.md`); `path` is the absolute file. `status`: `new` (no such file; will
+ * be created), `duplicate` (a file this generator wrote earlier exists, it carries the
+ * marker; applying rewrites it from the current template and values), `missing-values`
+ * (a required parameter has no value from the typed values or the template default;
+ * `missing` lists their keys), `invalid-name` (the template slug is not a valid agent
+ * name), `handmade-exists` (a file without the marker already has this name; it is
+ * never overwritten, rename or delete it by hand to let Generate write there),
+ * `write-failed` (set when applying: the file system refused this one file, for example
+ * a permission error; the other files of the run are still written).
+ * Only `new` and `duplicate` write a file.
+ *
+ * Produced by the generator planner; the profiles service returns it from the
+ * preview and generate calls.
+ */
+export type GeneratedAgentPlan = {
+  templateId: string;
+  name: string;
+  description: string;
+  path: string;
+  status: 'new' | 'duplicate' | 'missing-values' | 'invalid-name' | 'handmade-exists' | 'write-failed';
+  missing?: string[];
+};
+
+/**
+ * Body of the Generate preview and apply requests. `directory` is the absolute folder of
+ * the sidebar project (agents go to `<directory>/.claude/agents/`); omitted, null or empty
+ * means the global scope (`~/.claude/agents/`). `projectName` fills `{{project_name}}`
+ * (default: the folder name). `values` are the parameter values typed in the form; the
+ * template default is the only other layer.
+ */
+export type GenerateAgentsRequest = {
+  directory?: string | null;
+  projectName?: string;
+  templateIds: string[];
+  values?: AgentProfileValues;
+};
+
+/** Where Generate writes: the project folder's `.claude/agents` or the user-wide `~/.claude/agents`. */
+export type GenerateScope = 'project' | 'user';
+
+/** Answer of the Generate preview: the target folder and one plan per chosen template (request order). */
+export type GenerateAgentsPreview = {
+  scope: GenerateScope;
+  agentsDirectory: string;
+  plans: GeneratedAgentPlan[];
+};
+
+/**
+ * Answer of the Generate apply: `created` (status `new`) and `regenerated` (status
+ * `duplicate`) were written; `skipped` were not. `gitExclude.file` is the repository's
+ * `info/exclude` file when the project is in a git repo (null otherwise: not a repo,
+ * global scope, or git unavailable) and `added` the lines newly appended to it.
+ */
+export type GenerateAgentsResult = {
+  scope: GenerateScope;
+  agentsDirectory: string;
+  created: GeneratedAgentPlan[];
+  regenerated: GeneratedAgentPlan[];
+  skipped: GeneratedAgentPlan[];
+  gitExclude: { file: string | null; added: string[] };
+};
+
+/** Answer of the remembered-values lookup: the normalized folder (null = global scope) and its values. */
+export type GenerateRememberedValues = { directory: string | null; values: AgentProfileValues };
+
+/**
+ * One main agent a new chat in a sidebar project can start with: an agent file the project's
+ * `.claude/agents` (`source: 'project'`) or the user's `~/.claude/agents` (`'user'`) holds, not
+ * hidden, readable. A project agent shadows a user agent of the same name. `isOrchestrator` is true
+ * for the agent named exactly `orchestrator` (what the sample orchestrator template generates).
+ * `group` is the heading of the template the file was generated from (see `AgentProfileTemplate.group`); absent for
+ * handmade files and for templates without one. Carries no path, description or prompt: this is what a Remote
+ * Controller may see.
+ */
+export type ScopeAgentOption = { name: string; source: 'project' | 'user'; isOrchestrator: boolean; group?: string };
+
+/** Answer of `GET /api/agent-profiles/scope-options?projectId=<sidebar project id>`. */
+export type ScopeOptions = { agents: ScopeAgentOption[] };
+
+// ---------------------------
+//----------------- AGENT SESSION SCOPE AND SNAPSHOT ------------
+/**
+ * Scope a new chat session is opened with: the name of the main agent (a file under
+ * `<project>/.claude/agents/` or `~/.claude/agents/`; the session runs with
+ * `sdkOptions.agent = agentName`), or `null` for no main agent (a plain Claude chat that
+ * still applies the hide list). The folder comes from the request's `projectPath` (the
+ * sidebar project). A session created without any scope is a plain chat and never has one.
+ *
+ * Used by the profiles module (scope resolution) and the sessions route that parses the
+ * request body.
+ */
+export type SessionAgentScope = { agentName: string | null };
+
+/**
+ * What an agent-scoped session remembers, written once when the session is created and
+ * replayed on every run, resume included (the agent itself is the native file, read
+ * fresh by Claude Code on each run, so editing it applies to the next turn).
+ *
+ * - `agentName`: main agent passed as `sdkOptions.agent`, or null for none.
+ * - `hiddenClaudeAgents`: Claude agents hidden at creation time; each becomes a
+ *   `Task(<name>)` disallow rule.
+ *
+ * Stored as JSON in the `sessions.agent_profile_snapshot` column. Rows written before
+ * this shape existed (`orchestratorName` + `agents`) are read as `{ agentName: null,
+ * hiddenClaudeAgents }`.
+ *
+ * Used by the profiles module (builds it), the sessions database (stores it), the
+ * chat gateway (hands it to the runtime) and the Claude runtime (maps it to SDK options).
+ */
+export type SessionAgentSnapshot = {
+  agentName: string | null;
+  hiddenClaudeAgents: string[];
+};
+
+// ---------------------------------------------------------------------------
+// Agent Monitor ("Mission Control"): the live picture of what the agents are doing, and the kill of one of its boxes.
+// Mirrored by `src/shared/types.ts` (the client copy); the server module builds it, the client draws it.
+// ---------------------------------------------------------------------------
+
+/** Where one monitored agent (or background task) stands. `waiting` = it is blocked on a permission answer from the user. */
+export type AgentMonitorState = 'running' | 'waiting' | 'done' | 'failed' | 'stopped';
+
+/** One level-2 node of a session: a sub-agent, a workflow run or a background command the main agent launched. */
+export type AgentMonitorNode = {
+  /** The tool call that launched it (stable across the stream); falls back to the task id. */
+  id: string;
+  /** The agent type the orchestrator picked (an app agent name such as `review-code--alpha`), else the task description. */
+  name: string;
+  kind: 'agent' | 'workflow' | 'command';
+  description: string;
+  state: AgentMonitorState;
+  startedAt: number;
+  endedAt: number | null;
+  /** Tokens the SDK reported for this task so far (`task_progress.usage.total_tokens`). A billed total, not a context size. */
+  tokens: number;
+  toolCalls: number;
+  /** The tool the agent is calling right now, from its streamed tool calls; null when none was seen. */
+  lastToolName: string | null;
+  /** Token rate over the last seconds, 0 when the agent is quiet. Drives the edge thickness. */
+  tokensPerSecond: number;
+  model: string | null;
+};
+
+/** One chat session of the app with its agent tree. The server and the session are the two levels above the orchestrator. */
+export type AgentMonitorSession = {
+  id: string;
+  /** Session name, else the folder name. */
+  label: string;
+  projectName: string | null;
+  provider: string;
+  state: 'running' | 'waiting' | 'idle';
+  /** When the current run started (the user's send), null when no run is known. */
+  runStartedAt: number | null;
+  lastEventAt: number;
+  orchestrator: {
+    /** The orchestrator's agent name from the session snapshot, else "Main agent". */
+    name: string;
+    fromProfile: boolean;
+    state: AgentMonitorState;
+    lastToolName: string | null;
+    /** Context size now (last `token_budget`), not spend. */
+    contextTokens: number | null;
+    contextWindow: number | null;
+  };
+  agents: AgentMonitorNode[];
+  /** Finished agents folded away to keep the picture small (the oldest ones). */
+  foldedFinished: number;
+  /** Sum of `tokens` over the agents, folded ones included. */
+  agentTokens: number;
+  /** Cache read share of the latest request (0..1) when the transcript could be read; null otherwise. */
+  cacheHitRatio: number | null;
+  /** `app` = a chat started through this app; `terminal` = a Claude CLI process the app did not start (found in `~/.claude/sessions`). */
+  source: 'app' | 'terminal';
+  /**
+   * `live` = built from the run's event stream (exact timing). `transcript` = derived from the CLI's session registry and its
+   * transcript files: coarser, may lag a few seconds, token counts are approximate, a failed agent reads as done.
+   */
+  detail: 'live' | 'transcript';
+  /** Host folder the session runs in; null when the app does not know it. */
+  projectPath: string | null;
+  /** Key of the `AgentMonitorSnapshot.projects` entry this session is listed under. */
+  projectKey: string;
+  /** The app chat that shows this session (tap-through); null when the app has no chat for it. */
+  openSessionId: string | null;
+  /**
+   * The child OS processes of the session's Claude process (tools, MCP servers), grouped by process name, heaviest memory
+   * first. Empty when the session's pid is unknown or the sampler has no sample yet (nobody was watching a moment ago).
+   * The server always sends it; it is optional so a client reading an older server still works.
+   */
+  processes?: AgentMonitorProcessGroup[];
+  /**
+   * CPU and memory of the session's whole process tree (the Claude process included). Absent when the session's pid is
+   * unknown or the sampler has no sample yet; a client shows "—" then, never 0. Optional so a client reading an older
+   * server still works.
+   */
+  usage?: AgentMonitorSessionUsage;
+};
+
+/** Numbers only (no pid, no process list): what one session's process tree uses. `cpuPercent` is % of the whole machine; null until two samples exist. */
+export type AgentMonitorSessionUsage = {
+  cpuPercent: number | null;
+  rssBytes: number;
+  processCount: number;
+};
+
+/**
+ * `POST /api/agent-monitor/kill`: stop or kill one node of the graph. The client names the session and the node by the
+ * ids the snapshot gave it; it never sends (and never receives) a process id.
+ * `stop` asks the SDK to end one agent cooperatively; `kill` ends processes at once.
+ */
+export type AgentMonitorKillRequest = {
+  sessionId: string;
+  /** `orch:<sid>`, `agent:<sid>:<agentId>` or `proc:<sid>:<process name>`. */
+  nodeId: string;
+  mode: 'stop' | 'kill';
+};
+
+/** One word for every way a kill can end; the HTTP status is 403 for `refused`, 500 for `error`, 200 otherwise. */
+export type AgentMonitorKillResult = 'killed' | 'stopped' | 'gone' | 'no-handle' | 'unavailable' | 'refused' | 'error';
+
+export type AgentMonitorKillResponse = {
+  result: AgentMonitorKillResult;
+  /** How many processes were killed, when it applies. */
+  count?: number;
+};
+
+/**
+ * Descendant processes of one session that share a process name. Names, counts, memory and CPU only: never a command
+ * line, argument, path or environment (a Remote controller reads the snapshot).
+ */
+export type AgentMonitorProcessGroup = {
+  /** Executable name without path (`node`, `bash`). An empty name is the "other" group: everything past the group cap, summed. */
+  name: string;
+  /** Processes in the group. */
+  count: number;
+  /** Sum of the working sets, bytes. */
+  rssBytes: number;
+  /** % of the whole machine (Task Manager's scale); null until two samples exist. */
+  cpuPercent: number | null;
+};
+
+/** A project (a Host folder) with the sessions running in it. A project is running only while one of its sessions is. */
+export type AgentMonitorProject = {
+  key: string;
+  /** The app's project name, else the folder name. */
+  name: string;
+  /** Host folder; null for sessions with no known folder. */
+  path: string | null;
+  /** `waiting` when any session waits for a permission answer, else `running` when any session works, else `idle`. */
+  state: 'running' | 'waiting' | 'idle';
+  /** Sessions that are running or waiting. */
+  runningSessions: number;
+  runningAgents: number;
+  /** Sum of the sessions' `agentTokens`. */
+  tokens: number;
+  /** Ids of its sessions in `AgentMonitorSnapshot.sessions`, busiest first. */
+  sessionIds: string[];
+};
+
+/** Answer of `GET /api/agent-monitor/summary`: the few numbers the header badge needs. Cheap: no transcript is read, no sampler starts. */
+export type AgentMonitorSummary = {
+  generatedAt: number;
+  /** Sessions running or waiting (app chats and terminal sessions). */
+  runningSessions: number;
+  /** Of those, the ones blocked on a permission answer. */
+  waitingSessions: number;
+  /** Projects with at least one running or waiting session. */
+  runningProjects: number;
+};
+
+/** CPU and memory of one process tree. `cpuPercent` is % of the whole machine (all cores = 100, Task Manager's scale); null until two samples exist. */
+export type AgentMonitorUsage = {
+  cpuPercent: number | null;
+  rssBytes: number;
+  processCount: number;
+  /** Heaviest member processes by memory, for the "top processes" list. */
+  top: Array<{ pid: number; name: string; rssBytes: number; cpuPercent: number | null }>;
+};
+
+/** Resource use of one target: this server, a session the app runs, or a Claude process that is not run by the app. */
+export type AgentMonitorResourceRow = {
+  key: string;
+  kind: 'server' | 'session' | 'external';
+  label: string;
+  pid: number;
+  usage: AgentMonitorUsage;
+  /** Last ~60 s, oldest first. */
+  cpuSeries: Array<number | null>;
+  rssSeries: number[];
+};
+
+/** Answer of `GET /api/agent-monitor/snapshot` (read-only; a Remote controller may read it too). */
+export type AgentMonitorSnapshot = {
+  generatedAt: number;
+  kpi: {
+    runningAgents: number;
+    runningSessions: number;
+    tokensPerMinute: number;
+    /** Agent tokens reported since local midnight, counted since this server started. */
+    tokensToday: number;
+    /** All targets together (server + app sessions); null until the first two samples. */
+    cpuPercent: number | null;
+    rssBytes: number | null;
+    /** Last ~60 s, oldest first. */
+    tokenSeries: number[];
+    cpuSeries: Array<number | null>;
+    rssSeries: number[];
+  };
+  sessions: AgentMonitorSession[];
+  /** The same sessions grouped by project, running projects first. */
+  projects: AgentMonitorProject[];
+  resources: {
+    /** The sampler runs only while a screen is open; false right after the first request, until its first answer. */
+    sampling: boolean;
+    intervalMs: number;
+    lastSampleAt: number | null;
+    error: string | null;
+    cores: number;
+    /** The whole machine (not a process): what the overview shows while no session is selected. */
+    machine: AgentMonitorMachineUsage;
+    rows: AgentMonitorResourceRow[];
+  };
+};
+
+/** CPU and memory of the whole machine. `cpuPercent` is null until two readings exist; all cores busy = 100. */
+export type AgentMonitorMachineUsage = {
+  cpuPercent: number | null;
+  memoryUsedBytes: number;
+  memoryTotalBytes: number;
+};

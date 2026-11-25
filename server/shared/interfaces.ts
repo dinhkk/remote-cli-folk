@@ -52,6 +52,13 @@ export interface IProviderRuntime {
    * settled, or the id was never one of its own.
    */
   stopBackgroundTask?(sessionId: string, taskId: string): Promise<boolean>;
+  /**
+   * The session's process is about to be killed from outside: wind its run down quietly (no failed-run report) and cancel
+   * its pending permission prompts. Returns false when the session has no live run (nothing was marked).
+   */
+  markSessionKilled?(sessionId: string): boolean;
+  /** Undoes `markSessionKilled` when the kill did not happen. */
+  unmarkSessionKilled?(sessionId: string): void;
 }
 
 /**

@@ -26,6 +26,12 @@ import enGit from '@/modules/i18n/locales/en/git.json';
 // English only for now: every other locale falls back to it (`fallbackLng`).
 // oxlint-disable-next-line importx/order
 import enRemote from '@/modules/i18n/locales/en/remote.json';
+// English only for now, like `remote`: every other locale falls back to it.
+// oxlint-disable-next-line importx/order
+import enAgentProfiles from '@/modules/i18n/locales/en/agentProfiles.json';
+// English only for now, like `agentProfiles`: every other locale falls back to it.
+// oxlint-disable-next-line importx/order
+import enAgentMonitor from '@/modules/i18n/locales/en/agentMonitor.json';
 
 import frCommon from '@/modules/i18n/locales/fr/common.json';
 import frSettings from '@/modules/i18n/locales/fr/settings.json';
@@ -200,6 +206,8 @@ i18n
         tasks: enTasks,
 git: enGit,
         remote: enRemote,
+        agentProfiles: enAgentProfiles,
+        agentMonitor: enAgentMonitor,
       },
       fr: {
         common: frCommon,
@@ -346,7 +354,7 @@ git: enGit,
     debug: false,
 
     // Namespaces - load only what's needed
-    ns: ['common', 'settings', 'auth', 'sidebar', 'chat', 'codeEditor', 'tasks', 'git', 'remote'],
+    ns: ['common', 'settings', 'auth', 'sidebar', 'chat', 'codeEditor', 'tasks', 'git', 'remote', 'agentProfiles', 'agentMonitor'],
     defaultNS: 'common',
 
     // Key separator for nested keys (default: '.')

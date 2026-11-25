@@ -28,6 +28,11 @@ const BLOCKED_PREFIXES = [
   '/api/user/preferences',
   // The Host's own provider administration (MCP definitions carry commands and secrets).
   '/api/providers/mcp',
+  // Agent Profiles management is Host-only; `GET /api/agent-profiles/scope-options` stays open for the new-chat scope picker.
+  '/api/agent-profiles/templates',
+  '/api/agent-profiles/generate',
+  '/api/agent-profiles/claude-agents',
+  '/api/agent-profiles/memory-blocks',
 ] as const;
 
 // TaskMaster details of one project (`/api/projects/:id/taskmaster`) are part of

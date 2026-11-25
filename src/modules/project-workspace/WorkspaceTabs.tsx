@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, PillBar, Pill } from '@/shared/ui';
 import type { AppTab } from '@/shared/types';
 import { usePlugins, PluginIcon } from '@/modules/plugins';
-import { useOptionalProcessingSessions } from '@/shared/context/SessionProtectionContext';
 import {
   BASE_TABS,
   BROWSER_TAB,
@@ -28,16 +27,6 @@ export default function WorkspaceTabs({
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
   const { plugins } = usePlugins();
-  const processingSessions = useOptionalProcessingSessions();
-
-  let runningTasksCount = 0;
-  if (processingSessions) {
-    for (const activity of processingSessions.values()) {
-      if (activity.tasks) {
-        runningTasksCount += activity.tasks.length;
-      }
-    }
-  }
 
   const builtInTabs: BuiltInTab[] = [
     ...BASE_TABS,
@@ -114,11 +103,6 @@ export default function WorkspaceTabs({
                 <span className={`${isActive ? 'inline max-w-28' : 'hidden'} truncate sm:max-w-36 lg:inline`}>
                   {displayLabel}
                 </span>
-                {tab.id === 'agents' && runningTasksCount > 0 && (
-                  <span className="ml-1.5 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-purple-500 px-1 text-[10px] font-bold text-white">
-                    {runningTasksCount}
-                  </span>
-                )}
               </Pill>
             </Tooltip>
           </Fragment>

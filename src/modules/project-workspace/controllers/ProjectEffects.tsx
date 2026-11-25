@@ -14,11 +14,13 @@ export default function ProjectEffects({
     refreshProjectsSilently,
     setActiveTab,
     setSidebarOpen,
+    openNewChat,
   } = useProjectEffectsState();
 
   usePaletteOpsRegister({
     openSettings,
     refreshProjects: refreshProjectsSilently,
+    openNewChat,
   });
 
   useEffect(() => {

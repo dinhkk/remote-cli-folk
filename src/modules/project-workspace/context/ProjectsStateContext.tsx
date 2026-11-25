@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
@@ -9,7 +9,7 @@ type ProjectsState = ReturnType<typeof useProjectsState>;
 
 type ProjectSidebarState = Pick<
   ProjectsState,
-  'sidebarOpen' | 'setSidebarOpen' | 'sidebarSharedProps'
+  'sidebarOpen' | 'setSidebarOpen' | 'sidebarSharedProps' | 'handleSessionRelease'
 >;
 
 type ProjectMainState = Pick<
@@ -37,7 +37,10 @@ type ProjectCommandState = Pick<
 type ProjectEffectsState = Pick<
   ProjectsState,
   'openSettings' | 'refreshProjectsSilently' | 'setActiveTab' | 'setSidebarOpen'
->;
+> & {
+  /** Selects the sidebar project with this id and opens an empty chat on it; does nothing for an unknown id. */
+  openNewChat: (projectId: string) => void;
+};
 
 type ProjectActiveSessionState = {
   activeSessionId: string | null;
@@ -75,13 +78,23 @@ export function ProjectsStateProvider({
     isSessionProcessing,
   });
 
+  // The project list the id lookup below reads; kept in a ref so `openNewChat` stays stable while the list changes.
+  const projectsRef = useRef(state.projects);
+  useEffect(() => { projectsRef.current = state.projects; });
+  const { handleNewSession } = state;
+  const openNewChat = useCallback((projectId: string) => {
+    const project = projectsRef.current.find((candidate) => candidate.projectId === projectId);
+    if (project) handleNewSession(project);
+  }, [handleNewSession]);
+
   const sidebarState = useMemo<ProjectSidebarState>(
     () => ({
       sidebarOpen: state.sidebarOpen,
       setSidebarOpen: state.setSidebarOpen,
       sidebarSharedProps: state.sidebarSharedProps,
+      handleSessionRelease: state.handleSessionRelease,
     }),
-    [state.sidebarOpen, state.setSidebarOpen, state.sidebarSharedProps],
+    [state.sidebarOpen, state.setSidebarOpen, state.sidebarSharedProps, state.handleSessionRelease],
   );
 
   const mainState = useMemo<ProjectMainState>(
@@ -133,8 +146,10 @@ export function ProjectsStateProvider({
       refreshProjectsSilently: state.refreshProjectsSilently,
       setActiveTab: state.setActiveTab,
       setSidebarOpen: state.setSidebarOpen,
+      openNewChat,
     }),
     [
+      openNewChat,
       state.openSettings,
       state.refreshProjectsSilently,
       state.setActiveTab,

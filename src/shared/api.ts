@@ -2,6 +2,7 @@ import { requestMfaReauth,
   expireAuthSession,
   lockAuthSession,
   getStoredAuthToken } from '@/shared/authToken';
+import type { AgentMonitorKillRequest, AgentSessionScopePayload, GenerateAgentsRequest, MemoryBlockInput } from '@/shared/types';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { isBlockedInTargetMode } from '@/shared/transport/target-route-policy';
 import { TargetUrlError, httpUrl, isTargetMode } from '@/shared/transport/target-context';
@@ -515,10 +516,13 @@ export const api = {
     setCustomModelsOnly: (provider: string, enabled: boolean) =>
       put(`/api/providers/${provider}/models/custom-only`, { enabled }),
 
+    // `scope` (Agent Profiles) is optional and must be left out entirely for a plain chat: the server answers 400
+    // to `scope: null`. `scope: { agentName }` runs the chat as that native agent; `{ agentName: null }` = no main agent.
     createSession: (payload: {
       provider: string;
       projectPath: string;
       initialMessage?: unknown;
+      scope?: AgentSessionScopePayload;
     }) => post('/api/providers/sessions', payload),
     sessionMessages: (
       sessionId: string,
@@ -558,6 +562,53 @@ export const api = {
       get(`/api/providers/${encodeURIComponent(provider)}/skills${query({ workspacePath })}`),
     saveSkills: (provider: string, payload: unknown) =>
       post(`/api/providers/${provider}/skills`, payload),
+  },
+
+  // Agent Profiles (Settings → Agent Profiles). Management routes are Host-only; a Remote tab gets a local 403.
+  // Bodies of PUT requests carry the `rev` the record was loaded with (stale → 409 PROFILE_STALE).
+  agentProfiles: {
+    listTemplates: () => get('/api/agent-profiles/templates'),
+    createTemplate: (body: unknown) => post('/api/agent-profiles/templates', body),
+    updateTemplate: (id: string, body: unknown) =>
+      put(`/api/agent-profiles/templates/${encodeURIComponent(id)}`, body),
+    deleteTemplate: (id: string) => del(`/api/agent-profiles/templates/${encodeURIComponent(id)}`),
+
+    // App-owned memory blocks (Settings → Agent Profiles → Memory). An update body carries `expectedRev` (the `rev` it was loaded with).
+    listMemoryBlocks: () => get('/api/agent-profiles/memory-blocks'),
+    createMemoryBlock: (body: MemoryBlockInput) => post('/api/agent-profiles/memory-blocks', body),
+    updateMemoryBlock: (id: string, body: MemoryBlockInput & { expectedRev: number }) =>
+      put(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}`, body),
+    deleteMemoryBlock: (id: string) => del(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}`),
+
+    // Generate agent files from templates into `<directory>/.claude/agents` (no directory = `~/.claude/agents`).
+    // `values` must be sent in full on every call: the server does not merge remembered values.
+    previewGenerate: (body: GenerateAgentsRequest) => post('/api/agent-profiles/generate/preview', body),
+    generate: (body: GenerateAgentsRequest) => post('/api/agent-profiles/generate', body),
+    // Values remembered for a folder (no directory = the global scope); only used to pre-fill the Generate form.
+    generateValues: (directory?: string | null) =>
+      get(`/api/agent-profiles/generate/values${query({ directory })}`),
+
+    // The only Agent Profiles route a Remote tab may call: the main agents a new chat in a sidebar project can start as
+    // (`projectId` = `Project.projectId`, the id GET /api/projects returns); names only, no folders, prompts or values.
+    scopeOptions: (projectId: string) =>
+      get(`/api/agent-profiles/scope-options${query({ projectId })}`),
+
+    // The agent list: built-ins, `~/.claude/agents` and, with `directory` (a sidebar project's absolute folder), `<directory>/.claude/agents`.
+    claudeAgents: (directory?: string | null) =>
+      get(`/api/agent-profiles/claude-agents${query({ directory })}`),
+    setHiddenClaudeAgents: (body: { names: string[]; rev: number }) =>
+      put('/api/agent-profiles/claude-agents/hidden', body),
+  },
+
+  // Agent Monitor (header icon → Activity drawer / full view). Read-only; a Remote tab may call both (the owner's decision).
+  // `snapshot`: the open screen polls it about once a second, and every call also keeps the server's CPU/RAM sampler and
+  // terminal transcript reading alive, so stop polling when the screen is not shown.
+  // `summary`: the few numbers of the header badge; cheap, starts nothing, polled slowly while the screen is closed.
+  agentMonitor: {
+    snapshot: (options: ApiRequestOptions = {}) => get('/api/agent-monitor/snapshot', options),
+    summary: (options: ApiRequestOptions = {}) => get('/api/agent-monitor/summary', options),
+    // `kill`: stops one agent or kills the processes of a node. The body names a session and a node, never a process id.
+    kill: (body: AgentMonitorKillRequest, options: ApiRequestOptions = {}) => post('/api/agent-monitor/kill', body, options),
   },
 
   // Slash commands

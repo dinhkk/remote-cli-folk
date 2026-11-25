@@ -14,6 +14,23 @@ type LiveClaudeCliSession = {
 };
 
 /**
+ * One Claude CLI process the registry lists as alive, busy or not. `pid` is what lets the agent monitor measure
+ * its CPU and memory; `entrypoint` is how the CLI was started (the app's own runs say `remotecli`).
+ */
+export type LiveClaudeCliProcess = {
+  providerSessionId: string;
+  pid: number;
+  status: string;
+  startedAt: number;
+  cwd: string | null;
+  entrypoint: string | null;
+  /** The CLI's own name for the session (derived from the folder, or set by `/rename`); null when absent. */
+  name: string | null;
+  /** When the CLI last changed `status` (ms since epoch); null when the file does not say. */
+  statusUpdatedAt: number | null;
+};
+
+/**
  * Claude Code keeps one file per running session here, named `<pid>.json`.
  * The directory belongs to the CLI, not to CloudCLI: it is only ever read.
  */
@@ -63,8 +80,8 @@ async function isRecordedProcessAlive(pid: number, procStart: unknown): Promise<
   }
 }
 
-/** Reads one registry file, returning null for anything that is not a live busy session. */
-async function readLiveBusySession(filePath: string): Promise<LiveClaudeCliSession | null> {
+/** Reads one registry file, returning null for anything that is not a live session (any status). */
+async function readLiveProcess(filePath: string): Promise<LiveClaudeCliProcess | null> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(await fsp.readFile(filePath, 'utf8'));
@@ -81,7 +98,7 @@ async function readLiveBusySession(filePath: string): Promise<LiveClaudeCliSessi
 
   const providerSessionId = typeof record.sessionId === 'string' ? record.sessionId : '';
   const pid = typeof record.pid === 'number' ? record.pid : NaN;
-  if (!providerSessionId || !Number.isInteger(pid) || pid <= 0 || record.status !== 'busy') {
+  if (!providerSessionId || !Number.isInteger(pid) || pid <= 0) {
     return null;
   }
 
@@ -89,8 +106,40 @@ async function readLiveBusySession(filePath: string): Promise<LiveClaudeCliSessi
     return null;
   }
 
-  const startedAt = typeof record.startedAt === 'number' ? record.startedAt : Date.now();
-  return { providerSessionId, startedAt };
+  return {
+    providerSessionId,
+    pid,
+    status: typeof record.status === 'string' ? record.status : '',
+    startedAt: typeof record.startedAt === 'number' ? record.startedAt : Date.now(),
+    cwd: typeof record.cwd === 'string' ? record.cwd : null,
+    entrypoint: typeof record.entrypoint === 'string' ? record.entrypoint : null,
+    name: typeof record.name === 'string' && record.name ? record.name : null,
+    statusUpdatedAt: typeof record.statusUpdatedAt === 'number' ? record.statusUpdatedAt : null,
+  };
+}
+
+/**
+ * Lists every Claude CLI process the registry knows to be alive, busy or idle.
+ *
+ * Used by the agent monitor to find the process (and so the process tree) behind a session. Like the busy list it
+ * reads the CLI's registry on every call and never caches or writes it.
+ */
+export async function listLiveClaudeCliProcesses(): Promise<LiveClaudeCliProcess[]> {
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(registryDirectory());
+  } catch {
+    // No registry directory at all is the normal case for an install that has
+    // never run the CLI, and an unreadable one is not worth failing a poll for.
+    return [];
+  }
+
+  const registryFiles = entries.filter((entry) => entry.endsWith('.json')).slice(0, MAX_REGISTRY_FILES);
+  const processes = await Promise.all(
+    registryFiles.map((entry) => readLiveProcess(path.join(registryDirectory(), entry))),
+  );
+
+  return processes.filter((live): live is LiveClaudeCliProcess => live !== null);
 }
 
 /**
@@ -103,19 +152,7 @@ async function readLiveBusySession(filePath: string): Promise<LiveClaudeCliSessi
  * is recomputed on every read instead of being cached or persisted.
  */
 export async function listBusyClaudeCliSessions(): Promise<LiveClaudeCliSession[]> {
-  let entries: string[];
-  try {
-    entries = await fsp.readdir(registryDirectory());
-  } catch {
-    // No registry directory at all is the normal case for an install that has
-    // never run the CLI, and an unreadable one is not worth failing a poll for.
-    return [];
-  }
-
-  const registryFiles = entries.filter((entry) => entry.endsWith('.json')).slice(0, MAX_REGISTRY_FILES);
-  const sessions = await Promise.all(
-    registryFiles.map((entry) => readLiveBusySession(path.join(registryDirectory(), entry))),
-  );
-
-  return sessions.filter((session): session is LiveClaudeCliSession => session !== null);
+  return (await listLiveClaudeCliProcesses())
+    .filter((live) => live.status === 'busy')
+    .map(({ providerSessionId, startedAt }) => ({ providerSessionId, startedAt }));
 }
