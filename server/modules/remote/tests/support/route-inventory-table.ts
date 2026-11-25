@@ -90,7 +90,7 @@ export function mountMismatches(indexSource: string, modules: readonly RouteModu
   return problems;
 }
 
-/** Rows (method x path) the whole inventory expands to: 94 allow + 95 deny. Pinned: a different number is a route change to review. */
+/** Rows (method x path) the whole inventory expands to: 95 allow + 94 deny. Pinned: a different number is a route change to review. */
 export const EXPECTED_INVENTORY_ROWS = 208;
 
 /** The literal-path registrations of `server/index.ts` that are not router mounts (everything else must be in ROUTE_MODULES). */
