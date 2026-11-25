@@ -187,18 +187,23 @@ export function createProcessKiller({ readProcesses, run, serverPid, platform = 
       const members = treePids(before, rootPid);
       // A tree that holds another chat's Claude would take it down too.
       if (context.otherRoots.some((other) => other !== rootPid && members.includes(other))) return { result: 'refused', count: 0 };
-      const ordered = members.slice(0, MAX_KILL_PIDS);
-
-      // Windows' `/T` walks the tree itself; POSIX has no tree kill, so the root goes first (nothing respawns), then each child.
-      await execute(platform === 'win32'
-        ? killInvocations(platform, [rootPid], { tree: true }, systemRoot)
-        : killInvocations(platform, ordered, { tree: false }, systemRoot));
+      // Windows' `/T` walks the tree itself. POSIX has no tree kill: the root goes first and alone (so nothing respawns
+      // its children), then every other member, in batches, so a tree of any size is taken down completely.
+      if (platform === 'win32') {
+        await execute(killInvocations(platform, [rootPid], { tree: true }, systemRoot));
+      } else {
+        await execute(killInvocations(platform, [rootPid], { tree: false }, systemRoot));
+        const rest = members.filter((pid) => pid !== rootPid);
+        for (let index = 0; index < rest.length; index += MAX_KILL_PIDS) {
+          await execute(killInvocations(platform, rest.slice(index, index + MAX_KILL_PIDS), { tree: false }, systemRoot));
+        }
+      }
 
       const after = await read();
       if (!after) return { result: 'error', count: 0 };
-      const rootStart = before.byPid.get(rootPid)?.startedAt;
-      const alive = after.byPid.has(rootPid) && after.byPid.get(rootPid)?.startedAt === rootStart;
-      return alive ? { result: 'error', count: 0 } : { result: 'killed', count: members.length };
+      // A pid counts as alive only with the start time it had before: a reused pid is a different process.
+      const survivors = members.filter((pid) => after.byPid.has(pid) && after.byPid.get(pid)?.startedAt === before.byPid.get(pid)?.startedAt);
+      return survivors.length === 0 ? { result: 'killed', count: members.length } : { result: 'error', count: members.length - survivors.length };
     },
   };
 }

@@ -63,7 +63,7 @@ const outcomeToResponse = ({ result, count }: KillOutcome): AgentMonitorKillResp
  * is taken from the client, or given back.
  *
  * After a kill that ends a session's process the run loop is quiet, the chat run ends as aborted and every agent of the
- * aggregator's picture is stopped, so the screens do not keep a dead session "running". Two kills of one session at once run
+ * aggregator's picture is stopped, so the screens do not keep a dead session "running". Two identical kills (same session, node and mode) at once run
  * once.
  */
 export function createAgentMonitorKiller(deps: KillerDeps) {
@@ -159,10 +159,13 @@ export function createAgentMonitorKiller(deps: KillerDeps) {
       if (!sessionId || sessionId.length > MAX_ID_LENGTH || nodeId.length > MAX_ID_LENGTH || (request.mode !== 'stop' && request.mode !== 'kill')) {
         return { result: 'refused' };
       }
-      const running = inFlight.get(sessionId);
+      // One request per exact target: a second ask for the same node and mode shares the answer, but a different node of the
+      // same session (a group while the tree is going down) is its own request and gets its own outcome.
+      const key = JSON.stringify([sessionId, nodeId, request.mode]);
+      const running = inFlight.get(key);
       if (running) return running;
-      const attempt = run(request).catch((): AgentMonitorKillResponse => ({ result: 'error' })).finally(() => { inFlight.delete(sessionId); });
-      inFlight.set(sessionId, attempt);
+      const attempt = run(request).catch((): AgentMonitorKillResponse => ({ result: 'error' })).finally(() => { inFlight.delete(key); });
+      inFlight.set(key, attempt);
       return attempt;
     },
   };

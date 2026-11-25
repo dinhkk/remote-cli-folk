@@ -261,7 +261,7 @@ export const api = {
     mfaStatus: () => get('/api/auth/mfa/status'),
     mfaVerify: (challenge: string, code: string, recovery = false) => post('/api/auth/mfa/verify', { challenge, code, recovery }),
     mfaReauth: (code: string) => post('/api/auth/mfa/reauth', { code }),
-    mfaEnroll: (password: string) => post('/api/auth/mfa/enroll', { password }),
+    mfaEnroll: (password: string, code?: string) => post('/api/auth/mfa/enroll', code === undefined ? { password } : { password, code }),
     mfaActivate: (code: string) => post('/api/auth/mfa/activate', { code }),
     mfaDisable: (password: string, code: string) => post('/api/auth/mfa/disable', { password, code }),
     mfaRecoveryCodes: (password: string, code: string) => post('/api/auth/mfa/recovery-codes', { password, code }),

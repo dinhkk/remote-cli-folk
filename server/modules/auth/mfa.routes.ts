@@ -73,8 +73,13 @@ export function createMfaRouter(verifyPassword: (id: number, password: string, i
   router.post('/mfa/enroll', authenticate, handle(async (req, res) => {
     if (IS_PLATFORM) throw new AppError('TOTP cannot be used in platform mode', { code: 'MFA_PLATFORM_UNSUPPORTED', statusCode: 409 });
     const { user, session } = credentials(req);
-    await passwordCheck(req, user.id);
-    requireRecentMfa(user.id, session);
+    if (getMfaStore().enabled(user.id)) {
+      // Re-enrolling replaces the seed and the recovery codes, exactly what disabling TOTP would allow: it needs the same step-up.
+      await stepUp(req, user.id, session);
+    } else {
+      await passwordCheck(req, user.id);
+      requireRecentMfa(user.id, session);
+    }
     res.json(getMfaStore().beginEnrollment(user.id, user.username, session.id));
   }));
   router.post('/mfa/activate', authenticate, handle((req, res) => {
