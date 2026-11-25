@@ -35,6 +35,7 @@ async function requestJson(url, { method = 'POST', body = null, headers = {} } =
     const response = await fetch(url, {
       method,
       signal: controller.signal,
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         ...headers,
@@ -60,7 +61,7 @@ export class DesktopNotificationsController {
     getAccountEmail,
     getRunningEnvironmentUrls,
     getApiKey,
-    getAuthToken,
+    getAuthCookie,
     getIconPath,
     openNotificationTarget,
     onChange,
@@ -72,7 +73,7 @@ export class DesktopNotificationsController {
     this.getAccountEmail = getAccountEmail;
     this.getRunningEnvironmentUrls = getRunningEnvironmentUrls;
     this.getApiKey = getApiKey;
-    this.getAuthToken = getAuthToken;
+    this.getAuthCookie = getAuthCookie;
     this.getIconPath = getIconPath;
     this.openNotificationTarget = openNotificationTarget;
     this.onChange = onChange;
@@ -277,15 +278,15 @@ export class DesktopNotificationsController {
   }
 
   async getTargetAuthHeaders(httpUrl) {
-    const headers = {};
+    const headers = { Origin: new URL(httpUrl).origin, 'X-RemoteCLI-Request': '1' };
     const apiKey = this.getApiKey?.();
     if (apiKey) {
       headers['X-API-Key'] = apiKey;
     }
 
-    const authToken = await Promise.resolve(this.getAuthToken?.(httpUrl)).catch(() => null);
-    if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`;
+    const authCookie = await Promise.resolve(this.getAuthCookie?.(httpUrl)).catch(() => null);
+    if (authCookie) {
+      headers.Cookie = authCookie;
     }
     return headers;
   }

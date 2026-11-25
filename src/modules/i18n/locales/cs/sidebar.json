@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "Připnuté projekty",
+    "other": "Další projekty ({{count}})"
+  },
   "projects": {
     "title": "Projekty",
     "newProject": "Nový projekt",
@@ -199,5 +203,11 @@
     "deleteAllData": "Trvale smazat všechna data",
     "allConversationsDeleted": "Projekt bude odstraněn z postranního panelu. Vaše soubory, paměť a data relací zůstanou zachovány.",
     "cannotUndo": "Projekt můžete později znovu přidat."
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }

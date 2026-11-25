@@ -7,7 +7,7 @@
  * No localStorage for messages. Backend JSONL is the source of truth.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { api } from '@/shared/api';
 import type { LLMProvider, NormalizedMessage } from '@/shared/types';
@@ -287,6 +287,43 @@ function dedupeAdjacentAssistantEchoes(merged: NormalizedMessage[]): NormalizedM
   return out;
 }
 
+function errorText(content: string | undefined, provider: LLMProvider): string | undefined {
+  if (!content) return content;
+  // Only this documented Claude runtime wrapper is equivalent to its recorded error.
+  if (provider === 'claude') content = content.replace(/^Claude Code returned an error result: /, '');
+  try {
+    const parsed: unknown = JSON.parse(content);
+    if (parsed && typeof parsed === 'object' && 'message' in parsed && typeof parsed.message === 'string') {
+      return parsed.message;
+    }
+    if (parsed && typeof parsed === 'object' && 'error' in parsed
+      && parsed.error && typeof parsed.error === 'object' && 'message' in parsed.error
+      && typeof parsed.error.message === 'string') return parsed.error.message;
+  } catch { /* Plain error text is already canonical. */ }
+  return content;
+}
+
+/** Match an on-disk error only within the same prompt interval, not across turns. */
+function isErrorEchoedOnServer(message: NormalizedMessage, server: NormalizedMessage[]): boolean {
+  if (message.kind !== 'error') return false;
+  const matches = (row: NormalizedMessage) => row.kind === 'error'
+    && row.sessionId === message.sessionId && row.provider === message.provider
+    && errorText(row.content, row.provider) === errorText(message.content, message.provider);
+  if (server.some(row => matches(row) && row.timestamp === message.timestamp)) return true;
+  const time = readMessageTime(message);
+  if (time === null) return false;
+  let start = -1;
+  for (let index = 0; index < server.length; index++) {
+    const row = server[index];
+    const rowTime = readMessageTime(row);
+    if (row.kind === 'text' && row.role === 'user' && rowTime !== null && rowTime <= time) start = index;
+  }
+  if (start < 0) return false;
+  let end = start + 1;
+  while (end < server.length && !(server[end].kind === 'text' && server[end].role === 'user')) end++;
+  return server.slice(start + 1, end).some(matches);
+}
+
 /**
  * After a server refresh, drop only the realtime rows the persisted transcript
  * already owns. Anything not yet on disk (common right after `complete`, while
@@ -305,7 +342,7 @@ function pruneRealtimeSupersededByServer(
   const reconciledRealtimeMessages = removeOptimisticUserEchoes(serverMessages, realtimeMessages);
 
   return reconciledRealtimeMessages.filter((message) => {
-    if (serverIds.has(message.id)) {
+    if (serverIds.has(message.id) || isErrorEchoedOnServer(message, serverMessages)) {
       return false;
     }
 
@@ -348,7 +385,7 @@ function computeMerged(server: NormalizedMessage[], realtime: NormalizedMessage[
   const serverIds = new Set(server.map((message) => message.id));
   const reconciledRealtime = removeOptimisticUserEchoes(server, realtime);
   const extra = reconciledRealtime.filter((message) => {
-    if (serverIds.has(message.id)) {
+    if (serverIds.has(message.id) || isErrorEchoedOnServer(message, server)) {
       return false;
     }
     return true;
@@ -550,6 +587,18 @@ const MAX_REALTIME_MESSAGES = 500;
 
 export function useSessionStore() {
   const storeRef = useRef(new Map<string, SessionSlot>());
+  const revisions = useRef(new Map<string, number>());
+  const listeners = useRef(new Map<string, Set<() => void>>());
+  const subscribe = useCallback((sessionId: string, listener: () => void) => {
+    const group = listeners.current.get(sessionId) ?? new Set<() => void>();
+    group.add(listener);
+    listeners.current.set(sessionId, group);
+    return () => {
+      group.delete(listener);
+      if (group.size === 0) listeners.current.delete(sessionId);
+    };
+  }, []);
+  const getRevision = useCallback((sessionId: string) => revisions.current.get(sessionId) ?? 0, []);
   const activeSessionIdRef = useRef<string | null>(null);
   // Bump to force re-render — only when the active session's data changes.
   // Session ids are stable for the whole conversation lifetime (the backend
@@ -557,6 +606,8 @@ export function useSessionStore() {
   // no alias/redirect indirection.
   const [, setTick] = useState(0);
   const notify = useCallback((sessionId: string) => {
+    revisions.current.set(sessionId, (revisions.current.get(sessionId) ?? 0) + 1);
+    listeners.current.get(sessionId)?.forEach(listener => listener());
     if (sessionId === activeSessionIdRef.current) {
       setTick(n => n + 1);
     }
@@ -754,6 +805,12 @@ export function useSessionStore() {
       msg.sessionId === sessionId
         ? msg
         : { ...msg, sessionId };
+    // Replay can race the live error or a second subscription on reconnect.
+    if (normalizedMessage.kind === 'error' && (
+      slot.realtimeMessages.some(row => row.kind === 'error' && row.id === normalizedMessage.id)
+      || isErrorEchoedOnServer(normalizedMessage,
+        [...slot.serverMessages, ...slot.realtimeMessages].sort(compareMessagesChronologically))
+    )) return;
     let updated = [...slot.realtimeMessages, normalizedMessage];
     if (updated.length > MAX_REALTIME_MESSAGES) {
       updated = updated.slice(-MAX_REALTIME_MESSAGES);
@@ -867,6 +924,8 @@ export function useSessionStore() {
   }, []);
 
   return useMemo(() => ({
+    subscribe,
+    getRevision,
     fetchFromServer,
     fetchMore,
     appendRealtime,
@@ -879,6 +938,7 @@ export function useSessionStore() {
     getMessages,
     getSessionSlot,
   }), [
+    subscribe, getRevision,
     fetchFromServer, fetchMore, appendRealtime, truncateAt, refreshLatestFromServer,
     setActiveSession, isStale, updateStreaming, finalizeStreaming,
     getMessages, getSessionSlot,
@@ -887,3 +947,11 @@ export function useSessionStore() {
 
 /** Full store API returned by useSessionStore; chat hooks take it as a parameter. */
 export type SessionStore = ReturnType<typeof useSessionStore>;
+
+/** Subscribe the visible consumer directly, even when the store owner is memoized. */
+export function useSessionStoreRevision(store: SessionStore, sessionId: string | null) {
+  const subscribe = useCallback((listener: () => void) =>
+    sessionId ? store.subscribe(sessionId, listener) : () => {}, [store, sessionId]);
+  const snapshot = useCallback(() => sessionId ? store.getRevision(sessionId) : 0, [store, sessionId]);
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}

@@ -746,3 +746,40 @@ test('a file in another folder of the workspace can be read, but never written t
     await fsPromises.rm(outsideDirectory, { recursive: true, force: true });
   }
 });
+
+test('HP-01/HP-10d: the HTML preview opens only .html/.htm files inside the project root', async () => {
+  const projectRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'file-tree-preview-'));
+  const outside = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'file-tree-preview-outside-'));
+  try {
+    await fsPromises.mkdir(path.join(projectRoot, 'site', 'folder.html'), { recursive: true });
+    await fsPromises.writeFile(path.join(projectRoot, 'site', 'index.html'), '<p>inside</p>');
+    await fsPromises.writeFile(path.join(projectRoot, 'old.HTM'), '<p>htm</p>');
+    await fsPromises.writeFile(path.join(projectRoot, 'notes.txt'), 'text');
+    await fsPromises.writeFile(path.join(outside, 'page.html'), '<p>outside</p>');
+    // The workspace root is wider than the project: the raw-file route could read `outside`, the preview cannot.
+    const service = createRealFileSystemService(projectRoot, os.tmpdir());
+    const read = async (filePath: string) => {
+      const { stream } = await service.openHtmlPreview('project-1', filePath, 1024);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(chunk as Buffer);
+      return Buffer.concat(chunks).toString('utf8');
+    };
+    assert.equal(await read('site/index.html'), '<p>inside</p>');
+    assert.equal(await read(path.join(projectRoot, 'site', 'index.html')), '<p>inside</p>');
+    assert.equal(await read('old.HTM'), '<p>htm</p>');
+    const code = (expected: string) => (error: unknown) => (error as AppError).code === expected;
+    for (const escape of [path.join(outside, 'page.html'), `../${path.basename(outside)}/page.html`, '../../../etc/hostname.html']) {
+      await assert.rejects(service.openHtmlPreview('project-1', escape, 1024), code('PATH_OUTSIDE_PROJECT'), escape);
+    }
+    await assert.rejects(service.openHtmlPreview('project-1', 'notes.txt', 1024), code('HTML_PREVIEW_UNSUPPORTED'));
+    await assert.rejects(service.openHtmlPreview('project-1', 'missing.html', 1024), code('FILE_NOT_FOUND'));
+    await assert.rejects(service.openHtmlPreview('project-1', 'site/folder.html', 1024), code('FILE_NOT_FOUND'));
+    // The size limit: the file is not opened when it is larger.
+    await assert.rejects(service.openHtmlPreview('project-1', 'site/index.html', 5), code('HTML_PREVIEW_TOO_LARGE'));
+    const exact = await service.openHtmlPreview('project-1', 'site/index.html', '<p>inside</p>'.length);
+    exact.stream.destroy();
+  } finally {
+    await fsPromises.rm(projectRoot, { recursive: true, force: true });
+    await fsPromises.rm(outside, { recursive: true, force: true });
+  }
+});

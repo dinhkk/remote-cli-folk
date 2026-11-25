@@ -134,7 +134,8 @@
     "browser": "Navegador",
     "notifications": "Notificaciones",
     "plugins": "Plugins",
-    "about": "Acerca de"
+    "about": "Acerca de",
+    "sessions": "Sessions"
   },
   "notifications": {
     "title": "Notificaciones",
@@ -694,7 +695,8 @@
     "disable": "Desactivar",
     "installAriaLabel": "URL del repositorio git del plugin",
     "tab": "pestaña",
-    "runningStatus": "en ejecución"
+    "runningStatus": "en ejecución",
+    "disabledByServer": "Los plugins están desactivados por la configuración de este servidor."
   },
   "skillsPage": {
     "description": "Gestiona las skills de {{provider}} desde archivos locales, carpetas completas y ubicaciones según el proyecto.",
@@ -882,5 +884,17 @@
     "teamManagementDescription": "Varios usuarios, acceso por roles y proyectos compartidos para tu equipo.",
     "licensed": "Con licencia AGPL-3.0",
     "proCta": "Disponible con RemoteCLI Pro"
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Review signed-in browsers. Signing out also disconnects that session’s open tabs. Sessions expire seven days after sign-in.",
+    "logout": "Sign out this device",
+    "current": "This device",
+    "lastSeen": "Last active",
+    "expires": "Expires",
+    "revoke": "Sign out",
+    "password": "Confirm your password to sign out every device",
+    "logoutAll": "Sign out all devices",
+    "error": "Could not update sessions. Check your connection and try again."
   }
 }

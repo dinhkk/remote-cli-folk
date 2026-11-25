@@ -674,8 +674,8 @@ async function openNotificationTarget({ environmentUrl, sessionId = null }) {
   return getDesktopState();
 }
 
-async function getEnvironmentAuthToken(environmentUrl) {
-  return (await desktopWindow?.readAuthTokenForTarget(environmentUrl)) || null;
+async function getEnvironmentAuthCookie(environmentUrl) {
+  return (await desktopWindow?.readAuthCookieForTarget(environmentUrl)) || null;
 }
 
 async function clearCloudAccount() {
@@ -928,7 +928,7 @@ async function bootstrap() {
     getAccountEmail: () => cloud.getAccount()?.email || null,
     getRunningEnvironmentUrls,
     getApiKey: () => cloud.getAccount()?.apiKey || '',
-    getAuthToken: getEnvironmentAuthToken,
+    getAuthCookie: getEnvironmentAuthCookie,
     getIconPath: getWindowIconPath,
     openNotificationTarget,
     onChange: syncDesktopState,

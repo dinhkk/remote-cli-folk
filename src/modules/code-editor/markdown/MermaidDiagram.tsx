@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react';
 // Type-only: erased at build time, so it does not pull mermaid into the main chunk.
 import type mermaid from 'mermaid';
 
+import { sanitizeMermaidSvg } from '@/modules/code-editor/markdown/sanitizeMermaidSvg';
 import { useTheme } from '@/shared/context/ThemeContext';
 
 // Mermaid is ~1.5MB minified, so it is loaded on demand the first time a
@@ -48,7 +49,7 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
       })
       .then((result) => {
         if (!cancelled) {
-          setSvg(result.svg);
+          setSvg(sanitizeMermaidSvg(result.svg) || null);
         }
       })
       .catch(() => {

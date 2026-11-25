@@ -21,6 +21,7 @@
 import type { IncomingMessage } from 'node:http';
 
 import { WebSocket } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import type { RemoteBrowserConnection, RemoteMuxStream, RemoteStreamEnd, RemoteUpgradeVerdict, RemoteWebSocketGateway } from '@/shared/types.js';
 
@@ -66,7 +67,7 @@ export type RemoteWebSocketGatewayOptions = {
   maxMessageBytes?: number;
 };
 
-type UpgradeContext = { peerId: string; path: '/ws' | '/shell' };
+type UpgradeContext = { peerId: string; sessionId: string; path: '/ws' | '/shell' };
 
 const refuse = (status: number, reason: string): RemoteUpgradeVerdict => ({ ok: false, status, reason });
 
@@ -185,7 +186,9 @@ export function createRemoteWebSocketGateway(options: RemoteWebSocketGatewayOpti
         dispose();
       }
     }
-    contexts.set(request, { peerId, path: channel === 'shell' ? '/shell' : '/ws' });
+    const parent = tabs.authenticate(token, peerId);
+    if (!parent.ok) return refuse(401, 'unauthorized');
+    contexts.set(request, { peerId, sessionId: parent.user.sessionId, path: channel === 'shell' ? '/shell' : '/ws' });
     return { ok: true };
   };
 
@@ -196,7 +199,11 @@ export function createRemoteWebSocketGateway(options: RemoteWebSocketGatewayOpti
       socket.close(1008, 'unauthorized');
       return;
     }
-    const { peerId, path } = context;
+    const { peerId, path, sessionId } = context;
+    if (!getSessionRuntime().store.getActive(sessionId)) {
+      socket.close(4401, 'session-ended');
+      return;
+    }
 
     let stream: RemoteMuxStream | undefined;
     let untrack: () => void = () => undefined;
@@ -253,10 +260,17 @@ export function createRemoteWebSocketGateway(options: RemoteWebSocketGatewayOpti
         closeBrowser(code, reason);
       },
     };
-    untrack = registry.trackConnection(peerId, connection);
+    const untrackPeer = registry.trackConnection(peerId, connection);
+    const untrackSession = getSessionRuntime().connections.track(sessionId, reason => connection.close(reason === 'locked' ? 4403 : 4401, reason === 'locked' ? 'session-locked' : 'session-ended'));
+    untrack = () => { untrackPeer(); untrackSession(); };
+    if (done) { untrack(); return; }
 
     socket.on('message', (data, isBinary) => {
       if (done) return;
+      if (!getSessionRuntime().store.getActive(sessionId)) {
+        connection.close(4401, 'session-ended');
+        return;
+      }
       const payload = data as Buffer; // the server socket keeps ws's default binaryType: one Buffer per message
       if (payload.length > maxMessage) {
         finish();

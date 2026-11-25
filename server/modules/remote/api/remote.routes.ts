@@ -78,7 +78,7 @@ export function createRemoteRoutes({ guards, resolveManagement }: RemoteRoutesOp
   router.get('/peers', handle((_req, m) => m.listPeers()));
   router.post('/peers/join', handle((req, m) => m.joinPeer(req.body)));
   router.get('/peers/join/:joinId', handle((req, m) => m.joinStatus(id(req, 'joinId'))));
-  router.post('/peers/:peerId/tab-token', handle((req, m) => m.issueTabToken(req.user, id(req, 'peerId'))));
+  router.post('/peers/:peerId/tab-token', handle((req, m) => m.issueTabToken(req.user, id(req, 'peerId'), req.authSession?.id ?? '')));
   router.delete('/peers/:peerId', handle((req, m) => m.forgetPeer(id(req, 'peerId'))));
   // Local label only (nothing goes to the Host or the relay), so no password: it is not a sensitive action.
   router.put('/peers/:peerId/alias', handle((req, m) => m.setPeerAlias(id(req, 'peerId'), req.body)));

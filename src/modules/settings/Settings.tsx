@@ -15,6 +15,7 @@ import NotificationsSettingsTab from '@/modules/settings/tabs/NotificationsSetti
 import TasksSettingsTab from '@/modules/settings/tabs/tasks-settings/TasksSettingsTab';
 import { PluginSettingsTab } from '@/modules/plugins';
 import { RemoteSettingsTab } from '@/modules/remote';
+import SessionsSettingsTab from '@/modules/settings/tabs/SessionsSettingsTab';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
 import { useWebPush } from '@/modules/settings/hooks/useWebPush';
@@ -276,6 +277,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               {activeTab === 'plugins' && <PluginSettingsTab />}
 
               {activeTab === 'remote' && <RemoteSettingsTab onClose={onClose} />}
+
+              {activeTab === 'sessions' && <SessionsSettingsTab />}
 
               {activeTab === 'about' && <AboutTab />}
             </div>

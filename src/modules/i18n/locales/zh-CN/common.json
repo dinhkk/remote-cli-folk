@@ -269,5 +269,11 @@
       "closeSidebar": "关闭侧边栏",
       "resizeSidebar": "调整侧边栏宽度"
     }
+  },
+  "remoteHosts": {
+    "loading": "正在加载主机…",
+    "loadError": "无法加载主机列表。列表加载后，所选主机的标签页将恢复。",
+    "retry": "重试",
+    "openLocal": "打开 Local"
   }
 }

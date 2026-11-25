@@ -270,13 +270,13 @@ export const chatRunRegistry = {
    * closed. Replay stays per-connection because each client sends its own
    * `lastSeq` with `chat.subscribe`.
    */
-  attachConnection(appSessionId: string, connection: RealtimeClientConnection): boolean {
+  attachConnection(appSessionId: string, connection: RealtimeClientConnection, errorsOnly = false): boolean {
     const run = runs.get(appSessionId);
     if (!run) {
       return false;
     }
 
-    run.writer.updateWebSocket(connection);
+    run.writer.updateWebSocket(connection, errorsOnly);
     return true;
   },
 

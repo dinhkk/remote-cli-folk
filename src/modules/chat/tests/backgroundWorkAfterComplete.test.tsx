@@ -275,3 +275,11 @@ test('a refused stop settles every running row of the task', () => {
     ['toolu_agent_1', 'toolu_agent_2'],
   );
 });
+
+
+test('UI-20: websocket connection notifications never enter the transcript', () => {
+  const { dispatch, stored, log } = renderHandlers();
+  dispatch({ kind: 'websocket_connected', timestamp: Date.now() } as ServerEvent);
+  assert.deepEqual(stored, []);
+  assert.deepEqual(log, []);
+});

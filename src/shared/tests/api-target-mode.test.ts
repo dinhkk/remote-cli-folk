@@ -4,7 +4,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import type * as ApiModule from '@/shared/api';
 import type * as AuthTokenModule from '@/shared/authToken';
-import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT } from '@/shared/authToken';
+import { AUTH_SESSION_EXPIRED_EVENT } from '@/shared/authToken';
 import type * as TargetContextModule from '@/shared/transport/target-context';
 import { frameWindow } from '@/shared/tests/framed-window';
 
@@ -80,12 +80,12 @@ beforeEach(() => {
   expiries = 0;
   refreshes = 0;
   window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, onExpired);
-  window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, onRefreshed);
+  window.addEventListener('auth-token-refreshed', onRefreshed);
 });
 
 afterEach(() => {
   window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, onExpired);
-  window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, onRefreshed);
+  window.removeEventListener('auth-token-refreshed', onRefreshed);
   vi.unstubAllGlobals();
   window.name = '';
   window.history.replaceState(null, '', '/');
@@ -206,7 +206,6 @@ test('a tab token that expired client-side does not clear the session; the page 
 test('the auth seam is inert in a tab: nothing is stored and expiring is a no-op', async () => {
   const { authToken } = await loadTarget();
 
-  assert.equal(authToken.storeAuthToken(tokenExpiringIn(600)), false);
   authToken.expireAuthSession();
 
   assert.equal(localStorage.getItem('auth-token'), null);

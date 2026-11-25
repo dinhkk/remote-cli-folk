@@ -6,7 +6,8 @@ import { WebSocket } from 'ws';
 export function handlePluginWsProxy(
   clientWs: WebSocket,
   pathname: string,
-  getPluginPort: (pluginName: string) => number | null
+  getPluginPort: (pluginName: string) => number | null,
+  isSessionActive: () => boolean = () => true,
 ): void {
   const pluginName = pathname.replace('/plugin-ws/', '');
   if (!pluginName || /[^a-zA-Z0-9_-]/.test(pluginName)) {
@@ -27,12 +28,14 @@ export function handlePluginWsProxy(
   });
 
   upstream.on('message', (data, isBinary) => {
+    if (!isSessionActive()) { clientWs.close(4401, 'session-ended'); return; }
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.send(data, { binary: isBinary });
     }
   });
 
   clientWs.on('message', (data, isBinary) => {
+    if (!isSessionActive()) { clientWs.close(4401, 'session-ended'); return; }
     if (upstream.readyState === WebSocket.OPEN) {
       upstream.send(data, { binary: isBinary });
     }

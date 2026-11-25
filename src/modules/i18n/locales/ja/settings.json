@@ -114,7 +114,8 @@
     "tasks": "タスク",
     "notifications": "通知",
     "plugins": "プラグイン",
-    "about": "概要"
+    "about": "概要",
+    "sessions": "Sessions"
   },
   "notifications": {
     "title": "通知",
@@ -557,6 +558,19 @@
     "disable": "無効にする",
     "installAriaLabel": "プラグインのgitリポジトリURL",
     "tab": "タブ",
-    "runningStatus": "実行中"
+    "runningStatus": "実行中",
+    "disabledByServer": "このサーバーの設定によりプラグインは無効になっています。"
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Review signed-in browsers. Signing out also disconnects that session’s open tabs. Sessions expire seven days after sign-in.",
+    "logout": "Sign out this device",
+    "current": "This device",
+    "lastSeen": "Last active",
+    "expires": "Expires",
+    "revoke": "Sign out",
+    "password": "Confirm your password to sign out every device",
+    "logoutAll": "Sign out all devices",
+    "error": "Could not update sessions. Check your connection and try again."
   }
 }

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
+vi.mock('@/shared/transport/event-source', () => ({ openEventSource: (url: string) => new FakeEventSource(url) }));
+
 import { cloneWorkspaceWithProgress } from '@/modules/project-creation-wizard/utils/workspaceApi';
 
 /**

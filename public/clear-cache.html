@@ -37,7 +37,7 @@
     <h1>Clear Cache & Service Worker</h1>
     <p>If you're seeing a blank page or old content, click the button below to clear all cached data.</p>
 
-    <button onclick="clearEverything()">Clear Cache & Reload</button>
+    <button id="clear-everything">Clear Cache & Reload</button>
 
     <div id="status"></div>
 
@@ -80,6 +80,9 @@
                 status.innerHTML += `<p class="error">✗ Error: ${error.message}</p>`;
             }
         }
+
+        // A listener: the page allows no inline event handler.
+        document.getElementById('clear-everything').addEventListener('click', clearEverything);
     </script>
 </body>
 </html>

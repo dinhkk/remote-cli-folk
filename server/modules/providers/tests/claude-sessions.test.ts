@@ -2286,3 +2286,39 @@ test('extractFirstValidJsonlData closes the file stream on the no-match path', {
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('EH-02: Claude recorded API errors are errors, without inventing failures for synthetic text', { concurrency: false }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'claude-recorded-error-'));
+  try {
+    const row = (uuid: string, seconds: number, error: boolean) => JSON.stringify({
+      type: 'assistant', uuid, sessionId: 'test-session-1', isApiErrorMessage: error,
+      timestamp: `2026-07-10T00:00:0${seconds}.000Z`,
+      message: { role: 'assistant', model: '<synthetic>', content: [{ type: 'text', text: error ? 'Synthetic API failure' : 'Usage notice' }] },
+    });
+    const file = await writeSessionJsonl(root, 'test-session-1.jsonl', [row('error-1', 1, true), row('notice-1', 2, false)]);
+    await withIsolatedDatabase(async () => {
+      const timestamp = '2026-07-10T00:00:00.000Z';
+      sessionsDb.createSession('test-session-1', 'claude', root, 'Synthetic error', timestamp, timestamp, file);
+      const provider = new ClaudeSessionsProvider({ getLiveRunStartTime: () => null });
+      for (let reload = 0; reload < 3; reload++) {
+        const result = await provider.fetchHistory('test-session-1', { providerSessionId: 'test-session-1' });
+        assert.deepEqual(result.messages.map(row => [row.kind, row.content]), [
+          ['text', 'first prompt'], ['error', 'Synthetic API failure'], ['text', 'Usage notice'],
+        ]);
+      }
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('EH-03: the live SDK assistant error is not an ordinary answer', () => {
+  const provider = new ClaudeSessionsProvider();
+  const content = 'Not logged in · Please run /login';
+  const raw = { type: 'assistant', session_id: 'native-error', uuid: 'sdk-error',
+    error: 'authentication_failed', message: { role: 'assistant', content: [{ type: 'text', text: content }] } };
+  const messages = provider.normalizeMessage(raw, 'error-session');
+  assert.deepEqual(messages.map(row => [row.kind, row.content]), [['error', content]]);
+  const ordinary = provider.normalizeMessage({ ...raw, error: undefined }, 'error-session');
+  assert.deepEqual(ordinary.map(row => [row.kind, row.content]), [['text', content]]);
+});

@@ -94,8 +94,14 @@ describe('uploads through Remote', () => {
     for (const item of cases) {
       const upload = singleFileUpload(item.field, item.filename, item.size, item.type);
       const remote = await viaRemote(item.path, upload);
+      // Local is reached as a browser would: session cookie, same-origin Origin and the request marker.
       const local = await uploadInChunks(world.host.baseUrl, item.path, {
-        headers: { authorization: `Bearer ${world.host.jwt}`, 'content-type': upload.contentType },
+        headers: {
+          cookie: `remotecli_session=${world.host.jwt}`,
+          origin: world.host.baseUrl,
+          'x-remotecli-request': '1',
+          'content-type': upload.contentType,
+        },
         body: upload.body,
       });
       assert.equal(remote.kind, 'response', item.filename);

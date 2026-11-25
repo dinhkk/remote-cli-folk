@@ -57,6 +57,7 @@ const LOADERS: Record<string, Loader> = {
   'modules/file-tree/file-tree.routes.ts': async () => (await import('../../../file-tree/file-tree.routes.js')).createFileTreeRouter(inert(), inert(), inert(), inert()),
   'modules/settings/settings.routes.ts': async () => (await import('../../../settings/settings.routes.js')).createSettingsRouter(inert()),
   'modules/user/user.routes.ts': async () => (await import('../../../user/user.routes.js')).createUserRouter(inert()),
+  'modules/auth/mfa.routes.ts': async () => (await import('../../../auth/mfa.routes.js')).createMfaRouter(inert(), inert()),
   'modules/auth/auth.routes.ts': async () => (await import('../../../auth/auth.routes.js')).createAuthRouter(inert(), inert()),
   'modules/commands/commands.routes.ts': async () => (await import('../../../commands/commands.routes.js')).createCommandsRouter(inert()),
   'modules/worktrees/worktrees.routes.ts': async () => (await import('../../../worktrees/worktrees.routes.js')).createWorktreesRouter(inert()),

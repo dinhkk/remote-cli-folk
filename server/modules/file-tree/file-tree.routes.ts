@@ -8,6 +8,8 @@ import type {
 } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
+import { HTML_PREVIEW_CSP } from './html-preview-csp.js';
+
 type FileTreeUploadLimits = {
   maximumFileSizeMegabytes: number;
   maximumFileCount: number;
@@ -16,6 +18,9 @@ type FileTreeUploadLimits = {
 type UploadedRequest = Request & {
   files?: Express.Multer.File[];
 };
+
+/** Largest file the HTML preview page serves: a document loaded into a frame, not a download. */
+const HTML_PREVIEW_MAXIMUM_BYTES = 10 * 1024 * 1024;
 
 function readBody(request: Request): Record<string, unknown> {
   return typeof request.body === 'object' && request.body !== null
@@ -131,6 +136,9 @@ export function createFileTreeRouter(
   }, logger));
 
   router.get('/projects/:projectId/files/content', createRouteHandler(async (request, response) => {
+    // Raw bytes of any type: a browser that opens one as a page gets an opaque origin and never sniffs the type.
+    response.setHeader('Content-Security-Policy', 'sandbox');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
     const file = await services.openFile(readProjectId(request), filePath);
     response.setHeader('Content-Type', file.contentType);
@@ -139,6 +147,41 @@ export function createFileTreeRouter(
       logger.error('Error streaming File Tree content', error);
       if (!response.headersSent) {
         response.status(500).json({ error: 'Error reading file' });
+      }
+    });
+  }, logger));
+
+  // The HTML preview frame loads this page (Local: the app's own frame; Remote: the Controller's frame, through the
+  // bridge): the file's script runs in a sandboxed document with an opaque origin and no network source, so it can
+  // read neither the session nor the app, nor call the server.
+  router.get('/projects/:projectId/files/html-preview', createRouteHandler(async (request, response) => {
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'no-store');
+    const { authKind } = request as Request & { authKind?: string };
+    // A browser session, or the Remote bridge: it forwards a request that the Controller already checked
+    // against the browser's own Fetch Metadata and session, and no other caller reaches this page.
+    if (authKind !== 'session' && authKind !== 'loopback') {
+      throw new AppError('The preview needs a browser session', { code: 'HTML_PREVIEW_SESSION_REQUIRED', statusCode: 401 });
+    }
+    // A browser session must send Fetch Metadata. A browser that sends none would get a refused frame, so its
+    // status check is refused too and the app falls back to displaying the HTML. The bridge has no browser at
+    // this end, and the Remote header allow-list does not carry Fetch Metadata, so it is not asked for there.
+    if (authKind === 'session' && ['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'].some((name) => typeof request.headers[name] !== 'string')) {
+      throw new AppError('This browser does not send Fetch Metadata', { code: 'HTML_PREVIEW_FETCH_METADATA_REQUIRED', statusCode: 400 });
+    }
+    const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
+    const file = await services.openHtmlPreview(readProjectId(request), filePath, HTML_PREVIEW_MAXIMUM_BYTES);
+    response.setHeader('Content-Type', 'text/html; charset=utf-8');
+    response.setHeader('Content-Security-Policy', HTML_PREVIEW_CSP);
+    response.setHeader('Referrer-Policy', 'no-referrer');
+    response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    file.stream.pipe(response);
+    file.stream.on('error', (error) => {
+      logger.error('Error streaming the HTML preview', error);
+      if (!response.headersSent) {
+        response.status(500).json({ error: 'Error reading file' });
+      } else {
+        response.destroy();
       }
     });
   }, logger));

@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'plugins', labelKey: 'mainTabs.plugins', icon: Puzzle },
   { id: 'notifications', labelKey: 'mainTabs.notifications', icon: Bell },
   { id: 'remote', labelKey: 'mainTabs.remote', icon: Radio },
+  { id: 'sessions', labelKey: 'mainTabs.sessions', icon: Key },
   { id: 'about', labelKey: 'mainTabs.about', icon: Info },
 ];
 
@@ -35,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
 export default function SettingsSidebar({ activeTab, onChange }: SettingsSidebarProps) {
   const { t } = useTranslation('settings');
   // A Remote tab frame has no management API (it is the Host's app, not the Controller page), so it offers no Remote work entry.
-  const navItems = isTargetMode() ? NAV_ITEMS.filter((item) => item.id !== 'remote') : NAV_ITEMS;
+  const navItems = isTargetMode() ? NAV_ITEMS.filter((item) => item.id !== 'remote' && item.id !== 'sessions') : NAV_ITEMS;
 
   return (
     <>

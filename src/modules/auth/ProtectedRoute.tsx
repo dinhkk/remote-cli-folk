@@ -8,6 +8,7 @@ import AuthLoadingScreen from '@/modules/auth/AuthLoadingScreen';
 import PasswordWeakBanner from '@/modules/auth/PasswordWeakBanner';
 import TargetSessionUnavailable from '@/modules/auth/TargetSessionUnavailable';
 import LoginForm from '@/modules/auth/LoginForm';
+import SessionLockScreen from '@/modules/auth/SessionLockScreen';
 import SetupForm from '@/modules/auth/SetupForm';
 
 type ProtectedRouteProps = {
@@ -16,7 +17,7 @@ type ProtectedRouteProps = {
 
 /** Used by App to gate the routed application behind setup, login and onboarding. */
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
+  const { user, isLoading, isLocked, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
 
   if (isLoading) {
     return <AuthLoadingScreen />;
@@ -40,6 +41,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     return <>{children}</>;
   }
+
+  if (isLocked) return <SessionLockScreen />;
 
   if (needsSetup) {
     return <SetupForm />;

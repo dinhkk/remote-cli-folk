@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { AppError } from '@/shared/utils.js';
 import { userDb } from '@/modules/database/index.js';
+import { getSessionRuntime } from '../services/session-runtime.service.js';
 
 import {
   authenticateToken,
@@ -37,106 +38,55 @@ function createRealisticService() {
     loginLimiter: createLoginRateLimiter(),
     dummyPasswordHash: 'hash:dummy',
     getSetupToken: () => undefined,
-    rotateJwtSecret,
+    revokeSessions: (userId) => getSessionRuntime().store.revokeAll(userId),
     bumpAuthEpoch,
   });
 }
 
-test('rotating the secret kills ordinary, tab and loopback tokens; new tokens work', async () => {
-  await withIsolatedAuthDatabase(async (user) => {
-    const ordinary = generateToken(user);
-    const tab = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
-    const loopback = issueLoopbackToken();
-    assert.equal((await runAuthenticateToken(authenticateToken, ordinary)).accepted, true, 'control');
-
+test('K-11: signing-key rotation leaves cookie sessions and process-local bridge credentials independent', async () => {
+  await withIsolatedAuthDatabase((user) => {
+    const { store } = getSessionRuntime();
+    const { secret, session } = store.create(user.id);
+    const tab = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1', sessionId: session.id });
+    const bridge = issueLoopbackToken();
     assert.deepEqual(rotateJwtSecret(), { rotated: true });
-
-    assert.equal((await runAuthenticateToken(authenticateToken, ordinary)).accepted, false);
-    assert.equal((await runAuthenticateToken(authenticateToken, loopback)).accepted, false);
-    assert.equal(authenticateWebSocket(ordinary), null);
+    assert.ok(store.authenticate(secret));
     assert.equal(verifyTabToken(tab, 'peer-1').ok, false);
-
-    assert.equal((await runAuthenticateToken(authenticateToken, generateToken(user))).accepted, true);
-    assert.equal(
-      verifyTabToken(issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' }), 'peer-1').ok,
-      true,
-    );
+    assert.ok(authenticateWebSocket({ headers: { authorization: `Bearer ${bridge}` }, socket: { remoteAddress: '127.0.0.1' } }));
   });
 });
 
-test('the rotated secret is persisted, not just cached', async () => {
-  await withIsolatedAuthDatabase(async (user) => {
-    rotateJwtSecret();
-    const token = generateToken(user);
-
-    const { invalidateJwtSecretCache } = await import('../auth.middleware.js');
-    invalidateJwtSecretCache();
-
-    assert.equal((await runAuthenticateToken(authenticateToken, token)).accepted, true);
+for (const pinned of [false, true]) {
+  test(`K-11: logout-all revokes sessions and tab tokens with pinned signing key = ${pinned}`, async () => {
+    await withIsolatedAuthDatabase(async (user) => {
+      const { getConnection } = await import('../../database/index.js');
+      getConnection().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run('hash:correct-horse-battery', user.id);
+      if (pinned) process.env.JWT_SECRET = 'synthetic-pinned-key';
+      const { store } = getSessionRuntime();
+      const a = store.create(user.id), b = store.create(user.id);
+      const tab = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1', sessionId: a.session.id });
+      const result = await createRealisticService().logoutAll(user, 'correct-horse-battery');
+      assert.deepEqual(result, { success: true, revoked: 2 });
+      assert.equal(store.authenticate(a.secret), null);
+      assert.equal(store.authenticate(b.secret), null);
+      assert.equal(verifyTabToken(tab, 'peer-1').ok, false);
+    });
   });
-});
+}
 
-test('logoutAll through the real wiring: epoch +1, listener called once, old tokens dead', async () => {
-  await withIsolatedAuthDatabase(async (user) => {
-    const { getConnection } = await import('@/modules/database/index.js');
-    getConnection().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run('hash:correct-horse-battery', user.id);
-
-    const service = createRealisticService();
-    const ordinary = generateToken(user);
-    const tab = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
-    const epochBefore = getAuthEpoch();
-    const seen: number[] = [];
-    const stop = onAuthEpochChange((epoch) => seen.push(epoch));
-
-    const result = await service.logoutAll({ id: user.id, username: 'alice' }, 'correct-horse-battery', '10.0.0.1');
-    stop();
-
-    assert.deepEqual(result, { success: true, rotated: true });
-    assert.equal(getAuthEpoch(), epochBefore + 1);
-    assert.deepEqual(seen, [epochBefore + 1]);
-    assert.equal((await runAuthenticateToken(authenticateToken, ordinary)).accepted, false);
-    assert.equal(verifyTabToken(tab, 'peer-1').ok, false);
-  });
-});
-
-test('with JWT_SECRET pinned by env: epoch still bumps and tab tokens die, ordinary JWTs survive, response is 409', async () => {
-  await withIsolatedAuthDatabase(async (user) => {
-    const { getConnection } = await import('@/modules/database/index.js');
-    getConnection().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run('hash:correct-horse-battery', user.id);
-    process.env.JWT_SECRET = 'pinned-secret-for-this-test-only';
-
-    const service = createRealisticService();
-    const ordinary = generateToken(user);
-    const tab = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
-    const epochBefore = getAuthEpoch();
-    const seen: number[] = [];
-    const stop = onAuthEpochChange((epoch) => seen.push(epoch));
-
-    assert.deepEqual(rotateJwtSecret(), { rotated: false });
-    await assert.rejects(
-      service.logoutAll({ id: user.id, username: 'alice' }, 'correct-horse-battery', '10.0.0.1'),
-      (error: unknown) => error instanceof AppError && error.code === 'AUTH_SECRET_PINNED' && error.statusCode === 409,
-    );
-    stop();
-
-    assert.equal(getAuthEpoch(), epochBefore + 1);
-    assert.deepEqual(seen, [epochBefore + 1]);
-    assert.equal(verifyTabToken(tab, 'peer-1').ok, false);
-    assert.equal((await runAuthenticateToken(authenticateToken, ordinary)).accepted, true);
-  });
-});
-
-test('auth epoch starts at 0, increments by one, and listeners can unsubscribe', async () => {
+test('K-20: migrated auth epoch increments by one and listeners can unsubscribe', async () => {
   await withIsolatedAuthDatabase(() => {
-    assert.equal(getAuthEpoch(), 0);
+    getSessionRuntime();
+    const initial = getAuthEpoch();
+    assert.equal(initial, 1);
     const seen: number[] = [];
     const stop = onAuthEpochChange((epoch) => seen.push(epoch));
 
-    assert.equal(bumpAuthEpoch(), 1);
+    assert.equal(bumpAuthEpoch(), initial + 1);
     stop();
-    assert.equal(bumpAuthEpoch(), 2);
+    assert.equal(bumpAuthEpoch(), initial + 2);
 
-    assert.deepEqual(seen, [1]);
-    assert.equal(getAuthEpoch(), 2);
+    assert.deepEqual(seen, [initial + 1]);
+    assert.equal(getAuthEpoch(), initial + 2);
   });
 });

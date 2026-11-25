@@ -5,6 +5,7 @@ import path from 'path';
 import spawn from 'cross-spawn';
 
 import { scanPlugins, getPluginsConfig, getPluginDir } from './plugin-registry.service.js';
+import { PLUGINS_DISABLED, pluginsDisabledError } from './plugins-switch.js';
 
 // Map<pluginName, { process, port }>
 const runningPlugins = new Map();
@@ -52,6 +53,7 @@ function buildPluginEnv(name) {
  * to stdout within 10 seconds.
  */
 export function startPluginServer(name, pluginDir, serverEntry) {
+  if (PLUGINS_DISABLED) return Promise.reject(pluginsDisabledError());
   if (runningPlugins.has(name)) {
     return Promise.resolve(runningPlugins.get(name).port);
   }
@@ -198,6 +200,10 @@ export function stopAllPlugins() {
  * Called once on host server boot.
  */
 export async function startEnabledPluginServers() {
+  if (PLUGINS_DISABLED) {
+    console.log('[Plugins] Plugins are disabled (REMOTECLI_PLUGINS_DISABLED=1): no plugin is loaded, started or served.');
+    return;
+  }
   const plugins = scanPlugins();
   const config = getPluginsConfig();
 

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import express from 'express';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { authenticateToken, issueTabToken, validateApiKey, verifyPassword } from '@/modules/auth/index.js';
 
@@ -43,7 +44,7 @@ const withGuardedApp = async (
       await run({
         port: running.port,
         jwt: user.jwt,
-        tabToken: issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' }),
+        tabToken: issueTabToken({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId: 'peer-1' }),
         passwords,
       });
     } finally {
@@ -53,12 +54,14 @@ const withGuardedApp = async (
 
 const json = (token: string | null, extra: Record<string, string> = {}): Record<string, string> => ({
   'content-type': 'application/json',
-  ...(token ? { authorization: `Bearer ${token}` } : {}),
+  'x-remotecli-request': '1',
+  'sec-fetch-site': 'same-origin',
+  ...(token ? { cookie: `remotecli_session=${token}` } : {}),
   ...extra,
 });
 
 describe('management API guards', () => {
-  it('accepts a full JWT on a same-origin JSON request', async () => {
+  it('C-02/C-03: accepts a session cookie on a same-origin JSON request', async () => {
     await withGuardedApp(async ({ port, jwt }) => {
       const res = await send(port, { path: '/api/remote/ping', headers: json(jwt) });
       assert.equal(res.status, 200);
@@ -86,11 +89,11 @@ describe('management API guards', () => {
 
   it('refuses a write without Content-Type: application/json with 415', async () => {
     await withGuardedApp(async ({ port, jwt }) => {
-      const missing = await send(port, { method: 'POST', path: '/api/remote/echo', headers: { authorization: `Bearer ${jwt}` }, body: '{}' });
+      const missing = await send(port, { method: 'POST', path: '/api/remote/echo', headers: { cookie: `remotecli_session=${jwt}`, 'x-remotecli-request': '1', 'sec-fetch-site': 'same-origin' }, body: '{}' });
       assert.equal(missing.status, 415);
       const wrong = await send(port, { method: 'POST', path: '/api/remote/echo', headers: json(jwt, { 'content-type': 'text/plain' }), body: '{}' });
       assert.equal(wrong.status, 415);
-      assert.equal(wrong.json<{ error: { code: string } }>().error.code, 'REMOTE_UNSUPPORTED_MEDIA');
+      assert.equal(wrong.json<{ code: string }>().code, 'AUTH_UNSUPPORTED_MEDIA');
       const form = await send(port, {
         method: 'POST',
         path: '/api/remote/echo',
@@ -103,12 +106,12 @@ describe('management API guards', () => {
 
   it('refuses a cross-site or same-site browser request with 403 and lets same-origin and direct requests through', async () => {
     await withGuardedApp(async ({ port, jwt }) => {
-      for (const site of ['cross-site', 'same-site']) {
+      for (const site of ['cross-site', 'same-site', 'none']) {
         const res = await send(port, { path: '/api/remote/ping', headers: json(jwt, { 'sec-fetch-site': site }) });
         assert.equal(res.status, 403, site);
-        assert.equal(res.json<{ error: { code: string } }>().error.code, 'REMOTE_FORBIDDEN');
+        assert.equal(res.json<{ code: string }>().code, 'AUTH_REQUEST_FORBIDDEN');
       }
-      for (const site of ['same-origin', 'none']) {
+      for (const site of ['same-origin']) {
         assert.equal((await send(port, { path: '/api/remote/ping', headers: json(jwt, { 'sec-fetch-site': site }) })).status, 200, site);
       }
     });

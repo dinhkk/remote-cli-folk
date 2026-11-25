@@ -133,7 +133,8 @@
     "browser": "브라우저",
     "notifications": "알림",
     "plugins": "플러그인",
-    "about": "정보"
+    "about": "정보",
+    "sessions": "Sessions"
   },
   "notifications": {
     "title": "알림",
@@ -639,6 +640,19 @@
     "disable": "비활성화",
     "installAriaLabel": "플러그인 git 저장소 URL",
     "tab": "탭",
-    "runningStatus": "실행 중"
+    "runningStatus": "실행 중",
+    "disabledByServer": "이 서버의 구성에 의해 플러그인이 꺼져 있습니다."
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Review signed-in browsers. Signing out also disconnects that session’s open tabs. Sessions expire seven days after sign-in.",
+    "logout": "Sign out this device",
+    "current": "This device",
+    "lastSeen": "Last active",
+    "expires": "Expires",
+    "revoke": "Sign out",
+    "password": "Confirm your password to sign out every device",
+    "logoutAll": "Sign out all devices",
+    "error": "Could not update sessions. Check your connection and try again."
   }
 }

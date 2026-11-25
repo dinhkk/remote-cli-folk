@@ -59,6 +59,9 @@ export type E2eServer = {
 
 export type StartServerOptions = {
   name: string;
+  /** An already installed local baseline checkout, used only for upgrade compatibility tests. */
+  sourceRoot?: string;
+  legacyAuth?: boolean;
   env?: Record<string, string>;
   /** false: do not create the admin account (platform mode has no registration). */
   register?: boolean;
@@ -76,9 +79,19 @@ const toResponse = async (response: Response): Promise<ApiResponse> => {
   };
 };
 
+/**
+ * Where each server's data, HOME and projects live. The server refuses workspaces under `/tmp` (a system
+ * directory) and every project sits in this HOME, so on Linux the default `/tmp` becomes `/var/tmp`, which
+ * the server allows. An explicit TMPDIR elsewhere is kept as is.
+ */
+const e2eTempBase = (): string => {
+  const base = os.tmpdir();
+  return process.platform === 'linux' && (base === '/tmp' || base.startsWith('/tmp/')) ? '/var/tmp' : base;
+};
+
 /** Starts a server and registers its admin account. Resolves when `/health` answers and the account exists. */
-export async function startE2eServer({ name, env = {}, register = true }: StartServerOptions): Promise<E2eServer> {
-  const root = await mkdtemp(path.join(os.tmpdir(), `e2e-remote-${name}-`));
+export async function startE2eServer({ name, env = {}, register = true, sourceRoot = FORK_ROOT, legacyAuth = false }: StartServerOptions): Promise<E2eServer> {
+  const root = await mkdtemp(path.join(e2eTempBase(), `e2e-remote-${name}-`));
   const home = path.join(root, 'home');
   await mkdir(path.join(home, '.remotecli'), { recursive: true });
   await mkdir(path.join(home, '.cloudcli'), { recursive: true });
@@ -120,7 +133,7 @@ export async function startE2eServer({ name, env = {}, register = true }: StartS
   const launch = (): void => {
     const useBuild = process.env.E2E_SERVER_ENTRY === 'dist';
     const args = useBuild ? ['dist-server/server/index.js'] : ['--import', 'tsx', 'server/index.ts'];
-    const spawned = spawn(process.execPath, args, { cwd: FORK_ROOT, env: buildEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const spawned = spawn(process.execPath, args, { cwd: sourceRoot, env: buildEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
     spawned.stdout?.on('data', (chunk: Buffer) => chunks.push(chunk.toString()));
     spawned.stderr?.on('data', (chunk: Buffer) => chunks.push(chunk.toString()));
     exited = false;
@@ -177,10 +190,16 @@ export async function startE2eServer({ name, env = {}, register = true }: StartS
     jwt: '',
     async api(pathAndQuery, options = {}) {
       const headers: Record<string, string> = { ...(options.headers ?? {}) };
+      headers['x-remotecli-request'] ??= '1';
+      headers.origin ??= baseUrl;
+      if (!['GET', 'HEAD'].includes(options.method ?? 'GET')) headers['content-type'] ??= 'application/json';
       // A server started with API_KEY demands it on every /api call (the stock behaviour).
       if (userEnv.API_KEY && pathAndQuery.startsWith('/api/')) headers['x-api-key'] ??= userEnv.API_KEY;
       const token = options.token === undefined ? server.jwt : options.token;
-      if (token) headers.authorization = `Bearer ${token}`;
+      if (token) {
+        if (legacyAuth || pathAndQuery.startsWith('/r/')) headers.authorization = `Bearer ${token}`;
+        else headers.cookie = `remotecli_session=${token}`;
+      }
       let body: string | Buffer | undefined = options.rawBody;
       if (options.body !== undefined) {
         headers['content-type'] ??= 'application/json';
@@ -191,7 +210,8 @@ export async function startE2eServer({ name, env = {}, register = true }: StartS
     async relogin() {
       const response = await server.api('/api/auth/login', { method: 'POST', token: null, body: { username: server.username, password: server.password } });
       if (response.status !== 200) throw new Error(`[${name}] login failed: ${response.status} ${response.text}`);
-      server.jwt = response.json<{ token: string }>().token;
+      server.jwt = legacyAuth ? response.json<{ token: string }>().token
+        : response.headers.get('set-cookie')!.split(';', 1)[0].split('=')[1];
       return server.jwt;
     },
     providerLog() {
@@ -220,7 +240,8 @@ export async function startE2eServer({ name, env = {}, register = true }: StartS
     if (!register) return server;
     const registered = await server.api('/api/auth/register', { method: 'POST', token: null, body: { username: server.username, password: server.password } });
     if (registered.status !== 200) throw new Error(`[${name}] register failed: ${registered.status} ${registered.text}`);
-    server.jwt = registered.json<{ token: string }>().token;
+    server.jwt = legacyAuth ? registered.json<{ token: string }>().token
+      : registered.headers.get('set-cookie')!.split(';', 1)[0].split('=')[1];
   } catch (error) {
     await stop();
     throw error;

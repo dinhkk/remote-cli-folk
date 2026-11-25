@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "Proyek yang disematkan",
+    "other": "Proyek lainnya ({{count}})"
+  },
   "projects": {
     "title": "Proyek",
     "newProject": "Proyek Baru",
@@ -175,5 +179,11 @@
     "archiveSessions_other": "Arsipkan {{count}} sesi",
     "archiveSessionsNotice_one": "Pengarsipan menyembunyikan sesi yang dipilih dari daftar aktif tanpa menghapus riwayatnya.",
     "archiveSessionsNotice_other": "Pengarsipan menyembunyikan sesi yang dipilih dari daftar aktif tanpa menghapus riwayatnya."
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }

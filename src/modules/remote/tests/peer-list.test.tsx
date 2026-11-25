@@ -131,7 +131,7 @@ test('forgetting a pairing also deletes what its tab stored in this browser, and
   await waitFor(() => assert.equal(onChanged.mock.calls.length, 1));
   assert.equal(localStorage.getItem('remote:peer_online1:local:activeTab'), null);
   assert.equal(localStorage.getItem('remote:peer_other111:local:activeTab'), 'chat');
-  assert.equal(localStorage.getItem('auth-token'), 'controller-jwt');
+  assert.equal(localStorage.getItem('auth-token'), null, 'legacy login storage is removed');
   localStorage.clear();
 });
 

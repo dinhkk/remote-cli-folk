@@ -114,7 +114,8 @@
     "tasks": "Tâches",
     "notifications": "Notifications",
     "plugins": "Plugins",
-    "about": "À propos"
+    "about": "À propos",
+    "sessions": "Sessions"
   },
   "notifications": {
     "title": "Notifications",
@@ -614,6 +615,19 @@
     "disable": "Désactiver",
     "installAriaLabel": "URL du dépôt git du plugin",
     "tab": "onglet",
-    "runningStatus": "en cours"
+    "runningStatus": "en cours",
+    "disabledByServer": "Les plugins sont désactivés par la configuration de ce serveur."
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Review signed-in browsers. Signing out also disconnects that session’s open tabs. Sessions expire seven days after sign-in.",
+    "logout": "Sign out this device",
+    "current": "This device",
+    "lastSeen": "Last active",
+    "expires": "Expires",
+    "revoke": "Sign out",
+    "password": "Confirm your password to sign out every device",
+    "logoutAll": "Sign out all devices",
+    "error": "Could not update sessions. Check your connection and try again."
   }
 }

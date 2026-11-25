@@ -93,7 +93,7 @@ describe('Remote WebSocket upgrade', () => {
     });
   });
 
-  it('regular sockets still accept only the main JWT: the tab token is refused, the JWT works (no regression)', async () => {
+  it('C-05: regular sockets accept session cookies, never query or tab tokens', async () => {
     await withGatewayHarness({}, async (h) => {
       assert.equal(await h.refusal(`/desktop-notifications?token=${h.tabToken}`), 401);
       assert.equal(await h.refusal('/desktop-notifications'), 401);

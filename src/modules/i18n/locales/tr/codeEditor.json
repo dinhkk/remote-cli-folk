@@ -38,5 +38,13 @@
   "unsavedChanges": {
     "confirmClose": "Kaydedilmemiş değişikliklerin var. Bu dosya kapatılsın ve değişiklikler silinsin mi?",
     "indicator": "Kaydedilmemiş değişiklikler"
+  },
+  "htmlPreview": {
+    "untrustedLocal": "Güvenilmeyen içerik. Dosyanın betikleri ağ erişimi ve bu uygulamaya erişimi olmayan yalıtılmış bir çerçevede çalışır. Bağlantılı dosyalar (CDN, diğer proje dosyaları) yüklenmez.",
+    "untrustedRemote": "Güvenilmeyen içerik. Dosyadaki betikler Remote sekmesinde çalışmaz.",
+    "untrustedRemoteIsolated": "Remote Host'tan gelen güvenilmeyen içerik. Dosyanın betikleri ağ erişimi ve bu uygulamaya erişimi olmayan yalıtılmış bir çerçevede çalışır. Bağlantılı dosyalar (CDN, diğer proje dosyaları) yüklenmez.",
+    "unsavedChanges": "Kaydedilmiş dosya gösteriliyor. Kaydedilmemiş değişiklikleri görmek için kaydedin.",
+    "scriptsDisabled": "Güvenilmeyen içerik. Dosyadaki betikler burada çalışmaz.",
+    "tooLarge": "Dosya 10 MB'tan büyük olduğu için betikleri çalışmaz."
   }
 }

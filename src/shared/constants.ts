@@ -47,7 +47,7 @@ export const BRAND = {
 
 /**
  * Version of the installed package, baked into the client bundle at build time.
- * Compare it with the version reported by `/health` to detect a package that was
+ * Compare it with the version reported by `/api/auth/version` to detect a package that was
  * updated without restarting the server. Empty outside a Vite build (for example
  * under the `tsx` test runner), where no build-time value is injected.
  */
@@ -78,6 +78,7 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
   { id: 'notifications', label: 'Notifications', keywords: 'notifications alerts push', icon: Bell },
   { id: 'plugins', label: 'Plugins', keywords: 'plugins extensions integrations', icon: Plug },
+  { id: 'sessions', label: 'Sessions', keywords: 'devices sign out sessions', icon: KeyRound },
   { id: 'about', label: 'About', keywords: 'about version info', icon: Info },
 ];
 

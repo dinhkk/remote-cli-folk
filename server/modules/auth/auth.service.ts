@@ -25,13 +25,14 @@ type AuthDependencies = {
   };
   hashPassword(password: string): Promise<string>;
   comparePassword(password: string, passwordHash: string): Promise<boolean>;
-  generateToken(user: AuthUser): string;
+  generateToken(user: AuthUser, userAgent?: string): string;
+  beginMfaLogin?(userId: number): { mfaRequired: true; challenge: string; expiresAt: number } | null;
   loginLimiter: LoginRateLimiter;
   /** bcrypt hash compared when a username does not exist, so timing does not reveal it. */
   dummyPasswordHash: string;
   /** Read at call time so tests and operators can change the env without a restart. */
   getSetupToken(): string | undefined;
-  rotateJwtSecret(): { rotated: boolean };
+  revokeSessions(userId: number): number;
   bumpAuthEpoch(): number;
 };
 
@@ -104,6 +105,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       passwordInput: unknown,
       setupTokenInput?: unknown,
       clientIp = 'unknown',
+      userAgent = '',
     ) {
       const username = typeof usernameInput === 'string' ? usernameInput : '';
       const password = typeof passwordInput === 'string' ? passwordInput : '';
@@ -140,6 +142,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
 
       dependencies.transaction.begin();
+      let committed = false;
       try {
         if (dependencies.users.hasUsers()) {
           throw new AppError('User already exists. This is a single-user system.', {
@@ -150,8 +153,9 @@ export function createAuthService(dependencies: AuthDependencies) {
 
         const passwordHash = await dependencies.hashPassword(password);
         const user = dependencies.users.createUser(username, passwordHash);
-        const token = dependencies.generateToken(user);
         dependencies.transaction.commit();
+        committed = true;
+        const token = dependencies.generateToken(user, userAgent);
         dependencies.users.updateLastLogin(numericUserId(user.id));
 
         return {
@@ -160,7 +164,7 @@ export function createAuthService(dependencies: AuthDependencies) {
           token,
         };
       } catch (error) {
-        dependencies.transaction.rollback();
+        if (!committed) dependencies.transaction.rollback();
         if (isUniqueConstraintError(error)) {
           throw new AppError('Username already exists', {
             code: 'AUTH_USERNAME_CONFLICT',
@@ -171,7 +175,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
     },
 
-    async login(usernameInput: unknown, passwordInput: unknown, clientIp = 'unknown') {
+    async login(usernameInput: unknown, passwordInput: unknown, clientIp = 'unknown', userAgent = '') {
       const username = typeof usernameInput === 'string' ? usernameInput : '';
       const password = typeof passwordInput === 'string' ? passwordInput : '';
       if (!username || !password) {
@@ -203,11 +207,13 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
 
       attempt.succeeded();
+      const challenge = dependencies.beginMfaLogin?.(numericUserId(user.id));
+      if (challenge) return { success: true, ...challenge };
       dependencies.users.updateLastLogin(numericUserId(user.id));
       return {
         success: true,
         user: { id: user.id, username: user.username },
-        token: dependencies.generateToken(user),
+        token: dependencies.generateToken(user, userAgent),
         // Passwords created before the 12 character rule keep working; the client nudges a change.
         ...(password.length < MIN_PASSWORD_LENGTH ? { passwordWeak: true } : {}),
       };
@@ -218,19 +224,13 @@ export function createAuthService(dependencies: AuthDependencies) {
     },
 
     refreshSession(user: unknown) {
-      return { token: dependencies.generateToken(readAuthUser(user)) };
+      return { user: readAuthUser(user) }; // Absolute expiry is never extended.
     },
 
     logout() {
       return { success: true, message: 'Logged out successfully' };
     },
 
-    /**
-     * "Log out everywhere": needs the account password (a stolen JWT alone is not enough),
-     * bumps the auth epoch (kills Remote tab tokens and streams) and rotates the JWT secret
-     * (kills every ordinary token). The epoch moves first so Remote is cut off even if the
-     * secret is pinned by env, in which case the caller gets 409 for the part that cannot happen.
-     */
     async logoutAll(userInput: unknown, passwordInput: unknown, clientIp = 'unknown') {
       const authUser = readAuthUser(userInput);
       const password = typeof passwordInput === 'string' ? passwordInput : '';
@@ -261,14 +261,8 @@ export function createAuthService(dependencies: AuthDependencies) {
       attempt.succeeded();
 
       dependencies.bumpAuthEpoch();
-      const { rotated } = dependencies.rotateJwtSecret();
-      if (!rotated) {
-        throw new AppError(
-          'Remote sessions were ended, but JWT_SECRET is set in the environment so existing logins stay valid. Remove JWT_SECRET to rotate it.',
-          { code: 'AUTH_SECRET_PINNED', statusCode: 409 },
-        );
-      }
-      return { success: true as const, rotated: true as const };
+      const revoked = dependencies.revokeSessions(numericUserId(authUser.id));
+      return { success: true as const, revoked };
     },
   };
 }

@@ -24,6 +24,8 @@
 import type { IncomingHttpHeaders } from 'node:http';
 
 import express, { type Request, type Response } from 'express';
+import { authenticatePreviewFrame, getSessionRuntime } from '@/modules/auth/index.js';
+import { HTML_PREVIEW_CSP } from '@/modules/file-tree/index.js';
 
 import type { RemoteBrowserConnection, RemoteErrorCode, RemoteMuxHeaders, RemoteMuxStream, RemoteStreamEnd } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
@@ -31,7 +33,7 @@ import { AppError } from '@/shared/utils.js';
 import { RemoteLinkDownError } from '../link/relay-link.js';
 import { MuxFrameError } from '../mux/frames.js';
 import { DEFAULT_MUX_LIMITS } from '../mux/stream-table.js';
-import { filterRequestHeaders, filterResponseHeaders } from '../policy/header-filter.js';
+import { SANDBOX_CSP, filterRequestHeaders, filterResponseHeaders, previewDocumentHeaders, withoutConditionalHeaders } from '../policy/header-filter.js';
 import { evaluateRemoteHttpRequest, type RemoteHttpPolicy } from '../policy/route-allow-list.js';
 
 import type { PeerRegistry } from './peer-registry.service.js';
@@ -40,6 +42,10 @@ import { createRefusedUploadDrain, resolveRefusedUploadBudgets, type RefusedUplo
 import type { TabTokenService } from './tab-token.service.js';
 
 const PEER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+/** The HTML preview page path: as the route policy spells it after canonicalisation, and as an answer for it is closed by default. */
+const HTML_PREVIEW_ROUTE = /^\/api\/file-tree\/projects\/[^/]+\/files\/html-preview$/i;
+/** What a browser sends with every fetch and navigation; only their presence is checked for a status check of the preview page. */
+const FETCH_METADATA_HEADERS = ['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'] as const;
 const EMPTY = Buffer.alloc(0);
 /** What Node itself accepts in a header value: tab, printable ASCII and Latin-1; no CR, LF, NUL, DEL or other controls. */
 const SAFE_RESPONSE_VALUE = /^[\t\x20-\x7e\x80-\xff]*$/;
@@ -107,7 +113,8 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
   const refusedUploads = createRefusedUploadDrain({ budgets: resolveRefusedUploadBudgets(process.env, options.refusedUpload), registry });
   const router = express.Router();
 
-  const proxy = (req: Request, res: Response, peerId: string, target: string): void => {
+  /** `previewDocument`: the Controller itself decided that this is a signed-in browser loading the preview page into a frame. */
+  const proxy = (req: Request, res: Response, peerId: string, target: string, previewDocument = false): void => {
     let link;
     try {
       link = registry.attach(peerId);
@@ -119,6 +126,8 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
 
     const verdict = filterRequestHeaders(req.headers as RemoteMuxHeaders);
     if (!verdict.ok) return sendJsonError(res, 403, 'REMOTE_FORBIDDEN', 'The request headers are not allowed.');
+    // A frame load never asks the Host for a partial or conditional answer, so the Host cannot answer 206 or 304 to it.
+    const forwardedHeaders = previewDocument ? withoutConditionalHeaders(verdict.headers) : verdict.headers;
 
     const declared = req.headers['content-length'] === undefined ? undefined : Number(req.headers['content-length']);
     if (declared !== undefined && declared > maxBody) {
@@ -161,7 +170,7 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
 
     try {
       stream = link.openStream(
-        { kind: 'http', meta: { method: req.method, path: target, headers: verdict.headers } },
+        { kind: 'http', meta: { method: req.method, path: target, headers: forwardedHeaders } },
         {
           onResponse: (meta) => {
             if (finished) return;
@@ -176,11 +185,14 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
             for (const value of Object.values(headers)) {
               if (typeof value === 'string' && !SAFE_RESPONSE_VALUE.test(value)) return stream.fail('REMOTE_INTERNAL', 'The Host sent an invalid response header.');
             }
-            const contentLength = headers['content-length'];
+            // Only a 200 for the frame load the Controller itself recognised gets the script-enabled policy of the page.
+            // Every other answer for the page route already carries the plain sandbox (set when the request arrived).
+            const delivered = previewDocument && meta.status === 200 ? previewDocumentHeaders(headers, HTML_PREVIEW_CSP) : headers;
+            const contentLength = delivered['content-length'];
             declaredLength = typeof contentLength === 'string' && !hasNoBody(req.method, meta.status) ? Number(contentLength) : null;
             responseStarted = true;
             res.statusCode = meta.status;
-            for (const [name, value] of Object.entries(headers)) {
+            for (const [name, value] of Object.entries(delivered)) {
               if (value !== undefined) res.setHeader(name, value);
             }
             res.flushHeaders();
@@ -268,17 +280,42 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
       res.status(404).json({ success: false, error: { code: 'REMOTE_PEER_NOT_FOUND', message: 'No such paired Host.' } });
       return;
     }
-    const auth = tabs.authenticate(bearerToken(req), peerId);
-    if (!auth.ok) {
-      // No `X-Auth-Error`: a tab's 401 means "renew the tab token", never "the Local session ended".
-      const expired = auth.reason === 'expired';
-      sendJsonError(res, 401, expired ? 'AUTH_TOKEN_EXPIRED' : 'AUTH_TOKEN_INVALID', expired ? 'The tab token expired.' : 'Invalid tab token.');
-      return;
-    }
-
     // `req.url` is what follows `/r/<peerId>`: the path and query as the browser wrote them.
     const raw = req.url;
     const pathOnly = raw.split('?', 1)[0];
+    // Every answer for the preview page route starts closed, our own JSON errors included: the plain sandbox. Only the
+    // 200 of a signed-in frame load replaces it (see `previewDocumentHeaders`).
+    if (HTML_PREVIEW_ROUTE.test(pathOnly)) res.setHeader('Content-Security-Policy', SANDBOX_CSP);
+
+    // One request is authenticated by the browser's session cookie instead of a tab token: the browser loading the
+    // HTML preview page into a frame of the app. `frame` is null for every other request, which keeps the tab token
+    // and nothing else. The answers below are JSON with no cookie and no auth marker, as on the tab token path.
+    const frame = authenticatePreviewFrame({ method: req.method, headers: req.headers, socket: req.socket, secure: req.secure }, pathOnly);
+    let identity: { id: number; username: string; sessionId: string };
+    if (frame) {
+      if (!frame.ok) {
+        sendJsonError(res, frame.status, frame.code, frame.message);
+        return;
+      }
+      identity = frame.user;
+    } else {
+      const auth = tabs.authenticate(bearerToken(req), peerId);
+      if (!auth.ok) {
+        // No `X-Auth-Error`: a tab's 401 means "renew the tab token", never "the Local session ended".
+        const expired = auth.reason === 'expired';
+        sendJsonError(res, 401, expired ? 'AUTH_TOKEN_EXPIRED' : 'AUTH_TOKEN_INVALID', expired ? 'The tab token expired.' : 'Invalid tab token.');
+        return;
+      }
+      identity = auth.user;
+    }
+
+    const runtime = getSessionRuntime();
+    runtime.store.touch(identity.sessionId, req.get('user-agent'));
+    const releaseSession = runtime.connections.track(identity.sessionId, () => res.destroy());
+    res.once('close', releaseSession);
+    res.once('finish', releaseSession);
+    if (res.destroyed) return;
+
     if (req.method === 'GET') {
       if (pathOnly === '/health') {
         res.setHeader('Cache-Control', 'no-store');
@@ -287,7 +324,7 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
       }
       if (pathOnly === '/api/auth/user') {
         res.setHeader('Cache-Control', 'no-store');
-        res.json({ user: { id: auth.user.id, username: auth.user.username } });
+        res.json({ user: { id: identity.id, username: identity.username } });
         return;
       }
       if (pathOnly === '/api/auth/status') {
@@ -302,7 +339,15 @@ export function createControllerProxyRoutes(options: ControllerProxyOptions): ex
       sendJsonError(res, 403, 'REMOTE_FORBIDDEN', 'This request is not available through Remote.');
       return;
     }
-    proxy(req, res, peerId, `${decision.canonical.path}${decision.canonical.query}`);
+    // A status check of the preview page (a fetch with the tab token) is refused when the browser sends no Fetch
+    // Metadata, as on Local, so the app falls back to displaying the HTML instead of loading a frame that would be
+    // refused. Only the presence of the headers is checked: a fetch sends other values than a frame load.
+    if (!frame && req.method === 'GET' && HTML_PREVIEW_ROUTE.test(decision.canonical.path)
+      && FETCH_METADATA_HEADERS.some((name) => typeof req.headers[name] !== 'string')) {
+      sendJsonError(res, 400, 'HTML_PREVIEW_FETCH_METADATA_REQUIRED', 'This browser does not send Fetch Metadata.');
+      return;
+    }
+    proxy(req, res, peerId, `${decision.canonical.path}${decision.canonical.query}`, frame !== null);
   });
 
   return router;

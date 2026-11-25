@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, test, vi } from 'vitest';
 
@@ -304,4 +304,76 @@ test('the sorted session list is the same array until the project itself changes
     getAllSessions(PROJECT_A),
     'a replaced project must not read a stale entry',
   );
+});
+
+const manyProjects = Array.from({ length: 16 }, (_, i) => makeProject(`project-${i}`, [`session-${i}`]));
+const renderedIds = () => recordedProjectRowProps.map((props) => (props.project as Project).projectId);
+
+test('PL-01/PL-04: long lists collapse behind an accessible disclosure without losing rows', () => {
+  const props = { ...listProps(null), projects: manyProjects, filteredProjects: manyProjects };
+  const view = render(<SidebarProjectList {...props} />);
+  assert.equal(renderedIds().length, 8);
+  const toggle = view.getByRole('button', { name: 'projectOrganization.other' });
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  const region = document.getElementById(toggle.getAttribute('aria-controls')!);
+  assert.equal(region?.hidden, true);
+  recordedProjectRowProps.length = 0;
+  fireEvent.click(toggle);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(region?.hidden, false);
+  assert.deepEqual(renderedIds(), manyProjects.map((p) => p.projectId));
+  recordedProjectRowProps.length = 0;
+  fireEvent.click(toggle);
+  assert.equal(renderedIds().length, 8);
+  view.unmount();
+});
+
+test('PL-02/PL-05: pinned and in-use projects stay visible once and keep action callbacks', () => {
+  const props = { ...listProps({ target: 'project', id: 'project-12', draft: 'New name' }),
+    projects: manyProjects, filteredProjects: manyProjects,
+    isProjectStarred: (id: string) => id === 'project-15',
+    selectedProject: manyProjects[9], isProjectExpanded: (id: string) => id === 'project-10',
+    activeSessions: new Set(['session-11']), backgroundSessionIds: new Set(['session-13']),
+    attentionSessionIds: new Set(['session-14']),
+  };
+  const view = render(<SidebarProjectList {...props} />);
+  const ids = renderedIds();
+  assert.equal(ids[0], 'project-15');
+  for (let i = 9; i <= 15; i++) assert.ok(ids.includes(`project-${i}`));
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(!ids.includes('project-8'));
+  for (const row of recordedProjectRowProps) {
+    assert.equal(row.onProjectSelect, props.onProjectSelect);
+    assert.equal(row.onSaveProjectName, props.onSaveProjectName);
+    assert.equal(row.onSessionSelect, props.onSessionSelect);
+  }
+  view.unmount();
+});
+
+test('PL-03: searching shows every match even when more than eight match', () => {
+  const view = render(<SidebarProjectList {...listProps(null)} projects={manyProjects}
+    filteredProjects={manyProjects} showAllProjects />);
+  assert.equal(renderedIds().length, manyProjects.length);
+  assert.equal(view.queryByRole('button', { name: 'projectOrganization.other' }), null);
+  view.unmount();
+});
+
+test('PL-02: selecting sessions in an overflow project keeps its row visible', () => {
+  const props = listProps(null, { projectId: 'project-15', sessionIds: new Set(['session-15']) });
+  const view = render(<SidebarProjectList {...props} projects={manyProjects} filteredProjects={manyProjects} />);
+  assert.ok(renderedIds().includes('project-15'));
+  assert.equal(recordedProjectRowProps.find((p) => (p.project as Project).projectId === 'project-15')?.selectedSessionIds, props.sessionSelection?.sessionIds);
+  view.unmount();
+});
+
+test('PL-05: loading and empty states do not show stale collapsed groups', () => {
+  const props = { ...listProps(null), projects: manyProjects, filteredProjects: manyProjects };
+  const view = render(<SidebarProjectList {...props} isLoading />);
+  assert.equal(recordedProjectRowProps.length, 0);
+  assert.ok(view.getByText('projects.loadingProjects'));
+  assert.equal(view.queryByRole('button'), null);
+  view.rerender(<SidebarProjectList {...props} filteredProjects={[]} />);
+  assert.ok(view.getByText('projects.noMatchingProjects'));
+  assert.equal(recordedProjectRowProps.length, 0);
+  view.unmount();
 });

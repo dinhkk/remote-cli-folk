@@ -141,6 +141,8 @@ To use RemoteCLI from your smartphone, tablet, or another laptop on your local n
 3. Open `http://<YOUR_LOCAL_IP>:3001` in your mobile browser.
 4. *(Optional)* Tap **"Add to Home Screen"** in Safari / Chrome for a standalone full-screen mobile app experience.
 
+> **Security:** Before opening RemoteCLI to other devices, turn on two-factor sign-in under **Settings → Sessions**.
+
 > **Tip:** You can also use secure mesh networks like [Tailscale](https://tailscale.com/) or WireGuard to access your coding agents securely from anywhere outside your local network.
 
 ---
@@ -256,6 +258,7 @@ Commands:
   help             Show CLI help and usage information
   sandbox          Manage Docker sandbox environments (experimental)
   browser-use-mcp  Run Browser MCP stdio server
+  reset-totp       Turn two-factor sign-in off and sign out every browser
 
 Options:
   -p, --port <port>        Set server port (default: 3001)
@@ -278,6 +281,9 @@ remotecli status
 
 # Update to latest version
 remotecli update
+
+# Lost your authenticator? Stop the server first, then:
+remotecli reset-totp
 ```
 
 ### Environment Variables
@@ -288,6 +294,9 @@ remotecli update
 | `DATABASE_PATH` | Path to the SQLite storage database | `~/.remotecli/data.db` (or application root) |
 | `CLAUDE_CLI_PATH` | Custom path to the Claude Code CLI binary | `claude` |
 | `CONTEXT_WINDOW` | Fallback context window token limit | `160000` |
+| `REMOTECLI_PLUGINS_DISABLED` | `1` turns the plugin feature off: no plugin is installed, updated, started or served, and the UI shows no plugin tabs. Read at startup; installed plugins stay on disk and work again once the variable is removed. Recommended on a server used only as a Remote Controller. | unset (plugins on) |
+| `REMOTECLI_ALLOWED_ORIGINS` | Comma-separated extra origins that may use the sign-in cookie, for example a reverse proxy's public `https://` origin. Write each origin in full. A wildcard stops the server at startup. | unset (own origin only) |
+| `REMOTECLI_MASTER_KEY_FILE` | Key file that encrypts authenticator seeds and Remote data. Back it up with the database. | `~/.remotecli/remote-master.key` |
 
 ---
 
@@ -309,8 +318,11 @@ Open full terminal sessions directly in the browser to run builds, test suites, 
 ### 🛡️ Safe by Default Tool Permissions
 All agent tools (such as Bash, Write, Edit, Glob, Grep) can be inspected, allowed, or blocked through the **Tools Settings** modal. Prevent unintended destructive commands from running automatically.
 
+### 🔐 Two-Factor Sign-in & Session Lock
+Protect sign-in with an authenticator app (TOTP) and 10 single-use recovery codes. While two-factor sign-in is on, a session locks after 24 hours without web activity (you can set 1 to 168 hours). The **Lock session** button locks it at once. Only an authenticator code unlocks it. **Settings → Sessions** lists every signed-in browser and signs out one device or all of them.
+
 ### 🧩 Extensible Plugin System
-Add custom tabs with their own frontend components and backend services. Install community plugins or develop custom extensions for task queues, session intelligence, or custom dashboards.
+Add custom tabs with their own frontend components and backend services. Install community plugins or develop custom extensions for task queues, session intelligence, or custom dashboards. Set `REMOTECLI_PLUGINS_DISABLED=1` to turn plugins off on a server (recommended on a Controller-only server).
 
 ---
 
@@ -325,11 +337,41 @@ Add custom tabs with their own frontend components and backend services. Install
 
 ---
 
+## Running Tests From a Source Checkout
+
+Use Node.js 22.5 or newer. Install both packages before running the server suite:
+
+```bash
+# From the repository root
+npm ci
+cd relay
+npm ci
+cd ..
+npm test
+```
+
+The server suite imports the relay package's conformance scenarios, so installing only
+the root dependencies is insufficient. Missing relay dependencies fail this guard with
+setup instructions. Set `SKIP_RELAY_CONFORMANCE=1` only to explicitly skip that guard;
+it is not a substitute for running conformance before review.
+
+The 12 parent-workspace documentation checks require `docs/deployment-guide.md`,
+`docs/system-architecture.md`, `docs/project-roadmap.md`, and
+`project/cloud-cli-remote/claudecodeui/relay/README.md` relative to the directory three
+levels above this checkout. These checks are skipped with the missing paths listed
+when all four files are absent, as in a standalone public checkout. If any is present,
+the checks run normally and report missing or invalid documentation.
+
+---
+
 ## Security & Privacy
 
 - **Local Execution**: RemoteCLI runs as a local web service on your machine.
 - **Your Own Credentials**: RemoteCLI connects directly to your local CLI sessions; you use your own provider authentication.
 - **Permission Safety**: Tool execution permissions match your security preferences and can be toggled per session or globally.
+- **Browser Sessions**: RemoteCLI keeps sign-in in an `HttpOnly`, `SameSite=Strict` cookie. The cookie expires 7 days after sign-in. When you sign out a device, its open tabs and terminals close too.
+- **Two-Factor Sign-in**: TOTP is optional. RemoteCLI encrypts authenticator seeds on disk. When you change the password or turn two-factor sign-in on or off, every other device is signed out. While two-factor sign-in is on, these actions also need a new authenticator code.
+- **HTML Preview Isolation**: When you preview a saved HTML file in the editor, its scripts run in an isolated frame with no network access and no access to RemoteCLI or your sign-in. In a Remote tab the Controller sets the policy of the preview page, and the Host cannot change it.
 
 ---
 

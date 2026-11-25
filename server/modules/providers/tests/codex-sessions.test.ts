@@ -610,3 +610,69 @@ test('Codex history restores user prompts from typed item_completed rows', { con
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
+
+test('EH-01/EH-07: persisted turn errors survive reload once, in order, across malformed lines', { concurrency: false }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'codex-error-history-'));
+  const restoreHome = patchHomeDir(root);
+  const workspace = path.join(root, 'workspace');
+  await mkdir(workspace);
+  try {
+    const file = await writeCodexTranscript(root, 'provider-errors', workspace);
+    const event = (seconds: number, payload: Record<string, unknown>) => JSON.stringify({
+      type: 'event_msg', timestamp: `2026-01-01T00:00:0${seconds}.000Z`, payload,
+    });
+    const failure = { type: 'task_complete', turn_id: 'turn-1', error: { message: JSON.stringify({ message: '<script>synthetic()</script> rejected model' }) } };
+    await writeFile(file, [
+      JSON.stringify({ type: 'session_meta', payload: { id: 'provider-errors', cwd: workspace } }),
+      event(0, { type: 'task_started', turn_id: 'turn-1' }),
+      event(1, { type: 'user_message', message: 'first prompt' }),
+      'malformed json row',
+      event(2, failure), event(2, failure),
+      event(3, { type: 'task_started', turn_id: 'turn-2' }),
+      event(4, { type: 'user_message', message: 'second prompt' }),
+      event(5, { type: 'task_complete', turn_id: 'turn-2' }),
+      event(6, { type: 'task_started', turn_id: 'turn-3' }),
+      event(7, { type: 'user_message', message: 'third prompt' }),
+      event(8, { type: 'task_complete', turn_id: 'turn-3', error: { message: 'plain failure' } }),
+      '',
+    ].join('\n'));
+    await withIsolatedDatabase(async () => {
+      sessionsDb.createAppSession('app-errors', 'codex', workspace);
+      sessionsDb.assignProviderSessionId('app-errors', 'provider-errors');
+      await new CodexSessionSynchronizer().synchronize();
+      const provider = new CodexSessionsProvider();
+      let errorIds: string[] | undefined;
+      for (let reload = 0; reload < 3; reload++) {
+        const result = await provider.fetchHistory('app-errors');
+        assert.deepEqual(result.messages.map(row => [row.kind, row.content]), [
+          ['text', 'first prompt'], ['error', '<script>synthetic()</script> rejected model'],
+          ['text', 'second prompt'], ['text', 'third prompt'], ['error', 'plain failure'],
+        ]);
+        const ids = result.messages.filter(row => row.kind === 'error').map(row => row.id);
+        if (errorIds) assert.deepEqual(ids, errorIds);
+        errorIds = ids;
+      }
+      for (const [encoded, expected] of [
+        [JSON.stringify({ error: { message: 'nested model error', type: 'invalid_request_error' } }), 'nested model error'],
+        [JSON.stringify({ message: 'top-level error', error: { message: 'nested ignored' } }), 'top-level error'],
+        ['{"error":{"message":42}}', '{"error":{"message":42}}'],
+        ['{invalid JSON', '{invalid JSON'],
+      ]) {
+        await writeFile(file, [
+          JSON.stringify({ type: 'session_meta', payload: { id: 'provider-errors', cwd: workspace } }),
+          event(0, { type: 'task_started', turn_id: 'encoded-turn' }),
+          event(1, { type: 'user_message', message: 'encoded error prompt' }),
+          event(2, { type: 'task_complete', turn_id: 'encoded-turn', error: { message: encoded } }),
+          '',
+        ].join('\n'));
+        const result = await provider.fetchHistory('app-errors');
+        assert.deepEqual(result.messages.map(row => [row.kind, row.content]), [
+          ['text', 'encoded error prompt'], ['error', expected],
+        ]);
+      }
+    });
+  } finally {
+    restoreHome();
+    await rm(root, { recursive: true, force: true });
+  }
+});

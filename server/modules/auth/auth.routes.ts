@@ -3,9 +3,13 @@ import type { NextFunction, RequestHandler, Response } from 'express';
 
 import { AppError } from '@/shared/utils.js';
 
+import { getMfaStore, requireRecentMfa } from './services/mfa-runtime.service.js';
+import { getSessionRuntime } from './services/session-runtime.service.js';
+import { clearSessionCookie, sessionCookie, isLocalSessionRequest, readAuthTransportConfig } from './services/session-transport.service.js';
+import type { AuthSession } from './services/session-store.service.js';
 import type { createAuthService } from './auth.service.js';
 
-type AuthenticatedRequest = express.Request & { user?: unknown };
+type AuthenticatedRequest = express.Request & { user?: { id: number; username: string }; authSession?: AuthSession; releaseAuthConnection?: () => void };
 
 /** Express fills `req.ip` honouring the `trust proxy` setting; 'unknown' keeps the limiter keyed. */
 function clientIp(req: express.Request): string {
@@ -35,6 +39,20 @@ export function createAuthRouter(
   authenticateToken: RequestHandler,
 ): express.Router {
   const router = express.Router();
+  const deliverLogin = (req: express.Request, res: Response, result: Awaited<ReturnType<typeof service.login>>) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if ('mfaRequired' in result) { res.json(result); return; }
+    const { token, ...publicResult } = result;
+    const store = getSessionRuntime().store;
+    const session = store.authenticate(token);
+    if (!session) throw new Error('Session issuance failed');
+    res.setHeader('Set-Cookie', sessionCookie(req, token, session.expiresAt));
+    res.setHeader('Cache-Control', 'no-store');
+    if (!req.secure && !isLocalSessionRequest(req, readAuthTransportConfig(process.env))) {
+      console.warn('[auth] Login over HTTP outside loopback; use HTTPS to protect the session in transit.');
+    }
+    res.json(publicResult);
+  };
 
   router.get('/status', (_req, res, next) => {
     try {
@@ -48,7 +66,7 @@ export function createAuthRouter(
     try {
       const body = req.body as { username?: unknown; password?: unknown; setupToken?: unknown };
       const setupToken = body.setupToken ?? req.get('x-setup-token');
-      res.json(await service.register(body.username, body.password, setupToken, clientIp(req)));
+      deliverLogin(req, res, await service.register(body.username, body.password, setupToken, clientIp(req), req.get('user-agent')));
     } catch (error) {
       forwardError(res, next, error);
     }
@@ -57,7 +75,7 @@ export function createAuthRouter(
   router.post('/login', async (req, res, next) => {
     try {
       const body = req.body as { username?: unknown; password?: unknown };
-      res.json(await service.login(body.username, body.password, clientIp(req)));
+      deliverLogin(req, res, await service.login(body.username, body.password, clientIp(req), req.get('user-agent')));
     } catch (error) {
       forwardError(res, next, error);
     }
@@ -71,17 +89,107 @@ export function createAuthRouter(
     res.json(service.refreshSession((req as AuthenticatedRequest).user));
   });
 
-  router.post('/logout', authenticateToken, (_req, res) => {
+  router.get('/session-status', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    if (!auth.authSession) return res.status(403).json({ code: 'AUTH_BROWSER_SESSION_REQUIRED' });
+    const store = getSessionRuntime().store;
+    const enabled = getMfaStore().enabled(auth.authSession.userId);
+    res.json({ locked: auth.authSession.lockedAt !== null, totpEnabled: enabled,
+      autoLock: enabled ? store.autoLockEnabled(auth.authSession.userId) : null,
+      idleHours: store.idleLockHours(auth.authSession.userId) });
+  });
+
+  router.post('/lock', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
+    auth.releaseAuthConnection?.();
+    getSessionRuntime().store.lock(auth.authSession.id);
+    res.json({ locked: true });
+  });
+
+  router.post('/unlock', authenticateToken, (req, res, next) => {
+    try {
+      const auth = req as AuthenticatedRequest;
+      if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
+      if (auth.authSession.lockedAt === null) return res.json({ locked: false });
+      auth.releaseAuthConnection?.();
+      try {
+        getMfaStore().verifySessionTotp(auth.authSession.userId, auth.authSession.id, req.body?.code, getSessionRuntime().store);
+      } catch (error) {
+        if (error instanceof AppError && error.code === 'MFA_SESSION_REVOKED') {
+          res.setHeader('X-Auth-Error', 'mfa-attempts-exceeded');
+          res.setHeader('Set-Cookie', clearSessionCookie(req));
+        }
+        throw error;
+      }
+      if (!getSessionRuntime().store.unlock(auth.authSession.id, auth.authSession.userId, Date.now())) {
+        return res.status(401).json({ code: 'AUTH_TOKEN_INVALID' });
+      }
+      res.json({ locked: false });
+    } catch (error) { forwardError(res, next, error); }
+  });
+
+  router.put('/auto-lock', authenticateToken, (req, res, next) => {
+    try {
+      const auth = req as AuthenticatedRequest;
+      if (!auth.authSession || !getMfaStore().enabled(auth.authSession.userId)) return res.status(409).json({ code: 'MFA_DISABLED' });
+      const { enabled, idleHours } = req.body ?? {};
+      if ((enabled === undefined && idleHours === undefined)
+        || (enabled !== undefined && typeof enabled !== 'boolean')
+        || (idleHours !== undefined && (!Number.isInteger(idleHours) || idleHours < 1 || idleHours > 168))) {
+        return res.status(400).json({ code: 'AUTH_INVALID_INPUT' });
+      }
+      const store = getSessionRuntime().store;
+      const userId = auth.authSession.userId;
+      if (enabled === false || (idleHours !== undefined && idleHours > store.idleLockHours(userId))) {
+        requireRecentMfa(userId, auth.authSession);
+      }
+      if (idleHours !== undefined) store.setIdleLockHours(userId, idleHours);
+      if (enabled !== undefined) store.setAutoLock(userId, enabled);
+      res.json({ autoLock: store.autoLockEnabled(userId), idleHours: store.idleLockHours(userId) });
+    } catch (error) { forwardError(res, next, error); }
+  });
+
+  router.post('/logout', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    auth.releaseAuthConnection?.();
+    if (auth.authSession) getSessionRuntime().store.revoke(auth.authSession.id, auth.authSession.userId, 'logout');
+    res.setHeader('Set-Cookie', clearSessionCookie(req));
     res.json(service.logout());
   });
 
   router.post('/logout-all', authenticateToken, async (req, res, next) => {
     try {
       const body = req.body as { password?: unknown };
-      res.json(await service.logoutAll((req as AuthenticatedRequest).user, body.password, clientIp(req)));
+      const auth = req as AuthenticatedRequest;
+      requireRecentMfa(auth.user!.id, auth.authSession);
+      auth.releaseAuthConnection?.();
+      const result = await service.logoutAll((req as AuthenticatedRequest).user, body.password, clientIp(req));
+      res.setHeader('Set-Cookie', clearSessionCookie(req));
+      res.json(result);
     } catch (error) {
       forwardError(res, next, error);
     }
+  });
+
+  router.get('/sessions', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    res.json({ sessions: getSessionRuntime().store.list(auth.user!.id).map((session) => ({
+      id: session.id, browser: session.browser, createdAt: session.createdAt,
+      lastSeenAt: getSessionRuntime().store.lastActivity(session.id), expiresAt: session.expiresAt,
+      current: session.id === auth.authSession?.id,
+    })) });
+  });
+
+  router.delete('/sessions/:sessionId', authenticateToken, (req, res) => {
+    const auth = req as AuthenticatedRequest;
+    const id = String(req.params.sessionId);
+    if (id === auth.authSession?.id) {
+      auth.releaseAuthConnection?.();
+      res.setHeader('Set-Cookie', clearSessionCookie(req));
+    }
+    getSessionRuntime().store.revoke(id, auth.user!.id);
+    res.json({ success: true });
   });
 
   return router;

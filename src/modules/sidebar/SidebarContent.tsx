@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Activity, Archive, Folder, RotateCcw, Search, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { LLMProviderLogo, ScrollArea } from '@/shared/ui';
@@ -9,6 +9,8 @@ import SidebarFooter from '@/modules/sidebar/SidebarFooter';
 import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
+import { SidebarProviderFilter } from '@/modules/sidebar/SidebarProviderFilter';
+import type { ConversationProviderFilter } from '@/modules/sidebar/utils/providerFilter';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
   const parts: ReactNode[] = [];
@@ -102,6 +104,8 @@ type SidebarContentProps = {
   onClearSearchFilter: () => void;
   searchMode: SidebarSearchMode;
   onSearchModeChange: (mode: SidebarSearchMode) => void;
+  providerFilter?: ConversationProviderFilter;
+  onProviderFilterChange?: (value: ConversationProviderFilter) => void;
   conversationResults: ConversationSearchResults | null;
   isSearching: boolean;
   searchProgress: SearchProgress | null;
@@ -151,6 +155,8 @@ export default function SidebarContent({
   onClearSearchFilter,
   searchMode,
   onSearchModeChange,
+  providerFilter = 'all',
+  onProviderFilterChange = () => {},
   conversationResults,
   isSearching,
   searchProgress,
@@ -176,6 +182,12 @@ export default function SidebarContent({
   t,
 }: SidebarContentProps) {
   const showConversationSearch = searchMode === 'conversations' && searchFilter.trim().length >= 2;
+  const visibleConversationTotal = showConversationSearch
+    ? new Set([
+      ...(conversationResults?.titleResults.map(session => session.sessionId) ?? []),
+      ...(conversationResults?.results.flatMap(project => project.sessions.map(session => session.sessionId)) ?? []),
+    ]).size
+    : recentConversationsTotal;
   const hasSearchResults = Boolean(
     conversationResults
     && (conversationResults.titleResults.length > 0 || conversationResults.results.length > 0),
@@ -210,6 +222,10 @@ export default function SidebarContent({
         t={t}
       />
 
+      {searchMode === 'conversations' && <>
+        <SidebarProviderFilter value={providerFilter} onChange={onProviderFilterChange} t={t} />
+        <p className="px-3 pb-2 text-xs text-muted-foreground">{t('providerFilter.count', { count: visibleConversationTotal })}</p>
+      </>}
       <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
         {showConversationSearch ? (
           isSearching && !conversationResults ? (
@@ -345,7 +361,7 @@ export default function SidebarContent({
                           )}
                         >
                           <div className="mb-1 flex items-center gap-1.5">
-                            <MessageSquare className="h-3 w-3 flex-shrink-0 text-primary" />
+                            <LLMProviderLogo provider={session.provider || session.matches[0]?.provider || 'claude'} className="h-3 w-3 flex-shrink-0" />
                             <span className="truncate text-xs font-normal text-foreground">
                               {session.sessionSummary}
                             </span>
@@ -422,7 +438,7 @@ export default function SidebarContent({
                   {runningSessionsCount}
                 </span>
               </div>
-              <SidebarProjectList {...projectListProps} />
+              <SidebarProjectList {...projectListProps} showAllProjects={searchMode === 'running' || searchFilter.trim().length > 0} />
             </div>
           )
         ) : searchMode === 'archived' ? (
@@ -682,7 +698,7 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          <SidebarProjectList {...projectListProps} />
+          <SidebarProjectList {...projectListProps} showAllProjects={searchFilter.trim().length > 0} />
         )}
       </ScrollArea>
 

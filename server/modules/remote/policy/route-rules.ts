@@ -98,6 +98,7 @@ export const REMOTE_ALLOW_RULES: ReadonlyArray<RouteRule & { methods: readonly s
   allow('POST', '/api/file-tree/create-folder', 'folder picker of the new-project flow'),
   allow('GET', '/api/file-tree/projects/*/file', `${FILES}; reads ANY absolute path under WORKSPACES_ROOT (default: home), not only the project root`),
   allow('GET', '/api/file-tree/projects/*/files/content', 'raw file bytes of ANY absolute path under WORKSPACES_ROOT (default: home); the Controller forces nosniff + sandbox CSP on non-JSON answers'),
+  allow('GET', '/api/file-tree/projects/*/files/html-preview', 'HTML preview page: only a frame load of the signed-in browser gets its script-enabled sandbox policy (the Controller decides that); every other caller gets the plain sandbox policy'),
   allow('PUT', '/api/file-tree/projects/*/file', `${FILES}; writes inside the project root, which can include a repository's .git/config or hooks (they run under /api/git/* calls)`),
   allow('GET', '/api/file-tree/projects/*/files', FILES),
   allow('POST', '/api/file-tree/projects/*/files/create', FILES),

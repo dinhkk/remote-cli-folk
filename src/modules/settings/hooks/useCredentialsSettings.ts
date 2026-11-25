@@ -46,10 +46,10 @@ export function useCredentialsSettings({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<CreatedApiKey | null>(null);
 
+  // `loading` starts true and only covers the first load. A refresh after toggling, creating or
+  // deleting keeps the lists mounted, so the button the user just pressed keeps keyboard focus.
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
-
       const [apiKeysResponse, credentialsResponse] = await Promise.all([
         api.settings.apiKeys(),
         api.settings.credentials('github_token'),

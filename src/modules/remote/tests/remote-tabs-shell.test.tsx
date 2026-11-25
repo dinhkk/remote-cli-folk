@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import '@/modules/i18n';
+import { SELECTED_REMOTE_TAB_KEY } from '@/shared/transport/navigation-storage';
 import type { RemotePeer } from '@/shared/types';
 
 /**
@@ -13,15 +14,21 @@ import type { RemotePeer } from '@/shared/types';
  * every Remote tab is an isolated frame that stays mounted when you switch away.
  */
 
+vi.mock('@/modules/auth', () => ({ QuickSessionLockButton: () => <button aria-label="Lock Controller session" /> }));
+
 const HOOK = vi.hoisted(() => ({
   peers: [] as RemotePeer[],
+  isLoading: false,
+  hasLoadError: false,
   requestTabToken: vi.fn(),
+  refresh: vi.fn(async () => undefined),
 }));
 vi.mock('@/modules/remote/hooks/useRemoteTabs', () => ({
   useRemoteTabs: () => ({
     peers: HOOK.peers,
-    isLoading: false,
-    refresh: async () => undefined,
+    isLoading: HOOK.isLoading,
+    hasLoadError: HOOK.hasLoadError,
+    refresh: HOOK.refresh,
     requestTabToken: HOOK.requestTabToken,
   }),
 }));
@@ -61,6 +68,8 @@ function LocalApp() {
 const renderShell = () => render(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
 
 beforeEach(() => {
+  sessionStorage.clear();
+  HOOK.isLoading = false; HOOK.hasLoadError = false;
   HOOK.peers = [];
   BRIDGES.created.length = 0;
   mounts = 0;
@@ -214,6 +223,8 @@ test('a pairing that merely drops out of one poll is not treated as revoked', ()
   HOOK.peers = [peer('peer_online111', 'Live', 'online')];
   const view = renderShell();
 
+  sessionStorage.clear();
+  HOOK.isLoading = false; HOOK.hasLoadError = false;
   HOOK.peers = [];
   view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
 
@@ -255,6 +266,8 @@ test('a pairing that disappears closes its tab and falls back to Local', () => {
   fireEvent.click(screen.getByRole('tab', { name: /Laptop/ }));
   assert.ok(document.querySelector('iframe'));
 
+  sessionStorage.clear();
+  HOOK.isLoading = false; HOOK.hasLoadError = false;
   HOOK.peers = [];
   view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
 
@@ -262,4 +275,80 @@ test('a pairing that disappears closes its tab and falls back to Local', () => {
   assert.equal(screen.queryByRole('tablist'), null);
   assert.equal(BRIDGES.created[0]?.disposed, true);
   assert.equal(screen.getByTestId('local-app').closest('.hidden'), null);
+});
+
+
+test('UI-08/KU-05: selected Host is restored on remount without another click', () => {
+  HOOK.peers = [peer('host-A', 'Test Host')];
+  const first = renderShell();
+  fireEvent.click(screen.getByRole('tab', { name: 'Test Host' }));
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), 'host-A');
+  first.unmount(); renderShell();
+  assert.equal(screen.getByRole('tab', { name: 'Test Host' }).getAttribute('aria-selected'), 'true');
+  assert.ok(document.querySelector('iframe'));
+});
+
+test('UI-09/UI-10/KU-06/KU-07: loading and errors preserve selection; successful absence clears it', () => {
+  sessionStorage.setItem(SELECTED_REMOTE_TAB_KEY, 'host-A');
+  HOOK.isLoading = true;
+  const view = renderShell();
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), 'host-A');
+  assert.ok(screen.getByTestId('local-app').parentElement?.classList.contains('hidden'));
+  HOOK.isLoading = false; HOOK.hasLoadError = true;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), 'host-A');
+  HOOK.peers = [peer('host-A', 'Test Host')]; HOOK.hasLoadError = false;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(screen.getByRole('tab', { name: 'Test Host' }).getAttribute('aria-selected'), 'true');
+  HOOK.peers = [];
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), null);
+});
+
+test('SF-02: a saved Host whose list is loading or failed shows a visible state, not a blank page', () => {
+  sessionStorage.setItem(SELECTED_REMOTE_TAB_KEY, 'host-A');
+  HOOK.isLoading = true;
+  const view = renderShell();
+  assert.equal(screen.getByRole('status').textContent, 'Loading Hosts…');
+  assert.equal(screen.queryByRole('button', { name: 'Try again' }), null);
+
+  HOOK.isLoading = false; HOOK.hasLoadError = true;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.match(screen.getByRole('alert').textContent ?? '', /Could not load the list of Hosts/);
+  HOOK.refresh.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  assert.equal(HOOK.refresh.mock.calls.length, 1);
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), 'host-A', 'retrying keeps the saved Host');
+  assert.ok(screen.getByTestId('local-app').parentElement?.classList.contains('hidden'), 'no automatic fallback to Local');
+
+  // The list recovers: the saved Host comes back by itself and the state goes away.
+  HOOK.peers = [peer('host-A', 'Test Host')]; HOOK.hasLoadError = false;
+  view.rerender(<RemoteTabsShell><LocalApp /></RemoteTabsShell>);
+  assert.equal(screen.queryByTestId('remote-hosts-pending'), null);
+  assert.equal(screen.getByRole('tab', { name: 'Test Host' }).getAttribute('aria-selected'), 'true');
+});
+
+test('SF-02: after a failed list the user can choose Local', () => {
+  sessionStorage.setItem(SELECTED_REMOTE_TAB_KEY, 'host-A');
+  HOOK.hasLoadError = true;
+  renderShell();
+  fireEvent.click(screen.getByRole('button', { name: 'Open Local' }));
+  assert.equal(screen.queryByTestId('remote-hosts-pending'), null);
+  assert.ok(!screen.getByTestId('local-app').parentElement?.classList.contains('hidden'));
+  assert.equal(sessionStorage.getItem(SELECTED_REMOTE_TAB_KEY), null);
+});
+
+test('QL-08: only the active Remote tab exposes a Controller-shell lock control', () => {
+  HOOK.peers = [peer('host-a', 'Host A'), peer('host-b', 'Host B')];
+  const view = renderShell();
+  assert.equal(screen.queryByRole('button', { name: 'Lock Controller session' }), null);
+  fireEvent.click(screen.getByRole('tab', { name: 'Host A' }));
+  const button = screen.getByRole('button', { name: 'Lock Controller session' });
+  assert.ok(view.container.contains(button));
+  assert.equal(button.closest('[role="tablist"]'), null, 'lock stays outside the horizontally scrolling tabs');
+  assert.equal(screen.getAllByRole('button', { name: 'Lock Controller session' }).length, 1);
+  fireEvent.click(screen.getByRole('tab', { name: 'Host B' }));
+  assert.equal(screen.getAllByRole('button', { name: 'Lock Controller session' }).length, 1);
+  fireEvent.click(screen.getByRole('tab', { name: 'Local' }));
+  assert.equal(screen.queryByRole('button', { name: 'Lock Controller session' }), null);
 });

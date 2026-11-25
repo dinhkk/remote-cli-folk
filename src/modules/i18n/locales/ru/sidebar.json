@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "Закреплённые проекты",
+    "other": "Другие проекты ({{count}})"
+  },
   "projects": {
     "title": "Проекты",
     "newProject": "Новый проект",
@@ -185,5 +189,11 @@
     "archiveSessionsNotice_few": "Архивирование убирает сеансы из активного списка, сохраняя их историю.",
     "archiveSessionsNotice_many": "Архивирование убирает сеансы из активного списка, сохраняя их историю.",
     "archiveSessionsNotice_other": "Архивирование убирает сеансы из активного списка, сохраняя их историю."
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }

@@ -39,7 +39,7 @@ const withRealTokens = async (run: (context: { port: number; tokensSeen: () => s
   }
 };
 
-test('the loopback token is an ordinary JWT of at most 5 minutes with no special claim (phase 02 issueLoopbackToken)', async () => {
+test('H-02/H-04: the loopback token is typed, process-local and lives at most 5 minutes', async () => {
   await withRealTokens(async ({ port, tokensSeen }) => {
     const bridge = createHostBridge({ port, env: {} });
     const loop = createBridgedLoopback((stream, open) => bridge.handleStream(stream, open));
@@ -47,9 +47,9 @@ test('the loopback token is an ordinary JWT of at most 5 minutes with no special
       await callThroughBridge(loop, { path: '/api/projects' });
       const [token] = tokensSeen();
       const claims = jwt.decode(token) as Claims;
-      assert.equal(claims.username, 'alice');
+      assert.equal(claims.userId, userDb.getFirstUser()!.id);
       assert.ok(claims.exp - claims.iat <= 300, `lives ${claims.exp - claims.iat} s`);
-      assert.equal(claims.typ, undefined, 'no typ/scope flag: the stock middleware must accept it as is');
+      assert.equal(claims.typ, 'host-loopback');
       assert.equal(typeof claims.jti, 'string');
     } finally {
       bridge.closeAll();

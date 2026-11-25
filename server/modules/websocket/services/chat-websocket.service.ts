@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import type { WebSocket } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
@@ -552,11 +553,12 @@ function handleChatSubscribe(
     // keeps producing events through the same writer (task progress, the
     // turn the CLI pushes when a task reports), so a tab opened during that
     // work attaches too; the registry keeps the run while the work lasts.
-    if (isProcessing || dependencies.runtime.hasBackgroundWork(sessionId)) {
-      chatRunRegistry.attachConnection(sessionId, ws);
-      if (sessionId !== rawSessionId) {
-        chatRunRegistry.attachConnection(rawSessionId, ws);
-      }
+    const errorsOnly = !isProcessing && !dependencies.runtime.hasBackgroundWork(sessionId);
+    // A provider can report completion before a later CLI failure. Keep the
+    // retained run's error channel live even when the subscribe ack is idle.
+    chatRunRegistry.attachConnection(sessionId, ws, errorsOnly);
+    if (sessionId !== rawSessionId) {
+      chatRunRegistry.attachConnection(rawSessionId, ws, errorsOnly);
     }
 
     // Pending approvals are tracked under the app session id inside the
@@ -585,18 +587,12 @@ function handleChatSubscribe(
       });
     }
 
-    // Replay only for RUNNING runs, strictly after the ack. Completed runs
-    // are fully persisted to the provider transcript and served over REST —
-    // replaying them (e.g. after a page reload where the client's lastSeq is
-    // 0) would duplicate messages the history fetch already returned.
-    if (isProcessing) {
-      for (const event of chatRunRegistry.replayEvents(sessionId, lastSeq)) {
-        sendJson(ws, event);
-      }
-      if (sessionId !== rawSessionId) {
-        for (const event of chatRunRegistry.replayEvents(rawSessionId, lastSeq)) {
-          sendJson(ws, event);
-        }
+    // Completed replies come from REST. Runtime errors may never reach the
+    // provider transcript, so replay only those from the existing buffer.
+    // Preserve their ids/timestamps for reconciliation with REST and retries.
+    for (const replayId of new Set([sessionId, rawSessionId])) {
+      for (const event of chatRunRegistry.replayEvents(replayId, lastSeq)) {
+        if (isProcessing || event.kind === 'error') sendJson(ws, event);
       }
     }
   }
@@ -712,6 +708,10 @@ export function handleChatConnection(
 
   ws.on('message', async (rawMessage) => {
     try {
+      if (typeof request.user?.sessionId === 'string' && !getSessionRuntime().store.getActive(request.user.sessionId)) {
+        ws.close(4401, 'session-ended');
+        return;
+      }
       const parsed = parseIncomingJsonObject(rawMessage);
       if (!parsed) {
         throw new Error('Invalid websocket payload');

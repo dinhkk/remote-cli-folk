@@ -2,6 +2,7 @@ import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 
 import { WebSocket, WebSocketServer, type VerifyClientCallbackAsync, type VerifyClientCallbackSync } from 'ws';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
@@ -19,6 +20,8 @@ type WebSocketServerDependencies = {
   chat: Parameters<typeof handleChatConnection>[2];
   shell: Parameters<typeof handleShellConnection>[1];
   getPluginPort: Parameters<typeof handlePluginWsProxy>[2];
+  /** True when plugins are turned off on this server: every `/plugin-ws/**` connection is refused. */
+  pluginsDisabled?: boolean;
   /** `/r/**` sockets of the Remote Controller; absent when Remote is disabled or unsupported. */
   remote?: RemoteWebSocketGateway;
   /** Lets "log out everywhere" end the regular sockets too (only when the main JWT really changed). */
@@ -187,9 +190,16 @@ export function createWebSocketServer(
 
     const incomingRequest = request as AuthenticatedWebSocketRequest;
     const pathname = pathnameOf(incomingRequest);
+    const sessionId = incomingRequest.user?.sessionId;
+    if (typeof sessionId === 'string') {
+      const runtime = getSessionRuntime();
+      const release = runtime.connections.track(sessionId, reason => ws.close(reason === 'locked' ? 4403 : 4401, reason === 'locked' ? 'session-locked' : 'session-ended'));
+      ws.once('close', release);
+      if (!runtime.store.getActive(sessionId)) return;
+    }
 
     if (pathname === '/shell') {
-      handleShellConnection(ws, dependencies.shell);
+      handleShellConnection(ws, dependencies.shell, incomingRequest.user);
       return;
     }
 
@@ -204,7 +214,12 @@ export function createWebSocketServer(
     }
 
     if (pathname.startsWith('/plugin-ws/')) {
-      handlePluginWsProxy(ws, pathname, dependencies.getPluginPort);
+      if (dependencies.pluginsDisabled) {
+        ws.close(4403, 'plugins-disabled');
+        return;
+      }
+      handlePluginWsProxy(ws, pathname, dependencies.getPluginPort,
+        () => typeof sessionId !== 'string' || Boolean(getSessionRuntime().store.getActive(sessionId)));
       return;
     }
 

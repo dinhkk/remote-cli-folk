@@ -269,5 +269,11 @@
       "closeSidebar": "關閉側邊欄",
       "resizeSidebar": "調整側邊欄寬度"
     }
+  },
+  "remoteHosts": {
+    "loading": "正在載入主機…",
+    "loadError": "無法載入主機清單。清單載入後，所選主機的分頁將會恢復。",
+    "retry": "重試",
+    "openLocal": "開啟 Local"
   }
 }

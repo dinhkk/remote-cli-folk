@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import test from 'node:test';
 
 import jwt from 'jsonwebtoken';
+import { getSessionRuntime } from '../services/session-runtime.service.js';
 
 import {
   authenticateToken,
@@ -21,7 +22,7 @@ import { runAuthenticateToken, withIsolatedAuthDatabase } from './with-isolated-
 
 test('a tab token carries the contract claims and lives at most 900 seconds', async () => {
   await withIsolatedAuthDatabase((user) => {
-    const token = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
+    const token = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'peer-1' });
     const claims = jwt.decode(token) as Record<string, unknown>;
 
     assert.equal(claims.typ, 'remote-tab');
@@ -38,7 +39,7 @@ test('a tab token carries the contract claims and lives at most 900 seconds', as
 
 test('a requested lifetime above 900 seconds is clamped', async () => {
   await withIsolatedAuthDatabase((user) => {
-    const token = issueTabToken({ userId: user.id, username: user.username, peerId: 'p', ttlSeconds: 86_400 });
+    const token = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'p', ttlSeconds: 86_400 });
     const claims = jwt.decode(token) as { exp: number; iat: number };
     assert.ok(claims.exp - claims.iat <= 900);
   });
@@ -46,7 +47,7 @@ test('a requested lifetime above 900 seconds is clamped', async () => {
 
 test('verifyTabToken accepts the right peerId and rejects another', async () => {
   await withIsolatedAuthDatabase((user) => {
-    const token = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
+    const token = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'peer-1' });
 
     const ok = verifyTabToken(token, 'peer-1');
     assert.equal(ok.ok, true);
@@ -62,7 +63,7 @@ test('an expired tab token is reported as expired', async () => {
   await withIsolatedAuthDatabase((user) => {
     const realNow = Date.now;
     try {
-      const token = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1', ttlSeconds: 60 });
+      const token = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'peer-1', ttlSeconds: 60 });
       Date.now = () => realNow() + 61_000;
       assert.deepEqual(verifyTabToken(token, 'peer-1'), { ok: false, reason: 'expired' });
     } finally {
@@ -102,7 +103,7 @@ function signWithDerivedKey(claims: Record<string, unknown>, options: jwt.SignOp
 
 test('claim checks reject correctly signed tokens with missing/wrong typ or an over-long lifetime', async () => {
   await withIsolatedAuthDatabase((user) => {
-    const base = { typ: 'remote-tab', peerId: 'peer-1', userId: user.id, username: 'alice' };
+    const base = { sid: getSessionRuntime().store.create(user.id).session.id, typ: 'remote-tab', peerId: 'peer-1', userId: user.id, username: 'alice' };
 
     assert.equal(verifyTabToken(signWithDerivedKey(base, { expiresIn: 60 }), 'peer-1').ok, true, 'control');
     assert.equal(
@@ -130,7 +131,7 @@ test('claim checks reject correctly signed tokens with missing/wrong typ or an o
 
 test('the real authenticateToken and authenticateWebSocket reject a tab token', async () => {
   await withIsolatedAuthDatabase(async (user) => {
-    const tab = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
+    const tab = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'peer-1' });
 
     const rest = await runAuthenticateToken(authenticateToken, tab);
     assert.equal(rest.accepted, false);
@@ -138,19 +139,19 @@ test('the real authenticateToken and authenticateWebSocket reject a tab token', 
     assert.equal(authenticateWebSocket(tab), null);
 
     const ordinary = await runAuthenticateToken(authenticateToken, generateToken(user));
-    assert.equal(ordinary.accepted, true, 'control: the ordinary JWT still works');
+    assert.equal(ordinary.accepted, false, 'cookie credentials cannot be replayed as Bearer tokens');
   });
 });
 
 test('changing the token epoch kills tab tokens issued before it', async () => {
   await withIsolatedAuthDatabase((user) => {
-    const before = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
+    const before = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'peer-1' });
     assert.equal(verifyTabToken(before, 'peer-1').ok, true);
 
     bumpAuthEpoch();
 
     assert.deepEqual(verifyTabToken(before, 'peer-1'), { ok: false, reason: 'invalid' });
-    const after = issueTabToken({ userId: user.id, username: user.username, peerId: 'peer-1' });
+    const after = issueTabToken({ sessionId: getSessionRuntime().store.create(user.id).session.id, userId: user.id, username: user.username, peerId: 'peer-1' });
     assert.equal(verifyTabToken(after, 'peer-1').ok, true);
   });
 });

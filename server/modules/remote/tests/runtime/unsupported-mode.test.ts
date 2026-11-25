@@ -13,8 +13,9 @@ import express from 'express';
 
 import { remoteConfigDb } from '@/modules/database/index.js';
 
-import { MAIN_PAGE_CSP } from '../../runtime/main-page-security-headers.js';
-import { createRemoteModule, resolveBridgeHost, TARGET_PAGE_CSP } from '../../runtime/remote.module.js';
+import { buildMainPageCsp } from '../../runtime/main-page-security-headers.js';
+import { buildTargetPageCsp, sameHostSocketSources } from '../../runtime/target-page-csp.js';
+import { createRemoteModule, resolveBridgeHost } from '../../runtime/remote.module.js';
 import { MASTER_KEY, RELAY_SECRET, RELAY_URL, withModuleRig, type ModuleRig } from '../support/remote-module-rig.js';
 import { send, serve } from '../support/http-test-client.js';
 
@@ -125,7 +126,7 @@ describe('master key', () => {
         for (const path of ['/api/remote/relay-config', '/api/remote/host/status', '/api/remote/peers']) {
           const response = await send(server.port, {
             path,
-            headers: { authorization: `Bearer ${rig.jwt}`, 'sec-fetch-site': 'same-origin' },
+            headers: { cookie: `remotecli_session=${rig.jwt}`, 'x-remotecli-request': '1', 'sec-fetch-site': 'same-origin' },
           });
           assert.equal(response.status, 409, path);
           assert.equal(errorCode(response.text()), 'MASTER_KEY_MISMATCH');
@@ -164,11 +165,14 @@ describe('approval timeout reported by the Host', () => {
 describe('pages served with ?target=', () => {
   it('carry the CSP that limits the tab to its own origin; other pages and assets do not', async () => {
     await withModuleRig({}, async (rig) => {
+      const sockets = sameHostSocketSources(`127.0.0.1:${rig.port}`);
+      const targetPolicy = buildTargetPageCsp([], sockets);
       const withTarget = await send(rig.port, { path: '/?target=peer-1' });
-      assert.equal(withTarget.headers['content-security-policy'], TARGET_PAGE_CSP);
-      assert.equal((await send(rig.port, { path: '/index.html?target=peer-1' })).headers['content-security-policy'], TARGET_PAGE_CSP);
-      assert.equal((await send(rig.port, { path: '/settings?target=peer-1' })).headers['content-security-policy'], TARGET_PAGE_CSP);
-      assert.equal((await send(rig.port, { path: '/' })).headers['content-security-policy'], MAIN_PAGE_CSP, 'the plain page has only the main-page policy');
+      assert.equal(withTarget.headers['content-security-policy'], targetPolicy);
+      assert.equal((await send(rig.port, { path: '/index.html?target=peer-1' })).headers['content-security-policy'], targetPolicy);
+      assert.equal((await send(rig.port, { path: '/settings?target=peer-1' })).headers['content-security-policy'], targetPolicy);
+      assert.equal((await send(rig.port, { path: '/' })).headers['content-security-policy'], buildMainPageCsp({ frameAncestors: true, socketSources: sockets }),
+        'the plain page has the main-page policy');
       assert.equal((await send(rig.port, { path: '/assets/app.js?target=peer-1' })).headers['content-security-policy'], undefined);
     });
   });

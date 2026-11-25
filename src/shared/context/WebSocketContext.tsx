@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { useAuth } from '@/modules/auth';
 import { IS_PLATFORM } from '@/shared/utils';
-import { expireAuthSession, isAuthTokenExpired } from '@/shared/authToken';
+import { expireAuthSession, lockAuthSession } from '@/shared/authToken';
 import { isTargetMode, wsProtocols, wsUrl } from '@/shared/transport/target-context';
 import type { ServerEvent } from '@/shared/types';
 
@@ -68,11 +68,7 @@ const buildWebSocketUrl = (token: string | null): WebSocketTarget | null => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   if (IS_PLATFORM) return { url: `${protocol}//${window.location.host}/ws` }; // Platform mode: Use same domain as the page (goes through proxy)
   if (!token) return null;
-  if (isAuthTokenExpired(token)) {
-    expireAuthSession();
-    return null;
-  }
-  return { url: `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}` }; // OSS mode: Use same host:port that served the page
+  return { url: `${protocol}//${window.location.host}/ws` };
 };
 
 const useWebSocketProviderState = (): WebSocketContextType => {
@@ -90,7 +86,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
   // not read as a lost connection, or every page load would flash the indicator.
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { isLoading: isAuthLoading, token, user } = useAuth();
+  const { isLoading: isAuthLoading, isLocked, token, user } = useAuth();
 
   const dispatch = useCallback((event: ServerEvent) => {
     for (const listener of listenersRef.current) {
@@ -106,7 +102,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
   // without reading the `connect` binding while it is still initializing.
   const connect = useCallback(function connect() {
     if (unmountedRef.current) return; // Prevent connection if unmounted
-    if (!IS_PLATFORM && (isAuthLoading || !user)) return;
+    if (!IS_PLATFORM && (isAuthLoading || isLocked || !user)) return;
     try {
       // Construct WebSocket URL
       const socketTarget = buildWebSocketTarget(token);
@@ -150,7 +146,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         }
       };
 
-      websocket.onclose = () => {
+      websocket.onclose = (event) => {
         if (wsRef.current !== websocket) {
           return;
         }
@@ -159,6 +155,9 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         // closing a socket on purpose, so a token refresh never gets here.
         setConnectionStatus('disconnected');
         wsRef.current = null;
+
+        if (event?.code === 4403 && !isTargetMode()) { lockAuthSession(); return; }
+        if (event?.code === 4401 && !isTargetMode()) { expireAuthSession(); return; }
 
         // Attempt to reconnect after 3 seconds
         reconnectTimeoutRef.current = setTimeout(() => {
@@ -174,7 +173,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
     }
-  }, [dispatch, isAuthLoading, token, user]); // reconnect with current authentication state
+  }, [dispatch, isAuthLoading, isLocked, token, user]); // reconnect with current authentication state
 
   // Declared after `connect` so the effect body does not reference it before
   // initialization. `connect` is memoized on [dispatch, isAuthLoading, token,
@@ -185,7 +184,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
     // re-run of the effect (e.g. on token refresh) would short-circuit connect()
     // at its unmounted guard and leave the socket permanently disconnected.
     unmountedRef.current = false;
-    if (!IS_PLATFORM && (isAuthLoading || !user)) {
+    if (!IS_PLATFORM && (isAuthLoading || isLocked || !user)) {
       return undefined;
     }
     connect();
@@ -212,7 +211,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
       // before must not show as "Reconnecting" after the next sign-in.
       setConnectionStatus('connecting');
     };
-  }, [connect, isAuthLoading, user]); // reconnect after authentication or token refresh
+  }, [connect, isAuthLoading, isLocked, user]); // reconnect after authentication or token refresh
 
   const sendMessage = useCallback((message: unknown) => {
     const socket = wsRef.current;

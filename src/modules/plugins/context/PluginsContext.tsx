@@ -10,6 +10,8 @@ type PluginsContextValue = {
   plugins: Plugin[];
   loading: boolean;
   pluginsError: string | null;
+  /** True when the server's configuration turned plugins off: nothing may be installed, listed or loaded. */
+  pluginsDisabled: boolean;
   refreshPlugins: () => Promise<void>;
   installPlugin: (url: string) => Promise<{ success: boolean; error?: string }>;
   uninstallPlugin: (name: string) => Promise<{ success: boolean; error?: string }>;
@@ -33,6 +35,7 @@ export function PluginsProvider({ children }: { children: ReactNode }) {
   // Nothing is ever fetched in a Remote tab, so it starts out not loading.
   const [loading, setLoading] = useState(() => !isTargetMode());
   const [pluginsError, setPluginsError] = useState<string | null>(null);
+  const [pluginsDisabled, setPluginsDisabled] = useState(false);
 
   const refreshPlugins = useCallback(async () => {
     // Plugins are not available through Remote: there is nothing to list.
@@ -43,7 +46,10 @@ export function PluginsProvider({ children }: { children: ReactNode }) {
       const res = await api.plugins.list();
       if (res.ok) {
         const data = await res.json();
-        setPlugins(data.plugins || []);
+        // An older server sends no `disabled` field: plugins are then on, as before.
+        const disabled = data.disabled === true;
+        setPluginsDisabled(disabled);
+        setPlugins(disabled ? [] : data.plugins || []);
         setPluginsError(null);
       } else {
         let errorMessage = `Failed to fetch plugins (${res.status})`;
@@ -134,8 +140,8 @@ export function PluginsProvider({ children }: { children: ReactNode }) {
   // Built once per change: an inline object would re-render every consumer on
   // any render of this provider.
   const value = useMemo(
-    () => ({ plugins, loading, pluginsError, refreshPlugins, installPlugin, uninstallPlugin, updatePlugin, togglePlugin }),
-    [installPlugin, loading, plugins, pluginsError, refreshPlugins, togglePlugin, uninstallPlugin, updatePlugin],
+    () => ({ plugins, loading, pluginsError, pluginsDisabled, refreshPlugins, installPlugin, uninstallPlugin, updatePlugin, togglePlugin }),
+    [installPlugin, loading, plugins, pluginsDisabled, pluginsError, refreshPlugins, togglePlugin, uninstallPlugin, updatePlugin],
   );
 
   return (

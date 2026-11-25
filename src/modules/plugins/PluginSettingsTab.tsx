@@ -463,7 +463,7 @@ function PluginRecommendationCard({
 /** Rendered by the settings module as its Plugins tab, for installing, updating and toggling plugins. */
 export default function PluginSettingsTab() {
   const { t } = useTranslation('settings');
-  const { plugins, loading, installPlugin, uninstallPlugin, updatePlugin, togglePlugin } =
+  const { plugins, loading, pluginsDisabled, installPlugin, uninstallPlugin, updatePlugin, togglePlugin } =
     usePlugins();
 
   const [gitUrl, setGitUrl] = useState('');
@@ -569,6 +569,19 @@ export default function PluginSettingsTab() {
       />
     );
   };
+
+  // Turned off by the server: only say so. No install field, no recommendations, no toggles.
+  if (pluginsDisabled) {
+    return (
+      <div className="space-y-6">
+        <h3 className="mb-1 text-base font-semibold text-foreground">{t('pluginSettings.title')}</h3>
+        <p role="status" className="flex items-center gap-2 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+          <ShieldAlert className="h-4 w-4 flex-shrink-0" />
+          {t('pluginSettings.disabledByServer')}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

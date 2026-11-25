@@ -44,5 +44,13 @@
   "unsavedChanges": {
     "confirmClose": "Tienes cambios sin guardar. ¿Cerrar este archivo y descartarlos?",
     "indicator": "Cambios sin guardar"
+  },
+  "htmlPreview": {
+    "untrustedLocal": "Contenido no confiable. Los scripts del archivo se ejecutan en un marco aislado, sin red y sin acceso a esta aplicación. Los archivos enlazados (CDN, otros archivos del proyecto) no se cargan.",
+    "untrustedRemote": "Contenido no confiable. Los scripts del archivo no se ejecutan en una pestaña remota.",
+    "untrustedRemoteIsolated": "Contenido no confiable del host remoto. Los scripts del archivo se ejecutan en un marco aislado, sin red y sin acceso a esta aplicación. Los archivos enlazados (CDN, otros archivos del proyecto) no se cargan.",
+    "unsavedChanges": "Se muestra el archivo guardado. Guarde para ver los cambios sin guardar.",
+    "scriptsDisabled": "Contenido no confiable. Los scripts del archivo no se ejecutan aquí.",
+    "tooLarge": "El archivo supera los 10 MB, por eso sus scripts no se ejecutan."
   }
 }

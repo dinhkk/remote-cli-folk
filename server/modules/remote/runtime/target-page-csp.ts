@@ -9,9 +9,14 @@
  * `data:` (the app inlines small ones), images and workers `blob:`, and styles may be inline (the UI libraries
  * set `style` attributes).
  *
- * `index.html` carries two small inline scripts (the Remote tab storage shim, which must run before anything
- * else, and the service-worker registration). `script-src` therefore lists their SHA-256 hashes, read from the
- * built `index.html` when the policy is first needed (and again if the file changes): no `'unsafe-inline'`.
+ * `index.html` carries small inline scripts (the Remote tab storage shim, which must run before anything else,
+ * the stale-asset notice and the service-worker registration). `script-src` therefore lists their SHA-256
+ * hashes, read from the built `index.html` when the policy is first needed (and again if the file changes):
+ * no `'unsafe-inline'`, no `blob:`, no other origin.
+ *
+ * `connect-src` allows the Controller's own origin only. `'self'` covers its http(s) URLs; the page's
+ * WebSocket URLs (`ws:`/`wss:` on the same host) are listed explicitly, because some WebKit versions do not
+ * match `'self'` against WebSocket schemes.
  */
 
 import crypto from 'node:crypto';
@@ -21,7 +26,7 @@ import fs from 'node:fs';
 // Consumed by: the Remote module's `?target=` middleware, the tests.
 export const TARGET_PAGE_CSP = [
   "default-src 'self'",
-  "connect-src 'self' https: wss: http: ws:",
+  "connect-src 'self'",
   "img-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
@@ -32,10 +37,28 @@ export const TARGET_PAGE_CSP = [
   "object-src 'none'",
 ].join('; ');
 
-/** Adds `script-src 'self' <hashes>` right after `default-src`; unchanged when there are no hashes. */
+const HOST_HEADER = /^(?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
+
+/**
+ * `ws://<host> wss://<host>` for the host the page was requested with: the WebSocket form of the page's own
+ * origin. Anything that is not a plain host[:port] (or `[ipv6]:port`) yields nothing, so a header can never
+ * add another source to the policy.
+ */
+// Consumed by: the target and main page policies, the tests.
+export const sameHostSocketSources = (host: string | undefined): string[] =>
+  typeof host === 'string' && HOST_HEADER.test(host) ? [`ws://${host}`, `wss://${host}`] : [];
+
+/**
+ * Adds `script-src 'self' <hashes>` right after `default-src` (only when there are hashes) and the page's own
+ * WebSocket sources to `connect-src`.
+ */
 // Consumed by: createTargetPageCsp, the tests.
-export const buildTargetPageCsp = (scriptHashes: readonly string[]): string =>
-  scriptHashes.length === 0 ? TARGET_PAGE_CSP : TARGET_PAGE_CSP.replace("default-src 'self'", `default-src 'self'; script-src 'self' ${scriptHashes.join(' ')}`);
+export const buildTargetPageCsp = (scriptHashes: readonly string[], socketSources: readonly string[] = []): string => {
+  let policy = TARGET_PAGE_CSP;
+  if (scriptHashes.length > 0) policy = policy.replace("default-src 'self'", `default-src 'self'; script-src 'self' ${scriptHashes.join(' ')}`);
+  if (socketSources.length > 0) policy = policy.replace("connect-src 'self'", `connect-src 'self' ${socketSources.join(' ')}`);
+  return policy;
+};
 
 /** `'sha256-...'` sources for every inline `<script>` of the HTML file (empty when it cannot be read). */
 // Consumed by: createTargetPageCsp, the tests.
@@ -55,20 +78,31 @@ export const readInlineScriptHashes = (htmlPath: string): string[] => {
 };
 
 /**
- * Creates the function that returns the policy for the next `?target=` page. With an `index.html` path the
- * inline-script hashes are included and refreshed when the file changes; without one it is the plain policy.
+ * Returns the inline-script hashes of `index.html`, read again only when the file changes. Without a path or
+ * a readable file (development) there is nothing inline to allow.
  */
-// Consumed by: the Remote module.
-export function createTargetPageCsp(indexHtmlPath?: string): () => string {
-  let cached: { mtimeMs: number; policy: string } | undefined;
+// Consumed by: createTargetPageCsp, the main page headers.
+export function createInlineScriptHashReader(indexHtmlPath?: string): () => string[] {
+  let cached: { mtimeMs: number; hashes: string[] } | undefined;
   return () => {
-    if (!indexHtmlPath) return TARGET_PAGE_CSP;
+    if (!indexHtmlPath) return [];
     try {
       const { mtimeMs } = fs.statSync(indexHtmlPath);
-      if (cached?.mtimeMs !== mtimeMs) cached = { mtimeMs, policy: buildTargetPageCsp(readInlineScriptHashes(indexHtmlPath)) };
-      return cached.policy;
+      if (cached?.mtimeMs !== mtimeMs) cached = { mtimeMs, hashes: readInlineScriptHashes(indexHtmlPath) };
+      return cached.hashes;
     } catch {
-      return TARGET_PAGE_CSP; // no built page (development): nothing inline to allow
+      return [];
     }
   };
+}
+
+/**
+ * Creates the function that returns the policy for the next `?target=` page, given the Host header the page
+ * was requested with. With an `index.html` path the inline-script hashes are included and refreshed when the
+ * file changes.
+ */
+// Consumed by: the Remote module.
+export function createTargetPageCsp(indexHtmlPath?: string): (host?: string) => string {
+  const hashes = createInlineScriptHashReader(indexHtmlPath);
+  return (host) => buildTargetPageCsp(hashes(), sameHostSocketSources(host));
 }

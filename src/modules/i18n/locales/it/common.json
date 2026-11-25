@@ -269,5 +269,11 @@
       "closeSidebar": "Chiudi barra laterale",
       "resizeSidebar": "Ridimensiona barra laterale"
     }
+  },
+  "remoteHosts": {
+    "loading": "Caricamento degli host…",
+    "loadError": "Impossibile caricare l’elenco degli host. La scheda dell’host selezionato tornerà quando l’elenco sarà caricato.",
+    "retry": "Riprova",
+    "openLocal": "Apri Local"
   }
 }

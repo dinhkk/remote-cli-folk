@@ -148,7 +148,7 @@ test('without a usable token the chat socket waits and retries instead of giving
   assert.equal(FakeWebSocket.instances.length, 1);
 });
 
-test('local mode keeps the token in the query and offers no subprotocol', async () => {
+test('C-05: local mode uses the browser cookie and offers no credential on the URL', async () => {
   enterLocalMode();
   AUTH.current = { user: AUTH.user, token: 'local-token', isLoading: false };
   const token = makeToken('local');
@@ -158,7 +158,7 @@ test('local mode keeps the token in the query and offers no subprotocol', async 
   render(<WebSocketProvider><span /></WebSocketProvider>);
 
   const socket = FakeWebSocket.instances[0] as FakeWebSocket;
-  assert.equal(socket.url, `ws://localhost:3000/ws?token=${encodeURIComponent('local-token')}`);
+  assert.equal(socket.url, 'ws://localhost:3000/ws');
   assert.equal(socket.protocols, undefined);
 });
 
@@ -190,7 +190,7 @@ test('the local shell socket is unchanged', async () => {
 
   assert.equal(
     socketUtils.getShellWebSocketUrl(),
-    `ws://localhost:3000/shell?token=${encodeURIComponent(token)}`,
+    'ws://localhost:3000/shell',
   );
   assert.equal(socketUtils.getShellWebSocketProtocols(), undefined);
 });
@@ -216,24 +216,22 @@ const sseResponse = (chunks: string[], status = 200) => {
   return new Response(stream, { status, headers: { 'Content-Type': 'text/event-stream' } });
 };
 
-test('local mode opens a real EventSource on the URL it was given', async () => {
+test('C-03: local SSE streams use fetch with a cookie and custom header, without a URL token', async () => {
   enterLocalMode();
-  const opened: string[] = [];
-  vi.stubGlobal(
-    'EventSource',
-    class {
-      constructor(url: string) {
-        opened.push(url);
-      }
-      addEventListener() {}
-      close() {}
-    },
-  );
+  const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => sseResponse(['data: hello\n\n']));
+  vi.stubGlobal('fetch', fetchMock);
   const { openEventSource } = await import('@/shared/transport/event-source');
-
-  openEventSource('/api/providers/search/sessions?q=a&token=t');
-
-  assert.deepEqual(opened, ['/api/providers/search/sessions?q=a&token=t']);
+  const stream = openEventSource('/api/providers/search/sessions?q=a');
+  const seen: string[] = [];
+  stream.onmessage = (event) => seen.push(event.data);
+  await vi.waitFor(() => assert.deepEqual(seen, ['hello']));
+  const [url, init] = fetchMock.mock.calls[0];
+  assert.equal(url, '/api/providers/search/sessions?q=a');
+  assert.ok(init);
+  assert.equal(init.credentials, 'same-origin');
+  assert.equal((init.headers as Record<string, string>)['X-RemoteCLI-Request'], '1');
+  assert.equal((init.headers as Record<string, string>).Authorization, undefined);
+  stream.close();
 });
 
 test('a tab streams SSE over fetch with the bearer header and no EventSource', async () => {
@@ -511,13 +509,14 @@ test('a tab uploads to the prefixed URL with the bridge token and ignores refres
   assert.equal(localStorage.getItem('auth-token'), null);
 });
 
-test('a local upload is unchanged', async () => {
+test('C-03/K-31: a local upload uses cookies and the custom header', async () => {
   enterLocalMode();
   const token = makeToken('local');
   localStorage.setItem('auth-token', token);
   const { xhr, finish } = await runUpload();
 
   assert.equal(xhr.url, '/api/file-tree/projects/p1/files/upload');
-  assert.equal(xhr.headers.Authorization, `Bearer ${token}`);
+  assert.equal(xhr.headers.Authorization, undefined);
+  assert.equal(xhr.headers['X-RemoteCLI-Request'], '1');
   await finish();
 });

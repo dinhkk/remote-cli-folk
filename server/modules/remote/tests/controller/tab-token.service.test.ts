@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
+import { getSessionRuntime } from '@/modules/auth/index.js';
 
 import { verifyTabToken } from '@/modules/auth/index.js';
 
@@ -32,7 +33,7 @@ const withService = async (
 describe('tab token service', () => {
   it('issues a token for one peer that lives at most 900 seconds and verifies only for that peer', async () => {
     await withService({}, ({ service, user }) => {
-      const grant = service.issue({ userId: user.id, username: user.username, peerId: 'peer-1' });
+      const grant = service.issue({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId: 'peer-1' });
       const claims = jwt.decode(grant.tabToken);
       assert.equal(claims.typ, 'remote-tab');
       assert.equal(claims.peerId, 'peer-1');
@@ -46,7 +47,7 @@ describe('tab token service', () => {
   it('refuses to issue for a peer this Controller does not have', async () => {
     await withService({}, ({ service, user }) => {
       assert.throws(
-        () => service.issue({ userId: user.id, username: user.username, peerId: 'nobody' }),
+        () => service.issue({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId: 'nobody' }),
         (error: { code?: string; statusCode?: number }) => error.code === 'REMOTE_PEER_NOT_FOUND' && error.statusCode === 404,
       );
     });
@@ -54,21 +55,20 @@ describe('tab token service', () => {
 
   it('authenticates a tab token for its own peer and returns the account it belongs to', async () => {
     await withService({}, ({ service, user }) => {
-      const { tabToken } = service.issue({ userId: user.id, username: user.username, peerId: 'peer-1' });
+      const { tabToken } = service.issue({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId: 'peer-1' });
       const verdict = service.authenticate(tabToken, 'peer-1');
       assert.equal(verdict.ok, true);
-      assert.deepEqual(verdict.ok && verdict.user, { id: user.id, username: 'alice' });
+      assert.deepEqual(verdict.ok && verdict.user, { id: user.id, username: 'alice', sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id });
     });
   });
 
   it("refuses another peer's token, garbage, and a token for a user that no longer exists", async () => {
     await withService({}, ({ service, user }) => {
-      const { tabToken } = service.issue({ userId: user.id, username: user.username, peerId: 'peer-1' });
+      const { tabToken } = service.issue({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId: 'peer-1' });
       assert.equal(service.authenticate(tabToken, 'peer-2').ok, false);
       assert.equal(service.authenticate('not-a-token', 'peer-1').ok, false);
       assert.equal(service.authenticate('', 'peer-1').ok, false);
-      const ghost = service.issue({ userId: 9999, username: 'ghost', peerId: 'peer-1' });
-      assert.equal(service.authenticate(ghost.tabToken, 'peer-1').ok, false, 'verifyTabToken does not check the account; the service must');
+      assert.throws(() => service.issue({ userId: 9999, username: 'ghost', peerId: 'peer-1', sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id }), /parent session/i);
     });
   });
 
@@ -80,7 +80,7 @@ describe('tab token service', () => {
 
   it('a token from before "log out everywhere" is refused', async () => {
     await withService({}, async ({ service, user }) => {
-      const { tabToken } = service.issue({ userId: user.id, username: user.username, peerId: 'peer-1' });
+      const { tabToken } = service.issue({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId: 'peer-1' });
       assert.equal(service.authenticate(tabToken, 'peer-1').ok, true);
       await logoutEverywhere(user);
       assert.equal(service.authenticate(tabToken, 'peer-1').ok, false);
@@ -89,7 +89,7 @@ describe('tab token service', () => {
 
   it('limits how often one (user, peer) can obtain a token, per rolling minute, and recovers', async () => {
     await withService({ maxPerMinute: 3 }, ({ service, user, clock }) => {
-      const ask = (peerId = 'peer-1') => service.issue({ userId: user.id, username: user.username, peerId });
+      const ask = (peerId = 'peer-1') => service.issue({ sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id, userId: user.id, username: user.username, peerId });
       ask();
       ask();
       ask();
@@ -104,9 +104,9 @@ describe('tab token service', () => {
   });
 
   it('forgets idle buckets so the limiter cannot grow without bound', async () => {
-    await withService({ maxPerMinute: 1 }, ({ service, user, clock }) => {
+    await withService({ maxPerMinute: 1, peers: Array.from({ length: 2000 }, (_, i) => `peer-${i}`) }, ({ service, user, clock }) => {
       for (let i = 0; i < 2000; i += 1) {
-        service.issue({ userId: user.id + i, username: `u${i}`, peerId: 'peer-1' });
+        service.issue({ userId: user.id, username: user.username, peerId: `peer-${i}`, sessionId: getSessionRuntime().store.authenticate(user.jwt)!.id });
         clock.now += 61_000;
       }
       assert.ok(service.trackedBuckets() <= 1025, `tracked ${service.trackedBuckets()}`);

@@ -6,10 +6,9 @@
     <title>RemoteCLI - API Documentation</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    
-    <!-- Prism.js for syntax highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-    
+    <!-- Prism (syntax highlighting) from this origin: the client build copies it from the installed prismjs package. -->
+    <link rel="stylesheet" href="/vendor/prism-1.30.0/prism-tomorrow.min.css">
+
     <style>
         * {
             margin: 0;
@@ -359,10 +358,23 @@
             display: block;
         }
 
-        pre[class*="language-"] {
+        /* Code samples stay readable without Prism (when its files or scripts do not load). */
+        pre {
             margin: 0 0 1.5rem 0;
+            padding: 1em;
+            overflow: auto;
+            background: #2d2d2d;
             border-radius: 6px;
             font-size: 0.8125rem;
+            line-height: 1.5;
+        }
+
+        pre code {
+            display: block;
+            padding: 0;
+            background: none;
+            color: #ccc;
+            white-space: pre;
         }
 
         .example-block {
@@ -454,7 +466,9 @@
 
                     <section id="authentication">
                         <h2>Authentication</h2>
-                        <p>All API requests require authentication using an API key in the <code>X-API-Key</code> header.</p>
+                        <p>Browser management APIs use the session cookie issued after sign-in (and authenticator verification when enabled). The cookie is HttpOnly; on HTTPS it is Secure and named <code>__Host-remotecli_session</code>. Local HTTP uses <code>remotecli_session</code>.</p>
+                        <p>Browser requests must include <code>X-RemoteCLI-Request: 1</code>, use same-origin credentials, and send JSON for JSON mutations. Locked sessions must be unlocked before continuing; sensitive actions can require recent authenticator verification. Do not read or store a bearer token in browser storage.</p>
+                        <p>The automation endpoints under <code>/api/agent</code> use an API key in the <code>X-API-Key</code> header instead. Keys are accepted only in headers, never as query parameters. An API key does not replace a browser session for management APIs.</p>
 
                         <p>Generate API keys in Settings → API & Tokens.</p>
                     </section>
@@ -603,9 +617,9 @@
                     <div class="example-block">
                         <h4>Basic Request</h4>
                         <div class="tab-buttons">
-                            <button class="tab-button active" onclick="showTab('curl-basic')">cURL</button>
-                            <button class="tab-button" onclick="showTab('js-basic')">JavaScript</button>
-                            <button class="tab-button" onclick="showTab('python-basic')">Python</button>
+                            <button class="tab-button active" data-tab="curl-basic">cURL</button>
+                            <button class="tab-button" data-tab="js-basic">JavaScript</button>
+                            <button class="tab-button" data-tab="python-basic">Python</button>
                         </div>
 
                         <div class="tab-content active" id="curl-basic">
@@ -845,12 +859,11 @@ data: {"type":"done"}</code></pre>
             const modelCell = document.getElementById('model-options-cell');
             if (!modelCell) return;
 
-            const token = localStorage.getItem('auth-token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = { 'X-RemoteCLI-Request': '1' };
 
             const results = await Promise.allSettled(
                 PROVIDER_ORDER.map(({ id }) =>
-                    fetch(`/api/providers/${id}/models`, { headers }).then(r => r.json())
+                    fetch(`/api/providers/${id}/models`, { headers, credentials: 'same-origin', cache: 'no-store' }).then(r => r.json())
                 )
             );
 
@@ -869,9 +882,12 @@ data: {"type":"done"}</code></pre>
 
         document.addEventListener('DOMContentLoaded', populateModels);
 
-        // Tab switching
-        window.showTab = function(tabName) {
-            const parentBlock = event.target.closest('.example-block');
+        // Tab switching (a listener: the page allows no inline event handler)
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('.tab-button[data-tab]');
+            if (!button) return;
+            const tabName = button.dataset.tab;
+            const parentBlock = button.closest('.example-block');
             if (!parentBlock) return;
 
             parentBlock.querySelectorAll('.tab-content').forEach(tab => {
@@ -884,18 +900,18 @@ data: {"type":"done"}</code></pre>
             const targetTab = parentBlock.querySelector('#' + tabName);
             if (targetTab) {
                 targetTab.classList.add('active');
-                event.target.classList.add('active');
+                button.classList.add('active');
             }
-        };
+        });
     </script>
 
-    <!-- Prism.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-http.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-core.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-clike.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-javascript.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-bash.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-python.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-json.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-yaml.min.js"></script>
+    <script src="/vendor/prism-1.30.0/prism-http.min.js"></script>
 </body>
 </html>

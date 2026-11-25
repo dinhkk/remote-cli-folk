@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { QuickSessionLockButton } from '@/modules/auth';
 import { useRemoteTabs } from '@/modules/remote/hooks/useRemoteTabs';
 import { RemoteTabFrame } from '@/modules/remote/RemoteTabFrame';
 import { onOpenRemoteTabRequest } from '@/modules/remote/utils/open-remote-tab-request';
 import { peerDisplayName } from '@/modules/remote/utils/peer-display-name';
 import { PEER_STATE_DOT_CLASS } from '@/modules/remote/utils/peer-state-dot-class';
 import { purgeRemoteTabStorage } from '@/shared/transport/controller-tab-storage';
+import { readSelectedRemoteTab, writeSelectedRemoteTab } from '@/shared/transport/navigation-storage';
 import type { RemotePeer, RemotePeerState } from '@/shared/types';
 
 const LOCAL_TAB = 'local';
@@ -42,20 +44,33 @@ export function RemoteTabsShell({
   indicator?: (placement: 'tabbar' | 'overlay') => ReactNode;
 }) {
   const { t } = useTranslation('remote');
-  const { peers, requestTabToken } = useRemoteTabs();
+  const { t: tCommon } = useTranslation('common');
+  const { peers, requestTabToken, isLoading, hasLoadError, refresh } = useRemoteTabs();
 
   // Which tab is in front; falls back to Local when its pairing disappears.
-  const [selected, setSelected] = useState<string>(LOCAL_TAB);
+  const [selected, setSelected] = useState<string>(readSelectedRemoteTab);
   // Pairings whose frame was opened at least once, so frames load lazily.
-  const [visited, setVisited] = useState<ReadonlySet<string>>(new Set());
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => selected === LOCAL_TAB ? new Set() : new Set([selected]));
   // Permission cards waiting in each Remote tab, as the tab's frame reports them.
   const [pending, setPending] = useState<Readonly<Record<string, number>>>({});
 
   const hasPeers = peers.length > 0;
-  const activeId = peers.some((peer) => peer.peerId === selected) ? selected : LOCAL_TAB;
+  const selectionPending = isLoading || hasLoadError;
+  const selectedExists = peers.some((peer) => peer.peerId === selected);
+  const activeId = selectedExists || selectionPending ? selected : LOCAL_TAB;
+  // The saved Host is kept while the list is unknown, so Local stays hidden: say why instead of a blank page.
+  const waitingForSelected = selectionPending && selected !== LOCAL_TAB && !selectedExists;
+
+  useEffect(() => {
+    if (!selectionPending && selected !== LOCAL_TAB && !selectedExists) {
+      setSelected(LOCAL_TAB);
+      writeSelectedRemoteTab(LOCAL_TAB);
+    }
+  }, [selectionPending, selectedExists, selected]);
 
   const select = useCallback((id: string) => {
     setSelected(id);
+    writeSelectedRemoteTab(id);
     if (id !== LOCAL_TAB) {
       setVisited((previous) => (previous.has(id) ? previous : new Set(previous).add(id)));
     }
@@ -158,6 +173,7 @@ export function RemoteTabsShell({
             {peers.map(renderTab)}
           </div>
           {indicator?.('tabbar')}
+          {activeId !== LOCAL_TAB && <QuickSessionLockButton />}
         </div>
       )}
       {/* No tab bar to sit in: a floating pill, which is fixed-position and so cannot shift the app. */}
@@ -170,15 +186,50 @@ export function RemoteTabsShell({
       */}
       <div
         className={
-          !hasPeers
-            ? 'contents'
-            : activeId === LOCAL_TAB
+          activeId !== LOCAL_TAB
+            ? 'hidden'
+            : hasPeers
               ? 'relative min-h-0 flex-1 [contain:layout]'
-              : 'hidden'
+              : 'contents'
         }
       >
         {children}
       </div>
+
+      {waitingForSelected && (
+        <div
+          data-testid="remote-hosts-pending"
+          className={
+            hasPeers
+              ? 'flex min-h-0 flex-1 items-center justify-center p-6'
+              : 'fixed inset-0 flex items-center justify-center bg-background p-6'
+          }
+        >
+          <div className="flex max-w-sm flex-col items-center gap-3 text-center text-sm text-muted-foreground">
+            <p role={hasLoadError ? 'alert' : 'status'}>
+              {hasLoadError ? tCommon('remoteHosts.loadError') : tCommon('remoteHosts.loading')}
+            </p>
+            {hasLoadError && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { void refresh(); }}
+                  className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {tCommon('remoteHosts.retry')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => select(LOCAL_TAB)}
+                  className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {tCommon('remoteHosts.openLocal')}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {peers.map((peer) => {
         if (!visited.has(peer.peerId)) {

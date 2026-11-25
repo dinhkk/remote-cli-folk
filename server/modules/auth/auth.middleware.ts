@@ -1,9 +1,12 @@
-// @ts-nocheck -- JWT request augmentation is narrowed by Auth route contracts.
+// @ts-nocheck -- Express request augmentation is narrowed by Auth route contracts.
 import crypto from 'node:crypto';
 
-import jwt from 'jsonwebtoken';
-
 import { IS_PLATFORM } from '@/shared/utils.js';
+import { authenticateLoopback } from './services/loopback-token.service.js';
+import { isLockedSessionRouteAllowed } from './services/session-lock-policy.service.js';
+import { getSessionRuntime } from './services/session-runtime.service.js';
+import { isSessionOriginAllowed, readAuthTransportConfig, readSessionCookie } from './services/session-transport.service.js';
+
 
 import { userDb, appConfigDb } from '../database/index.js';
 
@@ -37,160 +40,81 @@ const rotateJwtSecret = () => {
   return { rotated: true };
 };
 
-// Optional API key middleware
+/** Constant-time comparison for independently authenticated endpoints. */
+const secretsMatch = (expected, actual) => typeof actual === 'string' && crypto.timingSafeEqual(
+  crypto.createHash('sha256').update(expected).digest(),
+  crypto.createHash('sha256').update(actual).digest(),
+);
+
 const validateApiKey = (req, res, next) => {
-  // Skip API key validation if not configured
-  if (!process.env.API_KEY) {
-    return next();
-  }
-  
-  const apiKey = req.headers['x-api-key'];
-  if (apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  next();
+  if (!process.env.API_KEY || secretsMatch(process.env.API_KEY, req.headers['x-api-key'])) return next();
+  return res.status(401).json({ error: 'Invalid API key' });
 };
 
-// JWT authentication middleware
-const authenticateToken = async (req, res, next) => {
-  // Platform mode:  use single database user
-  if (IS_PLATFORM) {
-    try {
-      const user = userDb.getFirstUser();
-      if (!user) {
-        return res.status(500).json({ error: 'Platform mode: No user found in database' });
-      }
-      req.user = user;
+const authenticateToken = (req, res, next) => {
+  try {
+    if (req.authKind) return next();
+    const bridge = authenticateLoopback(req.headers.authorization?.replace(/^Bearer /, ''), req.socket.remoteAddress);
+    if (bridge) {
+      req.user = bridge;
+      req.authKind = 'loopback';
       return next();
-    } catch (error) {
-      console.error('Platform mode error:', error);
-      return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
     }
-  }
-
-  // Normal OSS JWT validation
-  const authHeader = req.headers['authorization'];
-  let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  // Also check query param for SSE endpoints (EventSource can't set headers)
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
-
-  if (!token) {
-    res.setHeader('X-Auth-Error', 'invalid-token');
-    return res.status(401).json({
-      error: 'Access denied. No token provided.',
-      code: 'AUTH_TOKEN_INVALID',
-    });
-  }
-
-  try {
-    const decoded = jwt.verify(token, getJwtSecret());
-
-    // Verify user still exists and is active
-    const user = userDb.getUserById(decoded.userId);
-    if (!user) {
-      res.setHeader('X-Auth-Error', 'invalid-token');
-      return res.status(401).json({
-        error: 'Invalid token. User not found.',
-        code: 'AUTH_TOKEN_INVALID',
-      });
-    }
-
-    // Auto-refresh: if token is past halfway through its lifetime, issue a new one.
-    // Tokens carrying a `jti` are the short-lived Remote loopback tokens: they must never
-    // be exchanged for a 7 day login token through this header.
-    if (decoded.exp && decoded.iat && !decoded.jti) {
-      const now = Math.floor(Date.now() / 1000);
-      const halfLife = (decoded.exp - decoded.iat) / 2;
-      if (now > decoded.iat + halfLife) {
-        const newToken = generateToken(user);
-        res.setHeader('X-Refreshed-Token', newToken);
-      }
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      res.setHeader('X-Auth-Error', 'session-expired');
-      return res.status(401).json({
-        error: 'Session expired. Please log in again.',
-        code: 'AUTH_TOKEN_EXPIRED',
-      });
-    }
-
-    console.warn(
-      'Token verification failed:',
-      error instanceof Error ? error.message : String(error),
-    );
-    res.setHeader('X-Auth-Error', 'invalid-token');
-    return res.status(401).json({
-      error: 'Invalid token',
-      code: 'AUTH_TOKEN_INVALID',
-    });
-  }
-};
-
-// Generate JWT token
-const generateToken = (user) => {
-  return jwt.sign(
-    {
-      userId: user.id,
-      username: user.username
-    },
-    getJwtSecret(),
-    { expiresIn: '7d' }
-  );
-};
-
-// WebSocket authentication function
-const authenticateWebSocket = (token) => {
-  // Platform mode: bypass token validation, return first user
-  if (IS_PLATFORM) {
-    try {
+    if (IS_PLATFORM) {
       const user = userDb.getFirstUser();
-      if (user) {
-        return { id: user.id, userId: user.id, username: user.username };
-      }
-      return null;
-    } catch (error) {
-      console.error('Platform mode WebSocket error:', error);
-      return null;
+      if (!user) return res.status(401).json({ code: 'AUTH_USER_REQUIRED' });
+      req.user = user;
+      req.authKind = 'platform';
+      return next();
     }
-  }
+    const runtime = getSessionRuntime();
+    const secret = readSessionCookie(req);
+    const session = secret ? runtime.store.authenticate(secret, true) : null;
+    const user = session && userDb.getUserById(session.userId);
+    if (!session || !user) {
+      // Only a request that still carried a session cookie can have lost a session; a browser
+      // with no cookie at all is told it must sign in, so it does not read as an ended session.
+      res.setHeader('X-Auth-Error', secret ? 'session-expired' : 'session-required');
+      return res.status(401).json({ error: 'Please log in again', code: 'AUTH_TOKEN_INVALID' });
+    }
+    if (session.lockedAt !== null && !isLockedSessionRouteAllowed(req.method, req.originalUrl)) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(423).json({ error: 'Unlock this session to continue', code: 'AUTH_SESSION_LOCKED' });
+    }
+    req.user = user;
+    req.authSession = session;
+    req.authKind = 'session';
+    res.setHeader('Cache-Control', 'no-store');
+    if (session.lockedAt !== null) return next();
+    const release = runtime.connections.track(session.id, () => res.destroy());
+    req.releaseAuthConnection = release;
+    res.once('finish', release);
+    res.once('close', release);
+    return next();
+  } catch (error) { return next(error); }
+};
 
-  // Normal OSS JWT validation
-  if (!token) {
-    return null;
-  }
+// Kept as an internal issuance adapter; this value is delivered only in Set-Cookie.
+const generateToken = (user, userAgent = '') => getSessionRuntime().store.create(Number(user.id), userAgent).secret;
 
-  try {
-    const decoded = jwt.verify(token, getJwtSecret());
-    // Verify user actually exists in database (matches REST authenticateToken behavior)
-    const user = userDb.getUserById(decoded.userId);
-    if (!user) {
-      return null;
-    }
-    return { userId: user.id, username: user.username };
-  } catch (error) {
-    if (!(error instanceof jwt.TokenExpiredError)) {
-      console.warn(
-        'WebSocket token verification failed:',
-        error instanceof Error ? error.message : String(error),
-      );
-    }
-    return null;
+/** A browser upgrade uses cookies; only the process-local Host bridge uses a bearer. */
+const authenticateWebSocket = (request, secure = false) => {
+  if (!request || typeof request !== 'object' || !request.headers || !request.socket) return null;
+  const bridge = authenticateLoopback(request.headers.authorization?.replace(/^Bearer /, ''), request.socket.remoteAddress);
+  if (bridge) return { userId: bridge.id, username: bridge.username, authKind: 'loopback' };
+  const transport = { headers: request.headers, socket: request.socket, secure };
+  if (!isSessionOriginAllowed(transport, readAuthTransportConfig(process.env))) return null;
+  if (IS_PLATFORM) {
+    const user = userDb.getFirstUser();
+    return user ? { userId: user.id, username: user.username, authKind: 'platform' } : null;
   }
+  const secret = readSessionCookie(transport);
+  const session = secret ? getSessionRuntime().store.authenticate(secret) : null;
+  const user = session && userDb.getUserById(session.userId);
+  return user ? { userId: user.id, username: user.username, sessionId: session.id, authKind: 'session' } : null;
 };
 
 export {
-  validateApiKey,
-  authenticateToken,
-  generateToken,
-  authenticateWebSocket,
-  getJwtSecret,
-  rotateJwtSecret,
-  invalidateJwtSecretCache,
+  validateApiKey, authenticateToken, generateToken, authenticateWebSocket,
+  getJwtSecret, rotateJwtSecret, invalidateJwtSecretCache, secretsMatch,
 };

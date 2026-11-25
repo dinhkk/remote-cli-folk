@@ -133,7 +133,8 @@
     "browser": "浏览器",
     "notifications": "通知",
     "plugins": "插件",
-    "about": "关于"
+    "about": "关于",
+    "sessions": "Sessions"
   },
   "notifications": {
     "title": "通知",
@@ -639,6 +640,19 @@
     "disable": "禁用",
     "installAriaLabel": "插件 git 仓库 URL",
     "tab": "标签",
-    "runningStatus": "运行中"
+    "runningStatus": "运行中",
+    "disabledByServer": "插件已被此服务器的配置关闭。"
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Review signed-in browsers. Signing out also disconnects that session’s open tabs. Sessions expire seven days after sign-in.",
+    "logout": "Sign out this device",
+    "current": "This device",
+    "lastSeen": "Last active",
+    "expires": "Expires",
+    "revoke": "Sign out",
+    "password": "Confirm your password to sign out every device",
+    "logoutAll": "Sign out all devices",
+    "error": "Could not update sessions. Check your connection and try again."
   }
 }

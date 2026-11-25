@@ -38,5 +38,13 @@
   "unsavedChanges": {
     "confirmClose": "Ci sono modifiche non salvate. Chiudere questo file e scartarle?",
     "indicator": "Modifiche non salvate"
+  },
+  "htmlPreview": {
+    "untrustedLocal": "Contenuto non attendibile. Gli script del file vengono eseguiti in un riquadro isolato, senza rete e senza accesso a questa app. I file collegati (CDN, altri file del progetto) non vengono caricati.",
+    "untrustedRemote": "Contenuto non attendibile. Gli script del file non vengono eseguiti in una scheda remota.",
+    "untrustedRemoteIsolated": "Contenuto non attendibile dall'host remoto. Gli script del file vengono eseguiti in un riquadro isolato, senza rete e senza accesso a questa app. I file collegati (CDN, altri file del progetto) non vengono caricati.",
+    "unsavedChanges": "Viene mostrato il file salvato. Salva per vedere le modifiche non salvate.",
+    "scriptsDisabled": "Contenuto non attendibile. Gli script del file non vengono eseguiti qui.",
+    "tooLarge": "Il file supera i 10 MB, quindi i suoi script non vengono eseguiti."
   }
 }

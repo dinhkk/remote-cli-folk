@@ -167,6 +167,15 @@ function SidebarProjectItem({
                 !isSelected &&
                 'bg-yellow-50/50 dark:bg-yellow-900/5 border-yellow-200/30 dark:border-yellow-800/30',
             )}
+            role="button"
+            tabIndex={isEditing ? -1 : 0}
+            aria-label={project.displayName}
+            aria-expanded={isExpanded}
+            data-project-toggle
+            onKeyDown={event => {
+              if (event.target !== event.currentTarget || isEditing) return;
+              if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleProject(); }
+            }}
             onClick={toggleProject}
           >
             <div className="flex items-center justify-between gap-1.5">
@@ -293,6 +302,7 @@ function SidebarProjectItem({
 
         {!isCompact && (
         <Button
+          data-project-toggle
           variant="ghost"
           className={cn(
             'sticky top-0 z-10 flex w-full justify-between p-2 h-auto font-normal hover:bg-accent/50',

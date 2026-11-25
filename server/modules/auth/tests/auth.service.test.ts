@@ -27,7 +27,7 @@ function createDependencies(overrides: Partial<AuthDependencies> = {}): AuthDepe
     loginLimiter: createLoginRateLimiter(),
     dummyPasswordHash: 'dummy-hash',
     getSetupToken: () => undefined,
-    rotateJwtSecret: () => ({ rotated: true }),
+    revokeSessions: () => 2,
     bumpAuthEpoch: () => 1,
     ...overrides,
   };
@@ -104,19 +104,9 @@ test('login rejects an invalid password without issuing a token', async () => {
   assert.equal(tokenIssued, false);
 });
 
-test('refreshSession issues a replacement token for the authenticated user', () => {
-  let tokenUser: { id: number | bigint; username: string } | undefined;
-  const service = createAuthService(createDependencies({
-    generateToken: (user) => {
-      tokenUser = user;
-      return 'replacement-token';
-    },
-  }));
-
-  const result = service.refreshSession({ id: 7, username: 'alice' });
-
-  assert.deepEqual(result, { token: 'replacement-token' });
-  assert.deepEqual(tokenUser, { id: 7, username: 'alice' });
+test('K-20: session inspection never replaces the credential or extends expiry', () => {
+  const service = createAuthService(createDependencies({ generateToken: () => { throw new Error('must not issue'); } }));
+  assert.deepEqual(service.refreshSession({ id: 7, username: 'alice' }), { user: { id: 7, username: 'alice' } });
 });
 
 test('login with a legacy password shorter than 12 succeeds and reports passwordWeak', async () => {
@@ -262,7 +252,7 @@ test('logoutAll with a wrong password is refused and rotates nothing', async () 
   const service = createAuthService(createDependencies({
     users: { ...createDependencies().users, getUserByUsername: () => alice() },
     comparePassword: async () => false,
-    rotateJwtSecret: () => { calls.push('rotate'); return { rotated: true }; },
+    revokeSessions: () => { calls.push('revoke'); return 2; },
     bumpAuthEpoch: () => { calls.push('epoch'); return 2; },
   }));
 
@@ -270,32 +260,32 @@ test('logoutAll with a wrong password is refused and rotates nothing', async () 
   assert.deepEqual(calls, []);
 });
 
-test('logoutAll with the right password bumps the epoch and rotates the secret', async () => {
+test('K-11: logoutAll with the right password bumps the epoch and revokes sessions', async () => {
   const calls: string[] = [];
   const service = createAuthService(createDependencies({
     users: { ...createDependencies().users, getUserByUsername: () => alice() },
     comparePassword: async (password) => password === 'the-right-password',
-    rotateJwtSecret: () => { calls.push('rotate'); return { rotated: true }; },
+    revokeSessions: () => { calls.push('revoke'); return 2; },
     bumpAuthEpoch: () => { calls.push('epoch'); return 2; },
   }));
 
   const result = await service.logoutAll({ id: 1, username: 'alice' }, 'the-right-password', '10.0.0.1');
 
-  assert.deepEqual(result, { success: true, rotated: true });
-  assert.deepEqual(calls, ['epoch', 'rotate']);
+  assert.deepEqual(result, { success: true, revoked: 2 });
+  assert.deepEqual(calls, ['epoch', 'revoke']);
 });
 
-test('logoutAll with a secret pinned by env still bumps the epoch, then reports 409', async () => {
+test('K-11: logoutAll does not depend on rotating a signing secret', async () => {
   const calls: string[] = [];
   const service = createAuthService(createDependencies({
     users: { ...createDependencies().users, getUserByUsername: () => alice() },
     comparePassword: async () => true,
-    rotateJwtSecret: () => { calls.push('rotate'); return { rotated: false }; },
+    revokeSessions: () => { calls.push('revoke'); return 2; },
     bumpAuthEpoch: () => { calls.push('epoch'); return 3; },
   }));
 
-  await assertAppError(service.logoutAll({ id: 1, username: 'alice' }, 'x', '10.0.0.1'), 'AUTH_SECRET_PINNED', 409);
-  assert.deepEqual(calls, ['epoch', 'rotate']);
+  assert.deepEqual(await service.logoutAll({ id: 1, username: 'alice' }, 'x', '10.0.0.1'), { success: true, revoked: 2 });
+  assert.deepEqual(calls, ['epoch', 'revoke']);
 });
 
 test('wrong logoutAll passwords count towards the same lock as login', async () => {

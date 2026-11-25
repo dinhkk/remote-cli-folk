@@ -21,6 +21,10 @@ import { createRemoteModule } from '@/modules/remote/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
+import { startSessionExpiry } from './modules/auth/services/session-runtime.service.js';
+import { assertAuthModeCompatible } from './modules/auth/services/auth-mode.service.js';
+import { initializeMfa } from './modules/auth/services/mfa-runtime.service.js';
+import { createApiSessionGuard } from './modules/auth/services/api-session-guard.service.js';
 import { createGitModule } from './modules/git/index.js';
 import {
     authenticateToken,
@@ -39,7 +43,9 @@ import notificationRoutes from './modules/notifications/notifications.routes.js'
 import { userRoutes } from './modules/user/index.js';
 import {
     getPluginPort,
+    PLUGINS_DISABLED,
     pluginsRoutes,
+    pluginsSwitch,
     startEnabledPluginServers,
     stopAllPlugins,
 } from './modules/plugins/index.js';
@@ -56,7 +62,7 @@ import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
-import { initializeDatabase, sessionsDb } from './modules/database/index.js';
+import { getConnection, initializeDatabase, sessionsDb } from './modules/database/index.js';
 import { configureWebPush } from './modules/notifications/index.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
@@ -99,6 +105,8 @@ const remote = createRemoteModule({
     port: Number.parseInt(process.env.SERVER_PORT || '3001', 10),
     bindHost: process.env.HOST,
     indexHtmlPath: path.join(APP_ROOT, 'dist', 'index.html'),
+    // A Local plugin's module is imported from a blob URL; with plugins off no page allows blob: scripts.
+    pluginScripts: !PLUGINS_DISABLED,
 });
 const queryClaude = providerRuntimeService.getRunner('claude');
 const queryCursor = providerRuntimeService.getRunner('cursor');
@@ -123,7 +131,12 @@ chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackg
 createWebSocketServer(server, {
     verifyClient: {
         isPlatform: IS_PLATFORM,
-        authenticateWebSocket,
+        authenticateWebSocket: (request) => {
+            const trusted = app.settings['trust proxy fn'](request.socket.remoteAddress, 0);
+            const secure = Boolean((request.socket as typeof request.socket & { encrypted?: boolean }).encrypted)
+                || (trusted && request.headers['x-forwarded-proto']?.toString().split(',')[0].trim() === 'https');
+            return authenticateWebSocket(request, secure);
+        },
     },
     chat: {
         runtime: providerRuntimeService,
@@ -139,14 +152,15 @@ createWebSocketServer(server, {
         },
     },
     getPluginPort,
+    pluginsDisabled: PLUGINS_DISABLED,
     remote: remote.websocket,
     authEpoch: remote.enabled ? remote.authEpoch : undefined,
 });
 
-app.use(cors({ exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error', 'Retry-After'] }));
-// `/r` and `/api/remote` MUST be mounted here: after cors() (the sandboxed tab frame has origin "null"),
-// before the global body parsers below (they would read a proxied body whole, and a 50 MB limit would
-// apply to the management API), and before static files and the SPA catch-all.
+// Authentication precedes every API router and every body parser, including multipart.
+app.use('/api', validateApiKey, createApiSessionGuard(authenticateToken));
+// Sandboxed Remote frames use scoped bearer tokens, never ambient cookies.
+app.use('/r', cors({ exposedHeaders: ['X-Auth-Error', 'Retry-After'] }));
 remote.mount(app);
 app.use(express.json({
     limit: '50mb',
@@ -162,7 +176,11 @@ app.use(express.json({
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Public health check endpoint (no authentication required)
-app.get('/health', async (req, res) => {
+app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/auth/version', async (_req, res) => {
     const versionCheck = await systemRoutes.checkSystemVersion().catch(() => null);
     res.json({
         status: 'ok',
@@ -173,9 +191,6 @@ app.get('/health', async (req, res) => {
         updateAvailable: versionCheck?.updateAvailable ?? false,
     });
 });
-
-// Optional API key validation (if configured)
-app.use('/api', validateApiKey);
 
 // Authentication routes (public)
 app.use('/api/auth', authRoutes);
@@ -212,7 +227,7 @@ app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/user', authenticateToken, userRoutes);
 
 // Plugins API Routes (protected)
-app.use('/api/plugins', authenticateToken, pluginsRoutes);
+app.use('/api/plugins', authenticateToken, pluginsSwitch, pluginsRoutes);
 
 // Browser MCP bridge API (local token protected)
 app.use('/api/browser-use-mcp', browserUseMcpRoutes);
@@ -232,6 +247,10 @@ app.use('/api/voice', authenticateToken, voiceRoutes);
 // Serve public files (like api-docs.html). The service worker and the web-app
 // manifest must never be cached: an old worker (or a stale manifest) outlives a
 // deployment and keeps serving the previous build to every new navigation.
+app.use((req, res, next) => {
+    if (/^\/api(?:\/|$)/i.test(req.path)) return next();
+    return cors()(req, res, next);
+});
 app.use(express.static(path.join(APP_ROOT, 'public'), {
     setHeaders: (res, filePath) => {
         if (/(^|[\\/])(sw\.js|manifest\.json)$/.test(filePath)) {
@@ -375,6 +394,9 @@ async function startServer() {
     try {
         // Initialize authentication database
         await initializeDatabase();
+        assertAuthModeCompatible(getConnection(), IS_PLATFORM);
+        initializeMfa();
+        const stopSessionExpiry = startSessionExpiry();
 
         // Remote needs the database (settings, pairings); a Remote problem never stops the server.
         remote.start();
@@ -440,6 +462,7 @@ async function startServer() {
         closeScheduledMessageDispatcher();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            stopSessionExpiry();
             remote.stop();
             try {
                 await browserUseService.stopAllSessions();

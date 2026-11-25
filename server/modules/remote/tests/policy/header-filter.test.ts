@@ -8,6 +8,8 @@ import {
   filterRequestHeaders,
   filterResponseHeaders,
   isJsonOrEventStream,
+  previewDocumentHeaders,
+  withoutConditionalHeaders,
 } from '../../policy/header-filter.js';
 
 // ---------------------------------------------------------------------------
@@ -356,4 +358,53 @@ test('response: a text/html file opened top-level cannot run script: the sandbox
   assert.ok(csp.includes("default-src 'none'"));
   assert.equal(headers['x-content-type-options'], 'nosniff');
   assert.equal(headers['content-disposition'], 'inline; filename="evil.html"');
+});
+
+// ---------------------------------------------------------------------------
+// The HTML preview page loaded into a frame
+// ---------------------------------------------------------------------------
+
+test('preview frame request: range and conditional headers are dropped, every other header is kept', () => {
+  const kept = withoutConditionalHeaders({
+    accept: 'text/html',
+    'accept-language': 'vi',
+    range: 'bytes=0-9',
+    'if-none-match': '"a"',
+    'if-modified-since': 'Wed, 21 Oct 2015 07:28:00 GMT',
+    'x-request-id': 'req-1',
+  });
+  assert.deepEqual(kept, { accept: 'text/html', 'accept-language': 'vi', 'x-request-id': 'req-1' });
+});
+
+test('preview frame response: only the length and the request id come from the Host; type, policy and the rest are the Controller\'s', () => {
+  const headers = previewDocumentHeaders(
+    {
+      'content-type': 'application/octet-stream',
+      'content-length': '12',
+      'content-security-policy': 'script-src *',
+      'content-disposition': 'attachment',
+      'set-cookie': 'a=b',
+      etag: '"x"',
+      'last-modified': 'Wed, 21 Oct 2015 07:28:00 GMT',
+      'cache-control': 'public, max-age=31536000',
+      'x-request-id': 'req-1',
+    },
+    'sandbox allow-scripts',
+  );
+  assert.deepEqual(headers, {
+    'content-length': '12',
+    'x-request-id': 'req-1',
+    'content-type': 'text/html; charset=utf-8',
+    'content-security-policy': 'sandbox allow-scripts',
+    'x-content-type-options': 'nosniff',
+    'cache-control': 'no-store',
+    'referrer-policy': 'no-referrer',
+    'cross-origin-resource-policy': 'same-origin',
+  });
+});
+
+test('preview frame response: a Host that sends no length or request id gets neither added', () => {
+  const headers = previewDocumentHeaders({}, 'sandbox allow-scripts');
+  assert.equal(headers['content-length'], undefined);
+  assert.equal(headers['x-request-id'], undefined);
 });

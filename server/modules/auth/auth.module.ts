@@ -1,11 +1,16 @@
 import { createRequire } from 'node:module';
 
+import express from 'express';
+
 import { getConnection, userDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 
-import { authenticateToken, generateToken, rotateJwtSecret } from './auth.middleware.js';
+import { createMfaRouter } from './mfa.routes.js';
+import { getMfaStore } from './services/mfa-runtime.service.js';
+import { authenticateToken, generateToken } from './auth.middleware.js';
 import { createAuthRouter } from './auth.routes.js';
 import { createAuthService } from './auth.service.js';
+import { getSessionRuntime } from './services/session-runtime.service.js';
 import { bumpAuthEpoch } from './services/auth-epoch.service.js';
 import { createLoginRateLimiter } from './services/login-rate-limit.service.js';
 
@@ -44,15 +49,24 @@ const authService = createAuthService({
   hashPassword: (password) => bcrypt.hash(password, 12),
   comparePassword: (password, passwordHash) => bcrypt.compare(password, passwordHash),
   generateToken,
+  beginMfaLogin: (userId) => getMfaStore().challenge(userId),
   loginLimiter,
   dummyPasswordHash: DUMMY_PASSWORD_HASH,
   getSetupToken: () => process.env.REMOTECLI_SETUP_TOKEN || process.env.CLOUDCLI_SETUP_TOKEN || undefined,
-  rotateJwtSecret,
+  revokeSessions: (userId) => getSessionRuntime().store.revokeAll(userId),
   bumpAuthEpoch,
 });
 
 /** Auth router assembled for the server entrypoint. */
-export const authRoutes = createAuthRouter(authService, authenticateToken);
+let resolvedRouter: express.Router | undefined;
+export const authRoutes: express.RequestHandler = (req, res, next) => {
+  // Resolve after module initialization: Remote and Auth share lazy storage adapters.
+  if (!resolvedRouter) {
+    resolvedRouter = createAuthRouter(authService, authenticateToken);
+    resolvedRouter.use(createMfaRouter(verifyPassword, authenticateToken));
+  }
+  resolvedRouter(req, res, next);
+};
 
 /**
  * Checks a password for a user id (used by Remote management endpoints that must re-confirm

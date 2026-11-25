@@ -5,6 +5,7 @@ import { beforeEach, test, vi } from 'vitest';
 
 import '@/modules/i18n';
 import { requestOpenRemoteTab } from '@/modules/remote/utils/open-remote-tab-request';
+import { clearSelectedRemoteTab } from '@/shared/transport/navigation-storage';
 import type { RemotePeer } from '@/shared/types';
 
 /**
@@ -31,6 +32,7 @@ const { RemoteTabsShell } = await import('@/modules/remote/RemoteTabsShell');
 const peer = (peerId: string, name: string): RemotePeer => ({ peerId, name, alias: null, state: 'online', lastConnectedAt: null });
 
 beforeEach(() => {
+  clearSelectedRemoteTab();
   HOOK.peers = [peer('peer_one11111', 'Laptop'), peer('peer_two22222', 'Server')];
 });
 

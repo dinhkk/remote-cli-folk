@@ -43,5 +43,13 @@
   "unsavedChanges": {
     "confirmClose": "You have unsaved changes. Close this file and discard them?",
     "indicator": "Unsaved changes"
+  },
+  "htmlPreview": {
+    "untrustedLocal": "Untrusted content. The file's scripts run in an isolated frame with no network and no access to this app. Files it links to (CDN, other project files) do not load.",
+    "untrustedRemote": "Untrusted content. Scripts in the file do not run in a Remote tab.",
+    "untrustedRemoteIsolated": "Untrusted content from the Remote Host. The file's scripts run in an isolated frame with no network and no access to this app. Files it links to (CDN, other project files) do not load.",
+    "unsavedChanges": "Showing the saved file. Save to see your unsaved changes.",
+    "scriptsDisabled": "Untrusted content. Scripts in the file do not run here.",
+    "tooLarge": "The file is larger than 10 MB, so its scripts do not run."
   }
 }

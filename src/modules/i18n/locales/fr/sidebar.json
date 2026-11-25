@@ -1,4 +1,8 @@
 {
+  "projectOrganization": {
+    "pinned": "Projets épinglés",
+    "other": "Autres projets ({{count}})"
+  },
   "projects": {
     "title": "Projets",
     "newProject": "Nouveau projet",
@@ -167,5 +171,11 @@
     "archiveSessions_other": "Archiver {{count}} sessions",
     "archiveSessionsNotice_one": "L'archivage retire la session de la liste active tout en conservant son historique.",
     "archiveSessionsNotice_other": "L'archivage retire les sessions de la liste active tout en conservant leur historique."
+  },
+  "providerFilter": {
+    "label": "Filter conversations by provider",
+    "all": "All",
+    "provider": "{{provider}}",
+    "count": "Conversations: {{count}}"
   }
 }
