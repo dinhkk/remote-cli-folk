@@ -14,6 +14,10 @@
  * forced to `X-Content-Type-Options: nosniff`, and unless it is JSON or an event stream it also gets
  * `Content-Security-Policy: sandbox; default-src 'none'` so an HTML/SVG file opened top-level cannot
  * run script.
+ *
+ * One response is the exception: the HTML preview page when the Controller itself recognised a signed-in
+ * browser frame load (`previewDocumentHeaders`). The Controller sets every header of that page and takes only
+ * the length and the request id from the Host.
  */
 
 import type { IncomingHttpHeaders } from 'node:http';
