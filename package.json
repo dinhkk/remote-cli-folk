@@ -1,6 +1,6 @@
 {
   "name": "@tunghuynh/remotecli",
-  "version": "1.0.12",
+  "version": "1.1.0",
   "productName": "RemoteCLI",
   "description": "A web-based remote UI for Claude Code CLI",
   "type": "module",

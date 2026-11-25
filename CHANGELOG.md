@@ -3,6 +3,101 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.1.0](https://github.com/tunghuynh/remote-cli/compare/v1.0.12...v1.1.0) (2026-11-25)
+
+### New Features
+
+* **auth:** add browser TOTP enrollment and verification (A-02, T-09, C-09) ([397b93e](https://github.com/tunghuynh/remote-cli/commit/397b93ec3c13f885a0967529e490d9ba3a6e6d74))
+* **auth:** add TOTP verification and recovery (A-01, T-00, T-01, T-02, T-03, T-04, T-05, T-06, T-07, T-08, T-10, C-09) ([253a632](https://github.com/tunghuynh/remote-cli/commit/253a63222532a09cddf0b2c59603d051cc221c3b))
+* **auth:** authenticate the HTML preview frame load with the browser session ([a759576](https://github.com/tunghuynh/remote-cli/commit/a75957678d918c23d583f92240725344c5900a75))
+* **auth:** let the app frame load the HTML preview page without the request header ([0aa656d](https://github.com/tunghuynh/remote-cli/commit/0aa656d05005905c2443a6c682f50afe9fdce875))
+* **auth:** record replacing recovery codes and disabling TOTP as session events ([49a10cf](https://github.com/tunghuynh/remote-cli/commit/49a10cf76c0f7a9b0baedeebafd0110bfd16175e))
+* **code-editor:** run the scripts of a saved HTML file in an isolated preview frame ([9477f43](https://github.com/tunghuynh/remote-cli/commit/9477f43cd260c4fbe343c5d06cc045c1d274ece5))
+* **file-tree:** serve saved HTML files as an isolated preview page ([7fd7f85](https://github.com/tunghuynh/remote-cli/commit/7fd7f85b118d1232c238180952adc26494c5b90a))
+* **file-tree:** serve the HTML preview page to requests from the Remote bridge ([7d88305](https://github.com/tunghuynh/remote-cli/commit/7d8830562f15e82b8a739663a0e5ef533795606e))
+* **plugins:** add a switch that turns plugins off (PD-01, PD-02, PD-03, PD-07) ([c4efd73](https://github.com/tunghuynh/remote-cli/commit/c4efd736454880820c7b079aa5cd6aad78887c0a))
+* **plugins:** refuse plugin WebSocket connections while plugins are off (PD-04) ([150e53b](https://github.com/tunghuynh/remote-cli/commit/150e53bf2d9f0736d60f595bf2f4d3163f500868))
+* **plugins:** show that plugins are off and load no plugin code (PD-05, PD-06) ([75bd45d](https://github.com/tunghuynh/remote-cli/commit/75bd45ddda33faa1f5d5f417125874e667421c14))
+* **remote:** allow plugin blob scripts on the app page only and give static pages their own CSP ([7537678](https://github.com/tunghuynh/remote-cli/commit/7537678f49952d3d63ad875de95eee207d5c956d))
+* **remote:** allow the HTML preview page in the Remote route policy ([4db81f7](https://github.com/tunghuynh/remote-cli/commit/4db81f79b04ae591a94e860721adf06835d3d024))
+* **remote:** load the HTML preview page into a frame through the Controller proxy ([63ea22a](https://github.com/tunghuynh/remote-cli/commit/63ea22a7ca4a47ce774efbebd6038517a8ab8444))
+* **remote:** serve the API docs syntax highlighter from the own origin ([2ede767](https://github.com/tunghuynh/remote-cli/commit/2ede767d0b9cfd39d71ec7cc2a03b5d0cdd4d36b))
+* **remote:** tighten the page CSP (CS-02, CS-03, CS-04, CS-06, CS-10) ([3097078](https://github.com/tunghuynh/remote-cli/commit/309707882c2fce634d2fa142e9e4aaf3e1c351bd))
+* **settings:** ask for a password and a new code before replacing recovery codes or disabling ([d2beb5b](https://github.com/tunghuynh/remote-cli/commit/d2beb5bc549c43db8ad7d4fdac308214dd55a02b))
+* **web:** run the HTML preview of a Remote tab in the isolated frame ([a9ed6b8](https://github.com/tunghuynh/remote-cli/commit/a9ed6b8aadd1735085cc892c370148b655a076df))
+
+### Bug Fixes
+
+* **auth:** initialize browser family when issuing sessions (A-03, K-07) ([76e03ef](https://github.com/tunghuynh/remote-cli/commit/76e03efb3aa4a4210ff10020b8551e96727a3cc1))
+* **auth:** require a password and a new code to replace recovery codes or disable TOTP ([291687b](https://github.com/tunghuynh/remote-cli/commit/291687b408fa700f203ab0919a1a506ed798a34c))
+* **auth:** show the expiry notice only when a session ended (SF-01) ([d59e410](https://github.com/tunghuynh/remote-cli/commit/d59e41037a581146f7093237fa07bacd984eaabd))
+* **auth:** track the signed-in user for the expiry listener in an effect (SF-01) ([db2e718](https://github.com/tunghuynh/remote-cli/commit/db2e7186e803afc13987c7cac5f8bebd96a47ab3))
+* **chat:** reconcile live provider error variants (EH-03) ([8e14035](https://github.com/tunghuynh/remote-cli/commit/8e1403594d3a24b116060d1bb8cafdf1eb183d5a))
+* **chat:** reconcile recorded and replayed turn errors (EH-03) ([c5766ae](https://github.com/tunghuynh/remote-cli/commit/c5766aede43b1f0803c64f1bad3d270fb5629bbf))
+* **code-editor:** sanitize the Mermaid SVG before inserting it (CS-05) ([c0c46f1](https://github.com/tunghuynh/remote-cli/commit/c0c46f1fcfd2635cab7c980df99d26e979b198d1))
+* **codex:** restore recorded turn errors (EH-01, EH-07) ([46fa7b7](https://github.com/tunghuynh/remote-cli/commit/46fa7b7527c55a0dd10745dc13c5820daef0dd2f))
+* **codex:** unwrap nested recorded error messages (EH-01) ([0014ea5](https://github.com/tunghuynh/remote-cli/commit/0014ea5ea239662ef7d3af273a7c9a1beb0102d2))
+* **file-tree:** refuse the HTML preview page to a browser that sends no Fetch Metadata ([0ba654b](https://github.com/tunghuynh/remote-cli/commit/0ba654b0e28ed1bd92342a3b549f21bc0140515e))
+* **plugins:** turn plugins off in front of the plugin router (PD-03) ([4650e07](https://github.com/tunghuynh/remote-cli/commit/4650e073d8ee3fbced8440b7c505054cba7cb124))
+* preserve TOTP loading text encoding (L-10, K-23) ([18a7c86](https://github.com/tunghuynh/remote-cli/commit/18a7c86a3af547fc8b50480fd0d48b6e51959809))
+* **providers:** normalize recorded API errors (EH-02) ([e462ed8](https://github.com/tunghuynh/remote-cli/commit/e462ed86c8db1313e2a34ae24481c2c59dcc40e5))
+* **remote:** show the Host list state instead of a blank page (SF-02) ([3270a74](https://github.com/tunghuynh/remote-cli/commit/3270a740db2a9eb2d03910be080f4bdcec3c0afc))
+* **security:** accept API keys only in headers and strip app secrets from PTY env ([d35ec85](https://github.com/tunghuynh/remote-cli/commit/d35ec85131ff9dc6028b59e5d16687d16cbd9e01))
+* **settings:** keep focus on an API key toggle after it changes (SF-03) ([bf213e2](https://github.com/tunghuynh/remote-cli/commit/bf213e253c4f0b43530b6a50176ccaf21d3f5be4))
+* **sidebar:** collapse overflow projects and keep active work visible (PL-01..05) ([5df53ef](https://github.com/tunghuynh/remote-cli/commit/5df53efb5eb1d8bea731a77b1ce911eb2413765f))
+* **ws:** reject cross-origin upgrades to /ws and /shell ([7ebdeaa](https://github.com/tunghuynh/remote-cli/commit/7ebdeaa868c1df82f4386d4c749adfd6d700f0e5))
+
+### Refactoring
+
+* **file-tree:** export the HTML preview page policy through the module barrel ([5761b60](https://github.com/tunghuynh/remote-cli/commit/5761b604563088080a3e067f89e7485a910982b4))
+
+### Documentation
+
+* add the HTML preview isolation to Security & Privacy ([737bc88](https://github.com/tunghuynh/remote-cli/commit/737bc88b0cb6d8433c896e26431a2a2d94f3dfed))
+* **auth:** add a journal for the password and code check on TOTP changes ([5c2b166](https://github.com/tunghuynh/remote-cli/commit/5c2b166c68d058ce11d54170f6127f83f3b7c04f))
+* **auth:** add auth module guide and journal for cookie sessions, TOTP and session lock ([da57a93](https://github.com/tunghuynh/remote-cli/commit/da57a93d92b3ebb1544f975167e6c85bde84a1b7))
+* **auth:** describe the cookie authentication of the Remote preview frame load ([6199c79](https://github.com/tunghuynh/remote-cli/commit/6199c79b62b50afd82d9d3cb97628346132a8f76))
+* **auth:** document the step-up for disabling TOTP and replacing recovery codes ([1c6cc67](https://github.com/tunghuynh/remote-cli/commit/1c6cc67d9dcb8ac644715d17040b7a48cb78e589))
+* document the plugin switch (PD-08) ([87ce682](https://github.com/tunghuynh/remote-cli/commit/87ce6821abb20d7ec1b00036557471bfca26648a))
+* explain current API authentication (R7-07) ([cb46cfe](https://github.com/tunghuynh/remote-cli/commit/cb46cfe678e84a7c62416b7f764038d8d9668694))
+* install relay dependencies before server tests (BL-03) ([7555e79](https://github.com/tunghuynh/remote-cli/commit/7555e795e7cbec20fe6913e116238d2e020cfd9b))
+* **readme:** document two-factor sign-in, session lock and auth settings ([34091f8](https://github.com/tunghuynh/remote-cli/commit/34091f84f0bc9dce186945d26050a6c93402a1cd))
+* **remote:** add a guide for the Controller proxy, the route policy and the preview frame load ([c2e97be](https://github.com/tunghuynh/remote-cli/commit/c2e97bede209edb8584b1fa11e8c26463d1fe8c1))
+* **remote:** add a journal for the HTML preview with scripts in Remote tabs ([255d406](https://github.com/tunghuynh/remote-cli/commit/255d4061d6dcb3a2c61342d318acd07682fd57ee))
+
+### Styling
+
+* **auth:** normalize session throttle imports (TH-01) ([06473ff](https://github.com/tunghuynh/remote-cli/commit/06473ff8be4d22412bf2ac77d49501f8fd8c7183))
+* **workspace:** normalize quick-lock header ordering ([e99164e](https://github.com/tunghuynh/remote-cli/commit/e99164e385676ed5bd2fca094c8b708627af6516))
+
+### Maintenance
+
+* allowlist the fake test values for the secret scanner ([b02d618](https://github.com/tunghuynh/remote-cli/commit/b02d618aa65f0b768f27418fd34645059d797f21))
+* pin TOTP and QR dependencies (REG-05) ([db459e7](https://github.com/tunghuynh/remote-cli/commit/db459e78e7067ac666049a43263991b2d207d7d0))
+* use the npm registry for locked packages (REG-01) ([b984aac](https://github.com/tunghuynh/remote-cli/commit/b984aac7813c7664a71d41ac6cafd228d4fc953d))
+
+### Tests
+
+* **auth:** inventory real MFA router registrations (A-01, C-09) ([bc334f6](https://github.com/tunghuynh/remote-cli/commit/bc334f616f184056ae55413bd4fa14070f4f8760))
+* **chat:** render provider error markup as text (EH-05, EH-07) ([2ce3815](https://github.com/tunghuynh/remote-cli/commit/2ce3815662e0b3542e194261d2f380637e34b615))
+* cover TOTP master key recovery at startup (T-02, Q-06) ([b9e773f](https://github.com/tunghuynh/remote-cli/commit/b9e773f7c5758b050c8b79745a2bd2e7e4645559))
+* **e2e:** authenticate Local requests with the session cookie (SF-04) ([c057cbe](https://github.com/tunghuynh/remote-cli/commit/c057cbef57c19231577f7e6a8f0647a3e89b6c06))
+* **e2e:** expect blob: scripts on the Local page only while plugins are on ([104af22](https://github.com/tunghuynh/remote-cli/commit/104af225c7cdc8bc5b5a399bc2505bcae16f2c08))
+* **e2e:** keep server data off /tmp on Linux (SF-05) ([5d56fa6](https://github.com/tunghuynh/remote-cli/commit/5d56fa62f66f3a1cf6e07e77974168a327403f92))
+* isolate connection indicator from quick lock (QL-07) ([29ad9ba](https://github.com/tunghuynh/remote-cli/commit/29ad9ba9bdc088a00169fd29836438ad56b4572b))
+* isolate remembered Host selection between cases (UI-08) ([d7086b7](https://github.com/tunghuynh/remote-cli/commit/d7086b793ca8ab29ef3fc0a4e061ac1fe6fdf918))
+* **plugins:** cover the plugin switch on the server (PD-10) ([59d20cb](https://github.com/tunghuynh/remote-cli/commit/59d20cb5775001cded79b9ddbb65d43107fae205))
+* **plugins:** import through module barrels in the plugin switch tests (PD-10) ([12f1582](https://github.com/tunghuynh/remote-cli/commit/12f15822327fe7d6072c0fb80d1546ba3888966d))
+* **remote:** check Host-list strings across registered locales via the i18n barrel (SF-02) ([c6bb957](https://github.com/tunghuynh/remote-cli/commit/c6bb957699d2e00fec4daba2ffb52be5c4e5a6bd))
+* **remote:** check that a Host revoke refuses the preview frame load ([f74b0bf](https://github.com/tunghuynh/remote-cli/commit/f74b0bf58e9d0b19ba1d14f06a0cd990b66440cc))
+* **remote:** check that the preview answer allows no credentialed cross-origin read ([02357ca](https://github.com/tunghuynh/remote-cli/commit/02357ca3ffe629c7ec70720887a237d06668e0fc))
+* **remote:** check the HTML preview page through a real Controller and Host ([dea4c91](https://github.com/tunghuynh/remote-cli/commit/dea4c9124ea0426d43bc2186bf1a0d25ddedb992))
+* report missing relay vitest setup (BL-02) ([b044e76](https://github.com/tunghuynh/remote-cli/commit/b044e7677b7fa240f622cfc2bc5e61838433bb35))
+* skip absent parent workspace docs (BL-01) ([25a4354](https://github.com/tunghuynh/remote-cli/commit/25a43541d569958d3ca20c65bac8b3ed36c338ef))
+* **support:** add a shared login-phrase helper for tests ([2855672](https://github.com/tunghuynh/remote-cli/commit/285567256ffab528ec399ccdc88c5aced94083ed))
+* use supported project role query (R7-08) ([6caf394](https://github.com/tunghuynh/remote-cli/commit/6caf394dec92f58e4bfd5957e1c65ce6d8507ec2))
+* verify logout clears Host navigation storage (UI-12) ([f3310b4](https://github.com/tunghuynh/remote-cli/commit/f3310b496ca073b8d4dddc525ce400de9843c923))
+
 ## [1.0.12](https://github.com/tunghuynh/remote-cli/compare/v1.0.11...v1.0.12) (2026-11-19)
 
 ### Bug Fixes
