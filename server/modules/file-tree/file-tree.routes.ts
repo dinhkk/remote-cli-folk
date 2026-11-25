@@ -166,17 +166,22 @@ export function createFileTreeRouter(
     });
   }, logger));
 
-  // The Local HTML preview frame loads this page: the file's script runs in a sandboxed document with an
-  // opaque origin and no network source, so it can read neither the session nor the app, nor call the server.
+  // The HTML preview frame loads this page (Local: the app's own frame; Remote: the Controller's frame, through the
+  // bridge): the file's script runs in a sandboxed document with an opaque origin and no network source, so it can
+  // read neither the session nor the app, nor call the server.
   router.get('/projects/:projectId/files/html-preview', createRouteHandler(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Cache-Control', 'no-store');
-    if ((request as Request & { authKind?: string }).authKind !== 'session') {
+    const { authKind } = request as Request & { authKind?: string };
+    // A browser session, or the Remote bridge: it forwards a request that the Controller already checked
+    // against the browser's own Fetch Metadata and session, and no other caller reaches this page.
+    if (authKind !== 'session' && authKind !== 'loopback') {
       throw new AppError('The preview needs a browser session', { code: 'HTML_PREVIEW_SESSION_REQUIRED', statusCode: 401 });
     }
-    // The frame load is accepted only with Fetch Metadata. A browser that sends none would get a refused frame,
-    // so its status check is refused too and the app falls back to displaying the HTML.
-    if (['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'].some((name) => typeof request.headers[name] !== 'string')) {
+    // A browser session must send Fetch Metadata. A browser that sends none would get a refused frame, so its
+    // status check is refused too and the app falls back to displaying the HTML. The bridge has no browser at
+    // this end, and the Remote header allow-list does not carry Fetch Metadata, so it is not asked for there.
+    if (authKind === 'session' && ['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'].some((name) => typeof request.headers[name] !== 'string')) {
       throw new AppError('This browser does not send Fetch Metadata', { code: 'HTML_PREVIEW_FETCH_METADATA_REQUIRED', statusCode: 400 });
     }
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
