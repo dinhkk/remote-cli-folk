@@ -73,6 +73,9 @@ describe('HTML preview page through the Controller', () => {
     assert.equal(response.headers['referrer-policy'], 'no-referrer');
     assert.equal(response.headers['cross-origin-resource-policy'], 'same-origin');
     assert.equal(response.headers['set-cookie'], undefined);
+    // The real server mounts `cors()` for `/r`: it allows any origin to read, and never with credentials.
+    assert.equal(response.headers['access-control-allow-origin'], '*');
+    assert.equal(response.headers['access-control-allow-credentials'], undefined);
   });
 
   it('the status check a tab makes with its token gets the page under the plain sandbox, never the script-enabled one', async () => {
