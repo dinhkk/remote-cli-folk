@@ -54,6 +54,8 @@ export type ProxyHarnessOptions = {
   refusedUpload?: Partial<RefusedUploadBudgets>;
   /** Expiry (epoch ms) of the first pairing. */
   peerExpiresAt?: number;
+  /** Use the production route table (real paths) instead of the synthetic one. */
+  productionPolicy?: boolean;
 };
 
 export const waitUntil = async (condition: () => boolean, what: string, timeoutMs = 5000): Promise<void> => {
@@ -106,7 +108,7 @@ export const withHarness = async (options: ProxyHarnessOptions, run: (harness: P
       registry: countingRegistry,
       maxRequestBodyBytes: options.maxRequestBodyBytes,
       // The tests play the Host with synthetic paths (`/api/projects/slow`, ...).
-      evaluateHttp: syntheticPathPolicy,
+      evaluateHttp: options.productionPolicy ? undefined : syntheticPathPolicy,
       receiveBudgetBytes: options.receiveBudgetBytes,
       refusedUpload: options.refusedUpload,
       receiveLedger: options.receiveBudgets ? createReceiveLedger(resolveReceiveBudgets({}, options.receiveBudgets)) : undefined,

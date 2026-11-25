@@ -121,3 +121,35 @@ export function filterResponseHeaders(upstream: IncomingHttpHeaders): RemoteMuxH
   }
   return forwarded;
 }
+
+/** Conditional and range headers: a frame load of the preview page never forwards them, so the Host cannot answer 206 or 304. */
+const PREVIEW_DROPPED_REQUEST_HEADERS: readonly string[] = ['range', 'if-none-match', 'if-modified-since'];
+
+/** Removes the conditional and range headers from the headers of a preview frame load (the Controller's own decision). */
+export function withoutConditionalHeaders(headers: Record<string, string>): Record<string, string> {
+  const forwarded: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (!PREVIEW_DROPPED_REQUEST_HEADERS.includes(name)) forwarded[name] = value;
+  }
+  return forwarded;
+}
+
+/**
+ * The response headers of the HTML preview page when the Controller itself decided that a signed-in browser is
+ * loading it into a frame. Everything comes from the Controller: only the declared length (already checked by
+ * the caller) and the request id are taken from what the Host sent, so a Host cannot set the content type, a
+ * policy, a disposition, a cookie or any validator for this page. `policy` is the same value the Local page uses.
+ */
+export function previewDocumentHeaders(upstream: RemoteMuxHeaders, policy: string): RemoteMuxHeaders {
+  const headers: RemoteMuxHeaders = {};
+  for (const name of ['content-length', 'x-request-id']) {
+    if (upstream[name] !== undefined) headers[name] = upstream[name];
+  }
+  headers['content-type'] = 'text/html; charset=utf-8';
+  headers['content-security-policy'] = policy;
+  headers['x-content-type-options'] = 'nosniff';
+  headers['cache-control'] = 'no-store';
+  headers['referrer-policy'] = 'no-referrer';
+  headers['cross-origin-resource-policy'] = 'same-origin';
+  return headers;
+}
