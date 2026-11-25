@@ -19,6 +19,7 @@ import type {
   LLMProvider,
   ProviderPermissionDecision,
   ProviderRuntimeWriter,
+  SessionAgentSnapshot,
 } from '@/shared/types.js';
 import { parseIncomingJsonObject } from '@/shared/utils.js';
 
@@ -207,6 +208,26 @@ function resolveSendTarget(
   return { sessionId, session, provider };
 }
 
+/** Run options a client must not choose for a session with a main agent: the server sets all of them. */
+const SCOPED_SESSION_RESERVED_OPTIONS = ['systemPrompt', 'agents', 'agent', 'cwd'] as const;
+
+/**
+ * Copy of the client's `chat.send` options with the agent-profile keys under server
+ * control removed. `agentProfile` is dropped for every session (only the server may
+ * set it, from the session row); a session with a main agent also loses `systemPrompt`,
+ * `agents`, `agent` and `cwd`. A plain chat keeps everything else exactly as the client sent it.
+ */
+function sanitizeClientRunOptions(options: AnyRecord, hasMainAgent: boolean): AnyRecord {
+  const sanitized = { ...options };
+  delete sanitized.agentProfile;
+  if (hasMainAgent) {
+    for (const key of SCOPED_SESSION_RESERVED_OPTIONS) {
+      delete sanitized[key];
+    }
+  }
+  return sanitized;
+}
+
 /**
  * Registers the run and hands the turn to the provider runtime.
  *
@@ -224,6 +245,32 @@ async function dispatchRun(
   beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>,
 ): Promise<{ started: boolean; error: string | null }> {
   const provider = session.provider as LLMProvider;
+
+  // Agent-profile touchpoint: the agent record of a scoped session (`{ agentName, hiddenClaudeAgents }`; null
+  // for a plain chat). Read before the run is registered so an unreadable one refuses the turn
+  // outright instead of silently running it as a plain chat.
+  let agentSnapshot: SessionAgentSnapshot | null;
+  try {
+    agentSnapshot = sessionsDb.getAgentSnapshot(sessionId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (ws) {
+      sendProtocolError(ws, 'AGENT_SNAPSHOT_INVALID', message, sessionId);
+    }
+    return { started: false, error: message };
+  }
+
+  // A session with a main agent must run in its project directory. The row loses `project_path` if
+  // its project was deleted; falling back to a client path or the server's cwd would run the agent
+  // elsewhere. A scoped session without a main agent (`agentName: null`) only carries the hide
+  // list, so it keeps the plain-chat fallback.
+  if (agentSnapshot?.agentName && !session.project_path) {
+    const message = `The project directory of session "${sessionId}" is no longer registered, so it cannot run its agent.`;
+    if (ws) {
+      sendProtocolError(ws, 'SESSION_PROJECT_MISSING', message, sessionId);
+    }
+    return { started: false, error: message };
+  }
 
   const run = chatRunRegistry.startRun({
     appSessionId: sessionId,
@@ -245,7 +292,9 @@ async function dispatchRun(
     return { started: false, error: 'A run is already in progress for this session.' };
   }
 
-  const clientOptions = (data.options ?? {}) as AnyRecord;
+  // Only a session with a main agent locks the agent keys and `cwd`; `agentName: null` is a plain
+  // chat that also carries the hide list, so the client keeps choosing them as it does there.
+  const clientOptions = sanitizeClientRunOptions((data.options ?? {}) as AnyRecord, Boolean(agentSnapshot?.agentName));
   const command = typeof data.content === 'string' ? data.content : '';
 
   // Record what this turn runs with so reopening the session later restores the
@@ -283,8 +332,11 @@ async function dispatchRun(
     images: uniqueAttachments.filter(isImageAttachmentDescriptor),
     files: uniqueAttachments.filter((descriptor) => !isImageAttachmentDescriptor(descriptor)),
     sessionId,
+    // For a session with a main agent `cwd` was stripped from clientOptions, so this is the session's project path.
     cwd: clientOptions.cwd ?? session.project_path ?? undefined,
     projectPath: session.project_path ?? clientOptions.projectPath,
+    // Set after the client spread: the agent record comes from the session row, never from the client.
+    ...(agentSnapshot ? { agentProfile: agentSnapshot } : {}),
   };
 
   let failure: string | null = null;

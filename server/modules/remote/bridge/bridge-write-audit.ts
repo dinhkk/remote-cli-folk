@@ -6,7 +6,10 @@
  * - `/api/file-tree/**` and `/api/assets/**` -> `file-write` (create, save, rename, delete, upload);
  * - `/api/git/**` (commit, checkout, push, ...), `POST /api/projects/clone` (it may SPEND a GitHub token stored
  *   on the Host: the row only says that one was used, never the token), `/api/providers/<p>/skills`
- *   (writes outside every project root) -> `host-write`.
+ *   (writes outside every project root) -> `host-write`;
+ * - `POST /api/agent-monitor/kill` (stops an agent or kills processes of a Claude session on the Host) -> `host-write`.
+ *   The row says which node of which session and the mode; its result is the HTTP outcome (the route answers 403 for a
+ *   refused kill and 500 for a failed one), not the finer kill result.
  *
  * The identifying fields (the file path, a rename target, the project and branch, the repository URL, a skill
  * name) are read from the query and, for JSON requests, from the first 8 KiB of the body with a plain key
@@ -17,7 +20,7 @@
 
 import type { RemoteAuditEventKind } from '@/shared/types.js';
 
-export type HostWriteArea = 'file-tree' | 'assets' | 'git' | 'clone' | 'skills';
+export type HostWriteArea = 'file-tree' | 'assets' | 'git' | 'clone' | 'skills' | 'monitor';
 export type HostWriteKind = { event: Extract<RemoteAuditEventKind, 'file-write' | 'host-write'>; area: HostWriteArea };
 
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -31,6 +34,7 @@ export const classifyHostWrite = (method: string, canonicalPath: string): HostWr
   if (path.startsWith('/api/git/')) return { event: 'host-write', area: 'git' };
   if (path === '/api/projects/clone') return { event: 'host-write', area: 'clone' };
   if (/^\/api\/providers\/[^/]+\/skills(\/|$)/.test(path)) return { event: 'host-write', area: 'skills' };
+  if (path === '/api/agent-monitor/kill') return { event: 'host-write', area: 'monitor' };
   return null;
 };
 
@@ -46,6 +50,8 @@ const FIELDS: Record<HostWriteArea, ReadonlyArray<readonly [source: string, name
   git: [['project', 'project'], ['branch', 'branch']],
   clone: [['path', 'path'], ['githubUrl', 'url']],
   skills: [['name', 'name']],
+  // Which node of which session was killed or stopped, and how: never a process id (the route has none).
+  monitor: [['nodeId', 'node'], ['mode', 'mode'], ['sessionId', 'session']],
 };
 
 export type WriteProbe = {
@@ -55,8 +61,10 @@ export type WriteProbe = {
   details(rawTarget: string): Record<string, string | boolean>;
 };
 
+/** The value of `key` as a string. A key that appears twice reads as its LAST occurrence, which is what `JSON.parse` (and so the Host's body parser) keeps. */
 const stringField = (text: string, key: string): string | undefined => {
-  const match = new RegExp(String.raw`"${key}"\s*:\s*"((?:\\.|[^"\\])*)"`).exec(text);
+  const matches = [...text.matchAll(new RegExp(String.raw`"${key}"\s*:\s*"((?:\\.|[^"\\])*)"`, 'g'))];
+  const match = matches.at(-1);
   if (!match) return undefined;
   try {
     return (JSON.parse(`"${match[1]}"`) as string).slice(0, FIELD_MAX);

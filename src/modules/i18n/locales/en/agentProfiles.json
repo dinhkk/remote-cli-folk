@@ -1,0 +1,274 @@
+{
+  "title": "Agent Profiles",
+  "description": "Templates, and the agent files generated from them into a project's .claude/agents. Changes only affect new chat sessions; sessions that are already open keep what they started with.",
+  "remoteUnavailable": "Agent Profiles are managed on the Host computer. This Remote tab cannot open them.",
+  "tabs": {
+    "agents": "Agents",
+    "templates": "Templates",
+    "memory": "Memory"
+  },
+  "state": {
+    "loading": "Loading…",
+    "retry": "Try again"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "done": "Done",
+    "editName": "Edit {{name}}",
+    "deleteName": "Delete {{name}}"
+  },
+  "family": {
+    "orchestrator": "Orchestrator",
+    "worker": "Worker"
+  },
+  "errors": {
+    "unknown": "Something went wrong. Check that the server is running and try again.",
+    "reload": "Reload the latest version",
+    "PROFILE_STALE": "This record was changed somewhere else (another window or device) after you opened it, so your save was refused to avoid overwriting that change. Reload the latest version and make your edit again.",
+    "SLUG_TAKEN": "Another record already uses this slug. Pick a different slug.",
+    "DIRECTORY_NOT_FOUND": "The project folder does not exist (any more). Check that the project still points at an existing folder.",
+    "DIRECTORY_NOT_A_DIRECTORY": "The project folder is not a folder. Check the project's path.",
+    "PROFILE_CORRUPT": "A stored profile file could not be read, so nothing was written. Fix or remove the file named under Templates, then try again.",
+    "BLOCK_NAME_TAKEN": "Another memory block already has this name. Block names are unique across all scopes (global and every project), because agents ask for a block by name alone. Pick a different name.",
+    "BLOCK_LIMIT_REACHED": "The limit of 50 memory blocks is reached. Delete one before creating another."
+  },
+  "picker": {
+    "remove": "Remove {{name}}",
+    "add": "Add to {{label}}",
+    "nothingToAdd": "Nothing more to add",
+    "addPlaceholder": "Add…"
+  },
+  "capabilities": {
+    "tools": "Allowed tools (empty = all)",
+    "disallowedTools": "Denied tools",
+    "mcpServers": "MCP servers",
+    "skills": "Skills",
+    "model": "Model",
+    "modelDefault": "Default",
+    "noDelegationTool": "This orchestrator cannot call the delegation tool (Agent), so it will not be able to hand work to other agents. Allow Agent or remove it from the denied tools."
+  },
+  "params": {
+    "empty": "No parameters. Add one for each value that differs between projects (for example a git URL).",
+    "row": "Parameter {{index}}",
+    "key": "Key",
+    "type": "Type",
+    "title": "Title",
+    "description": "Description",
+    "default": "Default value",
+    "required": "Required",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove parameter",
+    "add": "Add parameter",
+    "types": {
+      "text": "Text",
+      "dir": "Folder",
+      "file": "File",
+      "url": "URL"
+    },
+    "keyProblem": {
+      "invalid": "The key must start with a letter and use only letters, digits and _ (at most 40 characters).",
+      "reserved": "This key is filled by the project itself (project_name, project_directory). Use another key.",
+      "duplicate": "Another parameter already uses this key."
+    }
+  },
+  "placeholders": {
+    "missing": "The instructions use {{placeholder}} but no parameter has the key \"{{key}}\". Saving is blocked until you add it.",
+    "addParam": "Add parameter \"{{key}}\"",
+    "unused": "Parameter \"{{key}}\" is not used in the instructions."
+  },
+  "preview": {
+    "sampleValue": "Sample value for {{key}}",
+    "rendered": "Rendered instructions"
+  },
+  "template": {
+    "new": "New template",
+    "newTitle": "New template",
+    "editTitle": "Edit template: {{name}}",
+    "empty": "No templates yet. Create one to generate agent files from.",
+    "memoryBadge": "Memory: {{scope}}",
+    "deleteConfirm": "Delete template \"{{name}}\"? Agent files already generated from it are not changed or removed.",
+    "regenerateNote": "Changes reach an agent file only when it is generated again (Agents > Generate agents). Open sessions are not affected.",
+    "name": "Name",
+    "slug": "Slug",
+    "slugHint": "Becomes the agent name and its file name (<slug>.md).",
+    "slugInvalid": "The slug must be lower-case letters and digits separated by single hyphens (at most 40 characters).",
+    "slugTaken": "Another template already uses this slug.",
+    "group": "Group",
+    "groupHint": "Heading the agents of this template are listed under in the main-agent dropdown of a new chat. Empty = System. Takes effect at once; no need to generate again.",
+    "family": "Family",
+    "description": "When to use it",
+    "descriptionHint": "The orchestrator reads this to decide when to call agents made from this template.",
+    "instructions": "Instructions",
+    "instructionsHint": "Write {{example}} where the value of a parameter should go.",
+    "paramsTitle": "Parameters",
+    "capabilitiesTitle": "Tools, MCP servers, skills, model and memory",
+    "memory": "Agent memory",
+    "memoryHint": "Claude Code lets an agent keep notes between sessions. When a tool list is set, Read, Write and Edit are added so the agent can reach its notes.",
+    "memoryNone": "None",
+    "memoryScope": {
+      "project": "Project (.claude/agent-memory)",
+      "user": "User (~/.claude/agent-memory)",
+      "local": "Local (.claude/agent-memory-local)"
+    },
+    "usesBlocks": "Memory blocks",
+    "usesBlocksHint": "Adds the three tools mcp__blocks__block_list, block_read and block_write to the agent's tool list (when it has one) and a short instruction on Generate: list the blocks at the start of a session, write only writable ones, never store secrets. Blocks work only in chats of this app.",
+    "blocksBadge": "Memory blocks",
+    "showPreview": "Show preview",
+    "hidePreview": "Hide preview"
+  },
+  "memory": {
+    "intro": "Memory blocks are named notes your agents can read, and update when the block is writable, across sessions. Turn on \"Memory blocks\" in a template and generate its agents again so they use them.",
+    "limits": "A block is visible by scope only: global (every chat) or one project. It cannot be limited to one agent. Blocks exist only inside chats of this app; the claude command on this computer does not see them.",
+    "new": "New block",
+    "empty": "No memory blocks yet. Create one to give your agents a shared note.",
+    "deleteConfirm": "Delete memory block \"{{name}}\"? Its content is lost.",
+    "mode": {
+      "writable": "Writable",
+      "read-only": "Read-only"
+    },
+    "scopeLabel": "Scope",
+    "scopeGlobal": "Global (every chat)",
+    "sizeLabel": "Size",
+    "size": "{{used}} / {{max}} chars",
+    "writerLabel": "Last writer",
+    "writerNone": "nobody yet",
+    "writerUser": "you",
+    "writerAgent": "agent {{name}}",
+    "updatedLabel": "Updated",
+    "lockWarning_one": "Read-only is not a hard lock: {{count}} agent in the list ({{names}}) has Bash or no tool limit, so it can still change this block's file. The list is the one loaded in the Agents tab (target: {{target}}); it is not checked per block scope.",
+    "lockWarning_other": "Read-only is not a hard lock: {{count}} agents in the list ({{names}}) have Bash or no tool limit, so they can still change this block's file. The list is the one loaded in the Agents tab (target: {{target}}); it is not checked per block scope.",
+    "form": {
+      "newTitle": "New memory block",
+      "editTitle": "Edit memory block: {{name}}",
+      "name": "Name",
+      "nameHint": "What agents call it: lower-case letters and digits separated by single hyphens, at most 40 characters. Unique across all scopes.",
+      "nameInvalid": "The name must be lower-case letters and digits separated by single hyphens (at most 40 characters).",
+      "mode": "Mode",
+      "modeHint": {
+        "writable": "Agents can replace or append to this block.",
+        "read-only": "Only you can change this block. Agents with Bash can still change its file."
+      },
+      "description": "Description",
+      "descriptionHint": "Optional. Shown to agents in the block list (at most 500 characters).",
+      "scope": "Scope",
+      "scopeHint": "Global blocks are visible in every chat; a project block only in chats on that project.",
+      "keptFolder": "{{directory}} (not in the sidebar)",
+      "noProjects": "No project in the sidebar yet. Add one there to scope a block to it; global is available meanwhile.",
+      "content": "Content",
+      "contentCount": "{{used}} of {{max}} characters used.",
+      "contentTooLong": "The content is longer than the limit of {{max}} characters.",
+      "maxChars": "Size limit (characters)",
+      "maxCharsHint": "A whole number from 1 to {{max}}. An agent write that would pass it is refused, nothing is cut. Length is counted in UTF-16 units, so an emoji counts as 2.",
+      "stale": "This block was changed after you opened it (last writer: {{writer}}), so your save was not applied. Your edits are still in the form: save again to replace that change with yours, or Cancel to discard them.",
+      "staleUnknownWriter": "This block was changed after you opened it, so your save was not applied. Your edits are still in the form: save again to replace that change with yours, or Cancel to discard them.",
+      "maxCharsInvalid": "Enter a whole number from 1 to {{max}}."
+    }
+  },
+  "generate": {
+    "open": "Generate agents",
+    "title": "Generate agents",
+    "targetProject": "Agent files are written to the .claude/agents folder of project \"{{name}}\".",
+    "targetGlobal": "Agent files are written to ~/.claude/agents and apply to every project.",
+    "templates": "Templates",
+    "noTemplates": "No templates yet. Create one in the Templates tab.",
+    "valuesTitle": "Values",
+    "valuesHint": "Filled in from what you entered for this project last time. An empty field uses the template default.",
+    "valuesFailed": "The values remembered for this folder could not be read. Generating without them would reset them, so Preview and Apply stay off until they load.",
+    "requiredValue": "\"{{key}}\" is required: type a value.",
+    "urlUnrecognized": "This does not look like a web or SSH address (https://..., ssh://..., git@host:org/repo). You can still use it.",
+    "preview": "Preview",
+    "apply": "Generate",
+    "writesTo": "Writes to {{directory}}",
+    "columns": {
+      "name": "Agent",
+      "description": "Description",
+      "status": "Result"
+    },
+    "status": {
+      "new": "Will be created",
+      "duplicate": "Generated before: will be regenerated from the template",
+      "missing-values": "Missing required values ({{keys}}), skipped",
+      "invalid-name": "The template slug is not a valid agent name, skipped",
+      "handmade-exists": "A handmade file with this name exists, skipped. Rename or delete it to let Generate write here",
+      "write-failed": "Could not write this file (permission or disk error, or the file is in use). The other files were still written; fix the cause and Generate again"
+    },
+    "outcome": "Created {{created}}, regenerated {{regenerated}}, skipped {{skipped}}.",
+    "createdItem": "Created {{name}}",
+    "regeneratedItem": "Regenerated {{name}}",
+    "gitExcluded_one": "Added {{count}} line to {{file}}, so the generated files stay out of git.",
+    "gitExcluded_other": "Added {{count}} lines to {{file}}, so the generated files stay out of git.",
+    "gitNotExcluded": "Not a git repository (or git is unavailable): nothing was added to a git exclude list."
+  },
+  "agents": {
+    "intro": "The agents Claude Code offers for the chosen target: built into Claude Code, personal (~/.claude/agents) and the project's own (.claude/agents). A generated agent is a plain file rendered from a template; edit the template and generate again, not the file. Hidden agents are not offered to new sessions, in any project.",
+    "target": "Show agents for",
+    "targetGlobal": "Global (~/.claude/agents)",
+    "noProjects": "No project in the sidebar yet. Add one there to generate agents for it; the global scope is available meanwhile.",
+    "fallbackNote": "The built-in list could not be read from Claude Code, so a fixed list is shown.",
+    "summary": "{{visible}} of {{total}} visible",
+    "hideAll": "Hide all",
+    "showAll": "Show all",
+    "hiddenOnly": "Hidden only",
+    "groupBuiltin": "Built into Claude Code",
+    "groupUser": "Personal (~/.claude/agents)",
+    "groupProject": "Project: {{name}}",
+    "empty": "No agents found.",
+    "noneHidden": "No agent is hidden.",
+    "details": "Details of {{name}}",
+    "generated": "Generated",
+    "generatedFrom": "Generated from {{template}}",
+    "handmade": "Handmade",
+    "hiddenBadge": "Hidden",
+    "visibleFor": "Visible: {{name}}",
+    "tools": "Tools: {{tools}}",
+    "noPrompt": "Claude Code does not let apps read the prompt or tools of its built-in agents.",
+    "prompt": "Prompt of {{name}}",
+    "fileError": "{{name}}: this agent file could not be read ({{error}}). Fix the file's front matter; the other agents are not affected."
+  },
+  "corrupt": {
+    "title_one": "{{count}} stored template file could not be read and was skipped:",
+    "title_other": "{{count}} stored template files could not be read and were skipped:",
+    "item": "{{id}}: {{error}}",
+    "fix": "They are left untouched. Fix or remove the file in the agent-profiles folder to see it again."
+  },
+  "scope": {
+    "label": "Main agent",
+    "auto": "Auto",
+    "autoHint": "Claude Code picks an agent for each task",
+    "groupSystem": "System",
+    "orchestratorOption": "{{name}} (orchestrator)",
+    "badge": "Main agent: {{name}}",
+    "badgeTitle": "Chosen when this chat was opened. Open a new chat to use another main agent."
+  },
+  "wizard": {
+    "title": "Setup guide",
+    "open": "Setup guide",
+    "stepOf": "Step {{step}} of {{total}}",
+    "next": "Next",
+    "back": "Back",
+    "skipStep": "Skip this step",
+    "skipSetup": "Skip setup",
+    "step1": {
+      "title": "Check that Claude is signed in",
+      "signedIn": "Claude is signed in.",
+      "signedInAs": "Claude is signed in as {{email}}.",
+      "signedOut": "Claude is not signed in yet. Chats and agents need it.",
+      "signIn": "Sign in to Claude"
+    },
+    "step2": {
+      "title": "Choose the templates to use",
+      "hint": "Templates are the roles your agents are made from. Tick the ones to generate agent files from in the next step.",
+      "none": "There are no templates yet. Create one in the Templates tab first.",
+      "openTemplates": "Open templates"
+    },
+    "step3": {
+      "title": "Choose a project and generate its agents",
+      "hint": "The agents become plain files in the project's .claude/agents folder, so Claude Code finds them in any chat on that project. Fill in the values the templates need; they are remembered for this project.",
+      "noProjects": "There is no project in the sidebar yet. Add the project folder in the sidebar, then run this guide again.",
+      "project": "Project",
+      "openChat": "Open a chat on {{name}}"
+    }
+  }
+}

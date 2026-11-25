@@ -60,6 +60,27 @@ const MAX_BUFFERED_EVENTS_PER_RUN = 5000;
 const runs = new Map<string, ChatRun>();
 
 /**
+ * What a run observer is told: a run started, or one live event left the run (already stamped with the app session
+ * id and `seq`, exactly as the sockets get it). Observers are read-only listeners for other modules (the agent
+ * monitor); they never see replayed events, and one that throws cannot disturb the run.
+ */
+export type ChatRunObserverEvent =
+  | { type: 'run-started'; appSessionId: string; provider: LLMProvider; startedAt: number }
+  | { type: 'message'; appSessionId: string; message: NormalizedMessage };
+
+const runObservers = new Set<(event: ChatRunObserverEvent) => void>();
+
+function notifyRunObservers(event: ChatRunObserverEvent): void {
+  for (const observer of runObservers) {
+    try {
+      observer(event);
+    } catch (error) {
+      console.error('[ChatRunRegistry] Run observer failed', error instanceof Error ? error.message : String(error));
+    }
+  }
+}
+
+/**
  * Answers whether a completed run must stay registered a while longer. Set by
  * the composition root to the provider runtimes' background-work check: a
  * session whose turn ended but whose agents, workflows or commands are still
@@ -131,6 +152,7 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     run.events.splice(0, run.events.length - MAX_BUFFERED_EVENTS_PER_RUN);
   }
 
+  notifyRunObservers({ type: 'message', appSessionId: run.appSessionId, message: outbound });
   return outbound;
 }
 
@@ -230,7 +252,16 @@ export const chatRunRegistry = {
     });
 
     runs.set(input.appSessionId, run);
+    notifyRunObservers({ type: 'run-started', appSessionId: run.appSessionId, provider: run.provider, startedAt: run.startedAt });
     return run;
+  },
+
+  /** Registers a read-only listener for run starts and live events; returns the function that removes it. */
+  addObserver(observer: (event: ChatRunObserverEvent) => void): () => void {
+    runObservers.add(observer);
+    return () => {
+      runObservers.delete(observer);
+    };
   },
 
   getRun(appSessionId: string): ChatRun | undefined {

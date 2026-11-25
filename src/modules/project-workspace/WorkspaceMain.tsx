@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, type Dispatch, type SetStateAction, useState } from 'react';
 
+import { RunningMonitorPane, useRunningMainPane } from '@/modules/agent-monitor';
 import { ChatInterface, useSessionStore } from '@/modules/chat';
 import { FileTree } from '@/modules/file-tree';
 import { StandaloneShell } from '@/modules/standalone-shell';
@@ -15,7 +16,8 @@ import { EditorSidebar, useEditorSidebar } from '@/modules/code-editor';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
-import { AgentsWorkspaceView } from '@/modules/project-workspace/agents/AgentsWorkspaceView';
+import { AgentActivityPanel } from '@/modules/project-workspace/agents/AgentActivityPanel';
+import MobileMenuButton from '@/modules/project-workspace/MobileMenuButton';
 
 type WorkspaceMainProps = {
   selectedProject: Project | null;
@@ -66,6 +68,8 @@ function WorkspaceMain({
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const sessionStore = useSessionStore();
+  // While the sidebar's Running tab is on show, its overview (or the graph of the focused node) covers the route's own view.
+  const runningPane = useRunningMainPane();
 
   useTaskMasterProjectSync(selectedProject);
   // The folder an in-chat `path/` reference asked to reveal. Held as an object
@@ -139,12 +143,36 @@ function WorkspaceMain({
     return <WorkspaceStateView mode="loading" isMobile={isMobile} onMenuClick={onMenuClick} />;
   }
 
+  // On a phone the pane has no header of its own to open the sidebar drawer with, so it gets the workspace's menu button.
+  // The graph's focused sub-agent gets its recorded work (the inspector the Agents tab used to hold) drawn under the graph.
+  const runningPaneView = runningPane
+    ? (
+      <RunningMonitorPane
+        leading={isMobile ? <MobileMenuButton onMenuClick={onMenuClick} /> : undefined}
+        renderActivity={(context) => (
+          <AgentActivityPanel
+            context={context}
+            sessionStore={sessionStore}
+            selectedProject={selectedProject}
+            selectedSession={selectedSession}
+            sendMessage={sendMessage}
+            setActiveTab={setActiveTab}
+            onFileOpen={openFileInEditor}
+          />
+        )}
+      />
+    )
+    : null;
+
   if (!selectedProject) {
-    return <WorkspaceStateView mode="empty" isMobile={isMobile} onMenuClick={onMenuClick} />;
+    return runningPaneView ?? <WorkspaceStateView mode="empty" isMobile={isMobile} onMenuClick={onMenuClick} />;
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <>
+    {runningPaneView}
+    {/* The workspace stays mounted behind the pane (hidden, not unmounted), so a chat keeps its state while the overview is up. */}
+    <div className={`flex h-full flex-col ${runningPane ? 'hidden' : ''}`}>
       <WorkspaceHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -162,7 +190,7 @@ function WorkspaceMain({
           <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
             <WorkspaceErrorBoundary showDetails>
               <ChatInterface
-                isActive={activeTab === 'chat'}
+                isActive={activeTab === 'chat' && !runningPane}
                 selectedProject={selectedProject}
                 selectedSession={selectedSession}
                 ws={ws}
@@ -181,19 +209,6 @@ function WorkspaceMain({
               />
             </WorkspaceErrorBoundary>
           </div>
-
-          {activeTab === 'agents' && (
-            <div className="h-full overflow-hidden">
-              <AgentsWorkspaceView
-                selectedProject={selectedProject}
-                selectedSession={selectedSession}
-                setActiveTab={setActiveTab}
-                sendMessage={sendMessage}
-                onFileOpen={handleFileOpen}
-                sessionStore={sessionStore}
-              />
-            </div>
-          )}
 
           {activeTab === 'files' && (
             <div className="h-full overflow-hidden">
@@ -263,6 +278,7 @@ function WorkspaceMain({
         />
       </div>
     </div>
+    </>
   );
 }
 

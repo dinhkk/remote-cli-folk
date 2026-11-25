@@ -10,6 +10,7 @@ import type { PendingPermissionRequest, PermissionMode,
   ProviderModelOption,
   ProviderModelsDefinition } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
+import { PROVIDER_MODELS_CHANGED_EVENT } from '@/shared/providerModelsChanged';
 import { readSelectedProvider, writeSelectedProvider } from '@/shared/selectedProvider';
 import { reportPendingCount } from '@/shared/transport/tab-channel';
 
@@ -227,6 +228,13 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
 
   useEffect(() => {
     void loadProviderModels();
+  }, [loadProviderModels]);
+
+  // The Settings "Models" tab edits the same server catalog from outside the chat; reload so the pickers follow.
+  useEffect(() => {
+    const reload = () => { void loadProviderModels(); };
+    window.addEventListener(PROVIDER_MODELS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(PROVIDER_MODELS_CHANGED_EVENT, reload);
   }, [loadProviderModels]);
 
   useEffect(() => {

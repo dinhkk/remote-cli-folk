@@ -3,17 +3,14 @@ import { useTranslation } from 'react-i18next';
 import {
   Activity,
   Bot,
-  CheckCircle2,
   Clock,
   ExternalLink,
   Layers,
   Square,
-  Terminal,
   Wrench,
-  XCircle,
 } from 'lucide-react';
 
-import type { ChatMessage, Project, ProjectSession, SubagentActivity } from '@/shared/types';
+import type { ChatMessage, Project, SubagentActivity } from '@/shared/types';
 import {
   SubagentTimeline,
   createCachedDiffCalculator,
@@ -28,7 +25,6 @@ type SubagentDetailViewProps = {
   selectedNode?: AgentTreeNode | null;
   message?: ChatMessage | null;
   selectedProject: Project | null;
-  selectedSession?: ProjectSession | null;
   onFileOpen: (filePath: string) => void;
   onJumpToChat: (message: ChatMessage) => void;
   onStopTask: (taskId: string) => void;
@@ -38,7 +34,6 @@ export const SubagentDetailView = memo(({
   selectedNode,
   message: propMessage,
   selectedProject,
-  selectedSession,
   onFileOpen,
   onJumpToChat,
   onStopTask,
@@ -61,117 +56,7 @@ export const SubagentDetailView = memo(({
     );
   }
 
-  // 1. Root Node Inspector: Main Agent / Session Overview
-  if (selectedNode && selectedNode.type === 'root') {
-    const totalSubagents = selectedNode.children.length;
-    const runningCount = selectedNode.children.filter((c) => c.status === 'running').length;
-    const completedCount = selectedNode.children.filter((c) => c.status === 'completed').length;
-    const failedCount = selectedNode.children.filter((c) => c.status === 'failed' || c.status === 'stopped').length;
-
-    return (
-      <div className="flex h-full flex-col overflow-y-auto bg-background">
-        {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-border/60 p-4 bg-muted/10">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
-              <Bot className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold truncate">{t('agents.mainAgent', 'Main Agent')}</h2>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                  selectedNode.status === 'running'
-                    ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
-                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                }`}>
-                  {selectedNode.status}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {selectedSession?.title || 'Active Session'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 p-4 space-y-4">
-          {/* Metrics summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Spawned</span>
-              <div className="mt-1 text-lg font-bold text-foreground">{totalSubagents}</div>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-purple-500/5 p-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-600 dark:text-purple-400">Running</span>
-              <div className="mt-1 text-lg font-bold text-purple-600 dark:text-purple-400">{runningCount}</div>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-emerald-500/5 p-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Completed</span>
-              <div className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{completedCount}</div>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-rose-500/5 p-3">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">Failed/Stopped</span>
-              <div className="mt-1 text-lg font-bold text-rose-600 dark:text-rose-400">{failedCount}</div>
-            </div>
-          </div>
-
-          {/* Subagents & Tasks in this session */}
-          <div className="rounded-xl border border-border/60 bg-card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              Spawned Tasks & Subagents ({totalSubagents})
-            </h3>
-
-            {totalSubagents === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No subagents spawned yet.</p>
-            ) : (
-              <div className="divide-y divide-border/40">
-                {selectedNode.children.map((child) => (
-                  <div key={child.id} className="flex items-center justify-between py-2 text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {child.status === 'running' ? (
-                        <span className="h-2 w-2 rounded-full bg-purple-500 animate-ping" />
-                      ) : child.status === 'completed' ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <XCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
-                      )}
-                      <span className="font-medium text-foreground truncate">{child.label}</span>
-                      {child.subtitle && (
-                        <span className="text-muted-foreground truncate max-w-xs text-[11px] hidden sm:inline">
-                          — {child.subtitle}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {child.model && (
-                        <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] font-mono text-muted-foreground">
-                          {child.model}
-                        </span>
-                      )}
-                      {child.message && (
-                        <button
-                          type="button"
-                          onClick={() => child.message && onJumpToChat(child.message)}
-                          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                          title="View in Chat"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Activity Node Inspector: Tool Execution View
+  // 1. Activity Node Inspector: Tool Execution View
   if (selectedNode && selectedNode.type === 'activity' && selectedNode.activity) {
     const act = selectedNode.activity;
     const toolName = act.toolName || (act.kind === 'tool' ? 'Tool' : act.kind);
@@ -252,7 +137,7 @@ export const SubagentDetailView = memo(({
     );
   }
 
-  // 3. Subagent / Workflow / Background Task View
+  // 2. Subagent / Workflow / Background Task View
   const parsedInput = activeMessage ? (parseToolPayload(activeMessage.toolInput) as Record<string, unknown> | null) : null;
   const status = selectedNode?.status
     || (activeMessage ? readBackgroundTaskStatus(activeMessage) : null)

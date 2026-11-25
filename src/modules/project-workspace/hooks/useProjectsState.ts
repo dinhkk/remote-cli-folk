@@ -362,7 +362,7 @@ const renameSessionInProject = (project: Project, sessionIdToRename: string, sum
   return { ...project, sessions: nextSessions };
 };
 
-const VALID_TABS: Set<string> = new Set(['chat', 'agents', 'files', 'shell', 'git', 'tasks', 'browser']);
+const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser']);
 
 const isValidTab = (tab: string): tab is AppTab => {
   return VALID_TABS.has(tab) || tab.startsWith('plugin:');
@@ -1140,6 +1140,13 @@ export function useProjectsState({
     [activeTab, clearSessionAttention, isMobile, navigate, projects, selectedProject?.projectId],
   );
 
+  // Leaves the open chat for the workspace's start page: no session selected and the route "/" (the project stays selected).
+  // The Running tab uses it when the focused session is clicked again, so the overview can take the main area back.
+  const handleSessionRelease = useCallback(() => {
+    setSelectedSession(null);
+    navigate('/');
+  }, [navigate]);
+
   const handleNewSession = useCallback(
     (project: Project) => {
       setSelectedProject(project);
@@ -1405,6 +1412,7 @@ export function useProjectsState({
     sidebarSharedProps,
     handleProjectSelect,
     handleSessionSelect,
+    handleSessionRelease,
     handleNewSession,
     handleSessionDelete,
     loadMoreProjectSessions,

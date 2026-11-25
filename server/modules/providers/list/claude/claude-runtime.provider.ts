@@ -37,6 +37,7 @@ import {
   notifyRunStopped,
   notifyUserIfEnabled
 } from '@/modules/notifications/index.js';
+import { resolveBlocksAgentName, withBlocksMcpServer, withBlocksToolsAllowed } from '@/modules/providers/list/claude/claude-blocks-mcp.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import {
   getReportedClaudeContextWindow,
@@ -49,6 +50,7 @@ import type {
   ProviderModelsDefinition,
   ProviderRuntimeContext,
   ProviderRuntimeWriter,
+  SessionAgentSnapshot,
 } from '@/shared/types.js';
 
 // The notifications module is still JavaScript, and its defaults (`dedupeKey = null`)
@@ -287,20 +289,35 @@ function matchesToolPermission(entry: string, toolName: string, input: unknown) 
  * CLAUDE_CODE_ARTIFACT is set, so a session continued from this UI would lose them.
  * Default it on; a host value (e.g. CLAUDE_CODE_ARTIFACT=0) still wins.
  *
+ * Claude Code puts a billing/attribution block at the top of the system prompt; behind
+ * some company gateways the model then ignores every system block after it, including an
+ * agent profile's orchestrator prompt. CLAUDE_CODE_ATTRIBUTION_HEADER=0 drops the block,
+ * so it is defaulted off here; a host value (e.g. =1) still wins.
+ *
  * @param {NodeJS.ProcessEnv} [hostEnv] - Environment to forward, `process.env` by default
  * @returns {NodeJS.ProcessEnv} Environment for the spawned CLI
  */
 export function buildClaudeSdkEnv(hostEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return {
     CLAUDE_CODE_ARTIFACT: '1',
+    CLAUDE_CODE_ATTRIBUTION_HEADER: '0',
     CLAUDE_CODE_ENTRYPOINT: 'remotecli',
     ...hostEnv,
     CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(BG_WAIT_CEILING_MS),
   };
 }
 
-function mapCliOptionsToSDK(options: AnyRecord = {}) {
+/**
+ * Maps the app's run options to Claude SDK options. Options carrying `agentProfile`
+ * (`{ agentName, hiddenClaudeAgents }` of a scoped session, set by the chat gateway) add
+ * `agent` (the main agent, a native `.claude/agents/<name>.md` file the CLI loads itself via
+ * `settingSources`; no `agents` option is ever passed) and the hide rules; without it the
+ * output is the plain-chat one.
+ * Exported for: the providers module's unit tests (the runtime itself calls it directly).
+ */
+export function mapCliOptionsToSDK(options: AnyRecord = {}) {
   const { providerSessionId, cwd, toolsSettings, permissionMode, effort, resumeAnchorId, resumeFromScratch } = options;
+  const agentProfile = options.agentProfile as SessionAgentSnapshot | undefined;
 
   const sdkOptions: AnyRecord = {};
 
@@ -351,7 +368,12 @@ function mapCliOptionsToSDK(options: AnyRecord = {}) {
   // but being explicit ensures forward compatibility and clarity.
   sdkOptions.tools = { type: 'preset', preset: 'claude_code' };
 
-  sdkOptions.disallowedTools = settings.disallowedTools || [];
+  // Agent-profile touchpoint: Claude agents the user hid are disallowed on top of the
+  // client's list (merged, so the client cannot lift a server-side hide rule).
+  const hiddenAgentRules = (agentProfile?.hiddenClaudeAgents ?? []).map((name) => `Task(${name})`);
+  sdkOptions.disallowedTools = hiddenAgentRules.length > 0
+    ? [...new Set([...(Array.isArray(settings.disallowedTools) ? settings.disallowedTools : []), ...hiddenAgentRules])]
+    : settings.disallowedTools || [];
 
   sdkOptions.model = options.model || CLAUDE_PREDEFINED_MODELS.DEFAULT;
 
@@ -365,6 +387,12 @@ function mapCliOptionsToSDK(options: AnyRecord = {}) {
     type: 'preset',
     preset: 'claude_code'
   };
+
+  // Agent-profile touchpoint: `agent` names a file agent (replaces the claude_code preset prompt, its
+  // tools stay as the file declares). The name is passed again on EVERY run, resume included.
+  if (agentProfile?.agentName) {
+    sdkOptions.agent = agentProfile.agentName;
+  }
 
   sdkOptions.settingSources = ['project', 'user', 'local'];
 
@@ -1107,10 +1135,24 @@ async function queryClaudeSDK(
       effortModels,
     });
 
-    const mcpServers = await loadMcpConfig(options.cwd);
+    // The app's memory blocks server joins the configured servers on every run: a session with a main agent, or a
+    // chat whose folder has at least one project memory block (then the writer is `claude-code`).
+    const blocksAgentName = await resolveBlocksAgentName(
+      options.agentProfile as SessionAgentSnapshot | undefined,
+      options.cwd,
+    );
+    const mcpServers = await withBlocksMcpServer(
+      await loadMcpConfig(options.cwd),
+      blocksAgentName,
+      options.cwd,
+    );
     if (mcpServers) {
       sdkOptions.mcpServers = mcpServers;
     }
+    sdkOptions.allowedTools = withBlocksToolsAllowed(
+      sdkOptions.allowedTools || [],
+      blocksAgentName,
+    );
 
     // Every turn uses streaming input so stdin stays open past the turn's
     // `result`. The message list is reusable, but each query attempt needs its
@@ -1578,6 +1620,35 @@ async function stopClaudeSDKTask(sessionId: string, taskId: string) {
 }
 
 /**
+ * Prepares a session whose Claude process is about to be killed from outside (the monitor's Kill button), so the run loop
+ * winds down quietly: the abort flag keeps it from reporting the dead process as a failed run, and every permission prompt
+ * the session still waits on is cancelled, because nothing will ever answer it (and `chat.subscribe` would replay it).
+ *
+ * Only a session with a live run is marked: a flag set for a run that does not exist would stay and swallow the terminal
+ * `complete` of the next run of the same session. The caller clears it with `unmarkClaudeSessionKilled` when the kill
+ * did not happen.
+ * @param {string} sessionId - Session identifier
+ * @returns {boolean} True when the session had a live run and was marked
+ */
+function markClaudeSessionKilled(sessionId: string) {
+  if (!getSession(sessionId)) {
+    return false;
+  }
+  abortedSessionIds.add(sessionId);
+  for (const [, resolver] of [...pendingToolApprovals.entries()]) {
+    if (resolver._sessionId === sessionId) {
+      resolver({ cancelled: true });
+    }
+  }
+  return true;
+}
+
+/** Takes back `markClaudeSessionKilled` when the process was not killed after all. */
+function unmarkClaudeSessionKilled(sessionId: string) {
+  abortedSessionIds.delete(sessionId);
+}
+
+/**
  * Checks if an SDK session is currently active
  * @param {string} sessionId - Session identifier
  * @returns {boolean} True if session is active
@@ -1656,6 +1727,8 @@ export const claudeRuntime = {
   },
   listBackgroundWork: listClaudeSDKBackgroundWork,
   stopBackgroundTask: stopClaudeSDKTask,
+  markSessionKilled: markClaudeSessionKilled,
+  unmarkSessionKilled: unmarkClaudeSessionKilled,
 };
 
 // Export public API
@@ -1665,6 +1738,8 @@ export {
   listClaudeSDKBackgroundWork,
   stopClaudeSDKTask,
   isClaudeSDKSessionActive,
+  markClaudeSessionKilled,
+  unmarkClaudeSessionKilled,
   getClaudeSDKSessionStartTime,
   getActiveClaudeSDKSessions,
   resolveToolApproval,

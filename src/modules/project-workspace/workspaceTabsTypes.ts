@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Bot, ClipboardCheck, Folder, GitBranch, MessageSquare, MonitorPlay, Terminal } from 'lucide-react';
+import { ClipboardCheck, Folder, GitBranch, MessageSquare, MonitorPlay, Terminal } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import type { AppTab } from '@/shared/types';
@@ -30,7 +30,6 @@ export type WorkspaceTabsProps = {
 
 export const BASE_TABS: BuiltInTab[] = [
   { kind: 'builtin', id: 'chat',   labelKey: 'tabs.chat',   icon: MessageSquare },
-  { kind: 'builtin', id: 'agents', labelKey: 'tabs.agents', icon: Bot },
   { kind: 'builtin', id: 'shell',  labelKey: 'tabs.shell',  icon: Terminal },
   { kind: 'builtin', id: 'files',  labelKey: 'tabs.files',  icon: Folder },
   { kind: 'builtin', id: 'git',    labelKey: 'tabs.git',    icon: GitBranch },

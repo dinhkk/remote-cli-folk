@@ -21,3 +21,13 @@ test('SDK sessions are labeled remotecli, and a host value wins', () => {
 test('host env vars are still forwarded', () => {
   assert.equal(buildClaudeSdkEnv({ ANTHROPIC_BASE_URL: 'http://proxy' }).ANTHROPIC_BASE_URL, 'http://proxy');
 });
+
+// Behind the company gateway the model ignores every system block that follows Claude
+// Code's attribution block, orchestrator prompt included, unless the block is off.
+test('SDK sessions turn the attribution header off by default', () => {
+  assert.equal(buildClaudeSdkEnv({}).CLAUDE_CODE_ATTRIBUTION_HEADER, '0');
+});
+
+test('a host CLAUDE_CODE_ATTRIBUTION_HEADER value wins over the default', () => {
+  assert.equal(buildClaudeSdkEnv({ CLAUDE_CODE_ATTRIBUTION_HEADER: '1' }).CLAUDE_CODE_ATTRIBUTION_HEADER, '1');
+});

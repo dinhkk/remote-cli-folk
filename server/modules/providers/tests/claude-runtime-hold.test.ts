@@ -28,6 +28,8 @@ type Scripted = {
   emit: (message: Record<string, unknown>) => void;
   end: () => void;
   released: () => boolean;
+  /** Resolves once the runtime has created its query, i.e. finished the setup that precedes the stream. */
+  started: Promise<void>;
   stopped: string[];
 };
 
@@ -36,16 +38,20 @@ function createScriptedQuery(): { createQuery: NonNullable<ProviderRuntimeContex
   const queue: Array<Record<string, unknown> | null> = [];
   let wake: (() => void) | null = null;
   let released = false;
+  let markStarted: () => void = () => {};
+  const started = new Promise<void>((resolve) => { markStarted = resolve; });
   const stopped: string[] = [];
 
   const script: Scripted = {
     emit: (message) => { queue.push(message); wake?.(); },
     end: () => { queue.push(null); wake?.(); },
     released: () => released,
+    started,
     stopped,
   };
 
   const createQuery: NonNullable<ProviderRuntimeContext['createQuery']> = ({ prompt }) => {
+    markStarted();
     void (async () => {
       for await (const _message of prompt) { /* the CLI reads its stdin */ }
       released = true;
@@ -94,6 +100,8 @@ async function withRun(
 
   try {
     const done = queryClaudeSDK('hello', { sessionId: SESSION_ID, cwd }, writer as never, context);
+    // The run's setup (config, memory blocks) is not what these tests time; wait it out before the fixed settle windows.
+    await script.started;
     await runTest({ script, sent, done });
     script.end();
     await done;

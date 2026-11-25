@@ -63,6 +63,9 @@ const LOADERS: Record<string, Loader> = {
   'modules/worktrees/worktrees.routes.ts': async () => (await import('../../../worktrees/worktrees.routes.js')).createWorktreesRouter(inert()),
   'modules/system/system.routes.ts': async () => (await import('../../../system/system.routes.js')).createSystemRouter(inert()),
   'modules/plugins/plugins.routes.ts': async () => (await import('../../../plugins/plugins.routes.js')).createPluginsRouter(inert()),
+  'modules/agent-profiles/agent-profiles.routes.ts': async () => (await import('../../../agent-profiles/agent-profiles.routes.js')).createAgentProfilesRouter(inert(), inert(), inert()),
+  // The kill route exists only when a killer is given: the stand-in is one.
+  'modules/agent-monitor/agent-monitor.routes.ts': async () => (await import('../../../agent-monitor/agent-monitor.routes.js')).createAgentMonitorRouter(inert(), inert()),
   'modules/taskmaster/taskmaster.routes.ts': async () => (await import('../../../taskmaster/taskmaster.routes.js')).createTaskmasterRouter(inert()),
   'modules/voice/voice.routes.ts': async () => (await import('../../../voice/voice.routes.js')).createVoiceRouter(inert()),
   'modules/agent/agent.routes.ts': async () => (await import('../../../agent/agent.routes.js')).createAgentRouter(inert()),

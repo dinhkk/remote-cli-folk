@@ -38,6 +38,8 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
+import ComposerAgentMenu from '@/modules/chat/composer/ComposerAgentMenu';
+import type { NewChatScopeState } from '@/modules/agent-profiles';
 
 type MentionableFile = {
   name: string;
@@ -67,8 +69,8 @@ type ChatComposerProps = {
   modelsLoading: boolean;
   tokenBudget: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
-  slashCommandsCount: number;
-  onToggleCommandMenu: () => void;
+  /** Main-agent choice of a brand-new Claude chat; null/absent once the chat has a session (it is fixed then). */
+  agentScope?: NewChatScopeState | null;
   hasInput: boolean;
   onClearInput: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
@@ -144,8 +146,7 @@ export default function ChatComposer({
   modelsLoading,
   tokenBudget,
   onShowTokenUsage,
-  slashCommandsCount,
-  onToggleCommandMenu,
+  agentScope = null,
   hasInput,
   onClearInput,
   onSubmit,
@@ -501,22 +502,7 @@ export default function ChatComposer({
 
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
-            <PromptInputButton
-              tooltip={{ content: t('input.showAllCommands') }}
-              onClick={onToggleCommandMenu}
-              className="relative"
-            >
-              <span className="flex items-center justify-center font-mono text-sm font-semibold leading-none select-none">
-                /
-              </span>
-              {slashCommandsCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground"
-                >
-                  {slashCommandsCount}
-                </span>
-              )}
-            </PromptInputButton>
+            {agentScope && <ComposerAgentMenu state={agentScope} />}
 
             {hasInput && (
               <PromptInputButton

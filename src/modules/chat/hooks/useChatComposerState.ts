@@ -12,10 +12,10 @@ import type {
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 
-import { api, ApiRequestError } from '@/shared/api';
+import { api, ApiRequestError, readApiErrorMessage } from '@/shared/api';
 import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
-import type { BackgroundSendChoice, BackgroundSendPrompt, CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand } from '@/shared/types';
+import type { BackgroundSendChoice, BackgroundSendPrompt, CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand,NewChatScopeRequest } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
   appendQueuedMessage,
@@ -63,6 +63,11 @@ type UseChatComposerStateArgs = {
   onSessionEstablished?: (sessionId: string, context: SessionEstablishedContext) => void;
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   onShowSettings?: () => void;
+  /**
+   * Main agent chosen for a brand-new chat (Agent Profiles picker). `scope` is sent with the session creation
+   * and left out entirely when the picker has nothing to say. Ignored once the chat has a session.
+   */
+  newChatScope?: NewChatScopeRequest;
   scrollToBottom: () => void;
   addMessage: (msg: ChatMessage) => void;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
@@ -230,6 +235,7 @@ export function useChatComposerState({
   onSessionEstablished,
   onFileOpen,
   onShowSettings,
+  newChatScope,
   scrollToBottom,
   addMessage,
   setIsUserScrolledUp,
@@ -987,9 +993,14 @@ export function useChatComposerState({
             provider,
             projectPath: resolvedProjectPath,
             initialMessage: messageContent,
+            // Left out for a plain chat: the server answers 400 to `scope: null`.
+            ...(newChatScope?.scope ? { scope: newChatScope.scope } : {}),
           });
           if (!response.ok) {
-            throw new Error(`Failed to create session (${response.status})`);
+            // A scoped create can fail for reasons the user must act on (the chosen agent's file is gone...), so its
+            // message is shown; a chat without a scope keeps the short status text.
+            const serverMessage = newChatScope?.scope ? readApiErrorMessage(await response.json().catch(() => null)) : null;
+            throw new Error(serverMessage ?? `Failed to create session (${response.status})`);
           }
           const body = await response.json();
           targetSessionId = body?.data?.sessionId || null;
@@ -1130,6 +1141,7 @@ export function useChatComposerState({
       editingAnchorId,
       executeCommand,
       isLoading,
+      newChatScope,
       onSessionProcessing,
       onSessionEstablished,
       provider,

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
 import { useTasksSettings } from '@/modules/task-master';
+import { SessionScopeBadge, useNewChatScope } from '@/modules/agent-profiles';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
@@ -15,6 +16,7 @@ import type {
   ProjectSession,
   SessionEstablishedContext,
   SessionNavigationOptions,
+  SettingsMainTab,
 } from '@/shared/types';
 import { useChatProviderState } from '@/modules/chat/hooks/useChatProviderState';
 import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessages';
@@ -39,7 +41,7 @@ type ChatInterfaceProps = {
   onFileOpen?: (filePath: string, diffInfo?: any) => void;
   onNavigateToSession?: (targetSessionId: string, options?: SessionNavigationOptions) => void;
   onSessionEstablished?: (sessionId: string, context: SessionEstablishedContext) => void;
-  onShowSettings?: () => void;
+  onShowSettings?: (tab?: SettingsMainTab) => void;
   showRawParameters?: boolean;
   showThinking?: boolean;
   sendByCtrlEnter?: boolean;
@@ -191,13 +193,20 @@ function ChatInterface({
     onNavigateToSession?.(sessionId);
   }, [setCurrentSessionId, onSessionEstablished, onNavigateToSession]);
 
+  // A chat without a session yet is where the main agent is chosen (Claude only: the server refuses scopes for
+  // other providers). The choices are the agents of the project open in the sidebar.
+  const isNewChat = !selectedSession && !currentSessionId;
+  const newChatScope = useNewChatScope({
+    projectId: selectedProject?.projectId ?? null,
+    enabled: isNewChat && provider === 'claude',
+  });
+
   const {
     input,
     setInput,
     textareaRef,
     inputHighlightRef,
     isTextareaExpanded,
-    slashCommandsCount,
     filteredCommands,
     frequentCommands,
     commandQuery,
@@ -205,7 +214,6 @@ function ChatInterface({
     selectedCommandIndex,
     resetCommandMenuState,
     handleCommandSelect,
-    handleToggleCommandMenu,
     showFileDropdown,
     filteredFiles,
     selectedFileIndex,
@@ -262,6 +270,7 @@ function ChatInterface({
     onSessionEstablished: handleSessionEstablished,
     onFileOpen,
     onShowSettings,
+    newChatScope: newChatScope.request,
     scrollToBottom,
     addMessage,
     setIsUserScrolledUp,
@@ -539,6 +548,10 @@ function ChatInterface({
             </div>
           )}
 
+          {!isNewChat && (
+            <SessionScopeBadge sessionId={currentSessionId || selectedSession?.id || null} enabled={provider === 'claude'} />
+          )}
+
           <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
@@ -564,8 +577,7 @@ function ChatInterface({
           scheduledMessages={scheduledMessages}
           onScheduleMessage={handleScheduleMessage}
           onCancelScheduledMessage={cancelScheduledMessage}
-          slashCommandsCount={slashCommandsCount}
-          onToggleCommandMenu={handleToggleCommandMenu}
+          agentScope={isNewChat ? newChatScope : null}
           hasInput={Boolean(input.trim())}
           onClearInput={handleClearInput}
           onSubmit={handleSubmit}

@@ -6,6 +6,8 @@ import { ProviderLoginModal } from '@/modules/provider-auth';
 import { Button } from '@/shared/ui';
 import SettingsSidebar from '@/modules/settings/SettingsSidebar';
 import AgentsSettingsTab from '@/modules/settings/tabs/agents-settings/AgentsSettingsTab';
+import AgentProfilesSettingsTab from '@/modules/settings/tabs/agent-profiles-settings/AgentProfilesSettingsTab';
+import ModelsSettingsTab from '@/modules/settings/tabs/models-settings/ModelsSettingsTab';
 import AppearanceSettingsTab from '@/modules/settings/tabs/AppearanceSettingsTab';
 import CredentialsSettingsTab from '@/modules/settings/tabs/api-settings/CredentialsSettingsTab';
 import VoiceSettingsTab from '@/modules/settings/tabs/VoiceSettingsTab';
@@ -249,6 +251,21 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
                   projects={projects}
                 />
               )}
+
+              {activeTab === 'agentProfiles' && (
+                <AgentProfilesSettingsTab
+                  claudeAuth={{
+                    authenticated: providerAuthStatus.claude.authenticated,
+                    email: providerAuthStatus.claude.email,
+                    loading: providerAuthStatus.claude.loading,
+                  }}
+                  onSignIn={() => openLoginForProvider('claude')}
+                  projects={projects}
+                  onClose={onClose}
+                />
+              )}
+
+              {activeTab === 'models' && <ModelsSettingsTab />}
 
               {activeTab === 'tasks' && <TasksSettingsTab />}
 

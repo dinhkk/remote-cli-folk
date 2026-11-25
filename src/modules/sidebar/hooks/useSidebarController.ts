@@ -79,6 +79,8 @@ type UseSidebarControllerArgs = {
   setSidebarVisible: (visible: boolean) => void;
   sidebarVisible: boolean;
   keepProjectsExpanded?: boolean;
+  /** The tab the sidebar opens on (only read when it mounts). A sidebar that is rebuilt, as when the window crosses the phone breakpoint, passes the tab it had. */
+  initialSearchMode?: SidebarSearchMode;
 };
 
 /** Used by Sidebar to coordinate project navigation, expansion and session actions. */
@@ -101,6 +103,7 @@ export function useSidebarController({
   setSidebarVisible,
   sidebarVisible,
   keepProjectsExpanded = false,
+  initialSearchMode = 'projects',
 }: UseSidebarControllerArgs) {
   const paletteOps = usePaletteOps();
   // Remember whether a saved set existed before the first persistence effect.
@@ -165,7 +168,7 @@ export function useSidebarController({
   const sessionIdsBeingDeletedRef = useRef<Set<string>>(new Set());
   const [showVersionModal, setShowVersionModal] = useState(false);
   const [providerFilter, setProviderFilter] = useState<ConversationProviderFilter>('all');
-  const [searchMode, setSearchMode] = useState<SidebarSearchMode>('projects');
+  const [searchMode, setSearchMode] = useState<SidebarSearchMode>(initialSearchMode);
   const [conversationResults, setConversationResults] = useState<ConversationSearchResults | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);

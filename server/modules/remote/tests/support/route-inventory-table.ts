@@ -37,6 +37,8 @@ export const ROUTE_MODULES: readonly RouteModule[] = [
   { prefix: '/api/notifications', file: 'modules/notifications/notifications.routes.ts', mountedAs: 'notificationRoutes', registrations: 4 },
   { prefix: '/api/user', file: 'modules/user/user.routes.ts', mountedAs: 'userRoutes', registrations: 11 },
   { prefix: '/api/plugins', file: 'modules/plugins/plugins.routes.ts', mountedAs: 'pluginsRoutes', registrations: 8 },
+  { prefix: '/api/agent-profiles', file: 'modules/agent-profiles/agent-profiles.routes.ts', mountedAs: 'agentProfilesRoutes', registrations: 15 },
+  { prefix: '/api/agent-monitor', file: 'modules/agent-monitor/agent-monitor.routes.ts', mountedAs: 'agentMonitorRoutes', registrations: 3 },
   { prefix: '/api/browser-use-mcp', file: 'modules/browser-use/browser-use-mcp.routes.ts', mountedAs: 'browserUseMcpRoutes', registrations: 1 },
   { prefix: '/api/browser-use', file: 'modules/browser-use/browser-use.routes.ts', mountedAs: 'browserUseRoutes', registrations: 8 },
   { prefix: '/api/providers', file: 'modules/providers/provider.routes.ts', mountedAs: 'providerRoutes', registrations: 35 },
@@ -90,8 +92,8 @@ export function mountMismatches(indexSource: string, modules: readonly RouteModu
   return problems;
 }
 
-/** Rows (method x path) the whole inventory expands to: 95 allow + 94 deny. Pinned: a different number is a route change to review. */
-export const EXPECTED_INVENTORY_ROWS = 208;
+/** Rows (method x path) the whole inventory expands to (allow + deny). Pinned: a different number is a route change to review. */
+export const EXPECTED_INVENTORY_ROWS = 226;
 
 /** The literal-path registrations of `server/index.ts` that are not router mounts (everything else must be in ROUTE_MODULES). */
 export const INDEX_OTHER_LITERALS: ReadonlyArray<{ call: string; note: string }> = [

@@ -13,6 +13,7 @@ import type {
   FetchHistoryResult,
   LLMProvider,
   NormalizedMessage,
+  SessionAgentSnapshot,
   WorkflowAgentActivity,
 } from '@/shared/types.js';
 import { AppError, sliceTailPage } from '@/shared/utils.js';
@@ -91,6 +92,11 @@ type SessionDetails = {
     isStarred: boolean;
     isArchived: boolean;
   } | null;
+  /**
+   * Main agent the session was opened with (a native agent file's name; null `agentName` = scoped session without a
+   * main agent); null for a plain chat. Names only, never prompts (Remote can read this).
+   */
+  agentScope: { agentName: string | null } | null;
 };
 
 const MAX_REMOTECLI_SESSION_NAME_WORDS = 4;
@@ -288,6 +294,8 @@ export const sessionsService = {
     provider: LLMProvider,
     projectPath: string,
     initialMessage: string,
+    // Agent-profile touchpoint: agent record (main agent name + hide list) of a scoped session; omitted for a plain chat.
+    agentSnapshot?: SessionAgentSnapshot,
   ): CreateAppSessionResult {
     const normalizedProjectPath = projectPath.trim();
     if (!normalizedProjectPath) {
@@ -299,7 +307,7 @@ export const sessionsService = {
 
     const sessionId = randomUUID();
     const sessionName = buildRemoteCliSessionName(initialMessage);
-    sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName);
+    sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName, agentSnapshot);
 
     return {
       sessionId,
@@ -610,6 +618,13 @@ export const sessionsService = {
 
     const projectPath = session.project_path?.trim() ? session.project_path : null;
     const project = projectPath ? projectsDb.getProjectPath(projectPath) : null;
+    // A corrupt agent record makes the run refuse to start; the lookup itself must still answer, so it counts as plain here.
+    let snapshot: SessionAgentSnapshot | null = null;
+    try {
+      snapshot = sessionsDb.getAgentSnapshot(session.session_id);
+    } catch {
+      snapshot = null;
+    }
 
     return {
       sessionId: session.session_id,
@@ -629,6 +644,7 @@ export const sessionsService = {
             isArchived: Boolean(project.isArchived),
           }
         : null,
+      agentScope: snapshot ? { agentName: snapshot.agentName } : null,
     };
   },
 

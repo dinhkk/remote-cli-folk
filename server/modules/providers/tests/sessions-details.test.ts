@@ -71,3 +71,24 @@ test('getSessionDetailsById throws SESSION_NOT_FOUND for unknown ids', async () 
     );
   });
 });
+
+test('getSessionDetailsById reports the agent scope of a scoped session and null for a plain one', async () => {
+  await withIsolatedDatabase(() => {
+    const projectPath = '/home/user/scoped-project';
+    const scopedId = sessionsDb.createAppSession('scoped-1', 'claude', projectPath, 'Scoped', {
+      agentName: 'orchestrator',
+      hiddenClaudeAgents: ['SECRET-hidden-name'],
+    });
+    const noAgentId = sessionsDb.createAppSession('scoped-2', 'claude', projectPath, 'No agent', {
+      agentName: null,
+      hiddenClaudeAgents: [],
+    });
+    const plainId = sessionsDb.createAppSession('plain-1', 'claude', projectPath, 'Plain');
+
+    const scoped = sessionsService.getSessionDetailsById(scopedId);
+    assert.deepEqual(scoped.agentScope, { agentName: 'orchestrator' });
+    assert.ok(!JSON.stringify(scoped).includes('SECRET'), 'details carry the agent name only, not the hide list');
+    assert.deepEqual(sessionsService.getSessionDetailsById(noAgentId).agentScope, { agentName: null });
+    assert.equal(sessionsService.getSessionDetailsById(plainId).agentScope, null);
+  });
+});

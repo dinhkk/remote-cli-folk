@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,DiffStats,Project,ToolGroupItem } from '@/shared/types';
 import { getToolConfig } from '@/modules/chat/tools';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
+import MessageTime from '@/modules/chat/transcript/MessageTime';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { DiffStatsBadge } from '@/modules/chat/tools/DiffStatsBadge';
 import { parseToolPayload, summarizeDiff } from '@/modules/chat/utils/messageTransforms';
@@ -139,6 +140,12 @@ function ToolGroupContainer({
           </>
         )}
         {groupDiffStats && <DiffStatsBadge stats={groupDiffStats} className="ml-auto pl-2" />}
+        {/* The group's time is its first call's; the pushed-right slot is shared
+            with the diff badge, so only one of them claims the free space. */}
+        <MessageTime
+          timestamp={group.timestamp}
+          className={`flex-shrink-0 ${groupDiffStats ? 'pl-2' : 'ml-auto'}`}
+        />
       </button>
 
       {showChildren && (

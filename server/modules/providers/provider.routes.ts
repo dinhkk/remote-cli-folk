@@ -1,5 +1,6 @@
 import express, { type Request, type Response } from 'express';
 
+import { resolveSessionAgentScope } from '@/modules/agent-profiles/index.js';
 import { providerAuthService } from '@/modules/providers/services/provider-auth.service.js';
 import { claudeSettingsPermissionsService } from '@/modules/providers/services/claude-settings-permissions.service.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
@@ -18,6 +19,7 @@ import type {
   McpTransport,
   ProviderSkillCreateFile,
   ProviderSkillCreateInput,
+  SessionAgentScope,
   UpsertProviderMcpServerInput,
 } from '@/shared/types.js';
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
@@ -327,6 +329,28 @@ const parseProvider = (value: unknown): LLMProvider => {
     code: 'UNSUPPORTED_PROVIDER',
     statusCode: 400,
   });
+};
+
+/**
+ * Optional agent scope of a new session: absent means a plain chat; otherwise it must
+ * be `{ agentName: <string> }` (the main agent file to run as) or `{ agentName: null }`
+ * (no main agent). Anything else is a 400, never quietly treated as "no scope" (which
+ * would open a chat without the agent asked for).
+ */
+const parseSessionScope = (value: unknown): SessionAgentScope | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const agentName = typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>).agentName
+    : undefined;
+  if (agentName !== null && (typeof agentName !== 'string' || agentName.trim().length === 0)) {
+    throw new AppError('scope must be { "agentName": "<agent name>" } or { "agentName": null }.', {
+      code: 'INVALID_SESSION_SCOPE',
+      statusCode: 400,
+    });
+  }
+  return { agentName: agentName === null ? null : (agentName as string).trim() };
 };
 
 /** Both fields are optional: an empty body forks the whole conversation. */
@@ -889,7 +913,31 @@ router.post(
     const provider = parseProvider(body.provider);
     const projectPath = typeof body.projectPath === 'string' ? body.projectPath : '';
     const initialMessage = typeof body.initialMessage === 'string' ? body.initialMessage : '';
-    const result = sessionsService.createAppSession(provider, projectPath, initialMessage);
+    const scope = parseSessionScope(body.scope);
+
+    // No scope: plain chat, exactly the original flow.
+    if (!scope) {
+      const result = sessionsService.createAppSession(provider, projectPath, initialMessage);
+      res.status(201).json(createApiSuccessResponse(result));
+      return;
+    }
+
+    // Scoped chat (agent profiles): the chat runs in the sidebar project's folder (`projectPath`) with the
+    // chosen native agent file as its main agent; the server checks that the agent exists.
+    if (provider !== 'claude') {
+      throw new AppError(`Agent scopes are only supported for provider "claude", not "${provider}".`, {
+        code: 'SCOPE_UNSUPPORTED_PROVIDER',
+        statusCode: 400,
+      });
+    }
+    if (!projectPath.trim()) {
+      throw new AppError('projectPath is required.', {
+        code: 'PROJECT_PATH_REQUIRED',
+        statusCode: 400,
+      });
+    }
+    const snapshot = await resolveSessionAgentScope(scope, projectPath);
+    const result = sessionsService.createAppSession(provider, projectPath, initialMessage, snapshot);
     res.status(201).json(createApiSuccessResponse(result));
   }),
 );

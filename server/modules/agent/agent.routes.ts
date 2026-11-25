@@ -34,6 +34,11 @@ type AgentRouterDependencies = {
     getSessionById(sessionId: string): AgentSessionRow | null;
     getSessionByProviderSessionId(providerSessionId: string): AgentSessionRow | null;
     createAppSession(provider: string, projectPath: string, initialMessage: string): { sessionId: string };
+    /**
+     * Agent record (`{ agentName, hiddenClaudeAgents }`) of a scoped session (null for a plain chat), the same reader the chat
+     * gateway uses. Optional so callers that never continue scoped sessions need not provide it.
+     */
+    getAgentSnapshot?(sessionId: string): unknown;
   };
   /** The live-run registry the chat socket uses; registering here is what puts an API run on the running-sessions list. */
   runs: Pick<typeof import('../websocket/index.js').chatRunRegistry, 'startRun' | 'completeRunIfCurrent' | 'isProcessing'>;
@@ -1044,12 +1049,16 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
       if (provider === 'claude') {
         console.log('🤖 Starting Claude SDK session');
 
+        const agentSnapshot = sessionGateway.getAgentSnapshot?.(appSessionId) ?? null;
         await queryClaudeSDK(message.trim(), {
           projectPath: finalProjectPath,
           cwd: finalProjectPath,
           sessionId: appSessionId,
           model: model || providerModels?.DEFAULT,
           effort,
+          // Agent-profile touchpoint: continuing a scoped session passes its main agent name and hide
+          // rules again, as the chat gateway does (every run carries them, resume included). Plain sessions: undefined.
+          ...(agentSnapshot ? { agentProfile: agentSnapshot } : {}),
           permissionMode: 'bypassPermissions' // Bypass all permissions for API calls
         }, run.writer);
 

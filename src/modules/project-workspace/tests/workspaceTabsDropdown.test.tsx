@@ -66,6 +66,21 @@ describe('WorkspaceTabsDropdown (Mobile Tab Switcher)', () => {
     expect(setActiveTab).toHaveBeenCalledWith('shell');
   });
 
+  it('lists no Agents view: the sub-agents live in the Running tab\'s Monitoring pane', () => {
+    render(
+      <WorkspaceTabsDropdown
+        activeTab="chat"
+        setActiveTab={vi.fn()}
+        shouldShowTasksTab={true}
+        shouldShowBrowserTab={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /switch view/i }));
+    const labels = screen.getAllByRole('menuitem').map((item) => item.textContent);
+    expect(labels).toEqual(['tabs.chat', 'tabs.shell', 'tabs.files', 'tabs.git', 'tabs.browser', 'tabs.tasks']);
+  });
+
   it('closes menu when Escape is pressed', () => {
     const setActiveTab = vi.fn();
     render(
@@ -114,6 +129,8 @@ describe('WorkspaceHeader mobile vs desktop layout', () => {
     expect(screen.getByRole('button', { name: /switch view/i })).toBeTruthy();
     // Scrollable tablist should not be rendered
     expect(screen.queryByRole('tablist')).toBeNull();
+    // The monitor lives in the sidebar's Running tab: the header carries no Activity entry.
+    expect(screen.queryByTestId('activity-button')).toBeNull();
   });
 
   it('renders scrollable tabs when isMobile is false', () => {
@@ -136,5 +153,7 @@ describe('WorkspaceHeader mobile vs desktop layout', () => {
     expect(screen.getByRole('tablist')).toBeTruthy();
     // Mobile dropdown is not rendered
     expect(screen.queryByRole('button', { name: /switch view/i })).toBeNull();
+    // No Activity entry in the desktop header either.
+    expect(screen.queryByTestId('activity-button')).toBeNull();
   });
 });

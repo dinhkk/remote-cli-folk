@@ -19,7 +19,6 @@
   },
   "tabs": {
     "chat": "Chat",
-    "agents": "Agents",
     "shell": "Shell",
     "files": "Files",
     "git": "Source Control",

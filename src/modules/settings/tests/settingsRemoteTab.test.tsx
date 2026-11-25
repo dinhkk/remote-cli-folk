@@ -68,6 +68,8 @@ test('the tab list is exactly the known tabs with Remote work just before About'
 
   assert.deepEqual(desktopTabs(container), [
     'Agents',
+    'Agent Profiles',
+    'Models',
     'Appearance',
     'Git',
     'API & Tokens',
@@ -98,6 +100,22 @@ test('inside a Remote tab frame the entry is not offered', () => {
 
   assert.equal(desktopTabs(container).includes('Remote work'), false);
   assert.equal(screen.queryByRole('button', { name: 'Remote work' }), null);
+});
+
+test('inside a Remote tab frame Agent Profiles management is not offered either (the Host denies its routes)', () => {
+  TARGET.active = true;
+  const { container } = render(<SettingsSidebar activeTab="agents" onChange={() => undefined} />);
+
+  assert.equal(desktopTabs(container).includes('Agent Profiles'), false);
+});
+
+test('the Agent Monitor is no settings tab: it lives in the header, in any frame', () => {
+  for (const active of [false, true]) {
+    TARGET.active = active;
+    const { container, unmount } = render(<SettingsSidebar activeTab="agents" onChange={() => undefined} />);
+    assert.equal(desktopTabs(container).some((label) => /monitor/i.test(label ?? '')), false);
+    unmount();
+  }
 });
 
 test('the controller opens straight on the remote tab when asked to', () => {

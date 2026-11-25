@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useRunningFocus, useRunningSessionClick } from '@/modules/agent-monitor';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useUiPreferences, useSetUiPreference } from '@/shared/context/UiPreferencesContext';
@@ -75,6 +76,10 @@ function Sidebar({
   // would re-render the whole tree on every provider status frame.
   const activeSessions = useBusySessionIdSet();
   const backgroundSessionIds = useBackgroundSessionIdSet();
+
+  // The focus provider lives above the sidebar, which is rebuilt when the window crosses the phone breakpoint: the Running tab
+  // it was on is read back from there, so a resize does not drop the monitor and fall back to the Projects tab.
+  const { runningActive, setRunningActive } = useRunningFocus();
 
   const {
     isSidebarCollapsed,
@@ -164,7 +169,26 @@ function Sidebar({
     setSidebarVisible: (visible) => setPreference('sidebarVisible', visible),
     sidebarVisible,
     keepProjectsExpanded: preferences.keepProjectsExpanded,
+    initialSearchMode: runningActive ? 'running' : 'projects',
   });
+
+  // The Running tab is the monitoring centre: while it is on show the main area follows its focus (overview, graph) and the
+  // monitor is polled; leaving the tab hands the main area back to the route and stops the poll. There is no cleanup on
+  // unmount on purpose: the provider is mounted with the workspace, so it goes away with the sidebar when the route is left,
+  // and a sidebar that is only rebuilt (breakpoint) must not switch the monitor off for the one that replaces it.
+  const isRunningTab = searchMode === 'running';
+  useEffect(() => {
+    setRunningActive(isRunningTab);
+  }, [isRunningTab, setRunningActive]);
+
+  // In the Running tab a session click only focuses the session in the monitor (see useRunningSessionClick). A project row there only folds: it must not change the route.
+  const handleRunningSessionClick = useRunningSessionClick<{ id: string }, string>();
+  const ignoreProjectSelect = useCallback(() => undefined, []);
+  // A new chat is not a running one: starting it leaves the Running tab, or the overview would stay over the new chat.
+  const handleRunningNewSession = useCallback((project: Project) => {
+    onNewSession(project);
+    setSearchMode('projects');
+  }, [onNewSession, setSearchMode]);
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -214,17 +238,17 @@ function Sidebar({
     isProjectStarred,
     onRenameDraftChange: updateRenameDraft,
     onToggleProject: toggleProject,
-    onProjectSelect: handleProjectSelect,
+    onProjectSelect: isRunningTab ? ignoreProjectSelect : handleProjectSelect,
     onToggleStarProject: toggleStarProject,
     onStartEditingProject: startEditingProject,
     onCancelEditingProject: cancelRename,
     onSaveProjectName: handleSaveProjectName,
     onDeleteProject: requestProjectDelete,
-    onSessionSelect: handleSessionClick,
+    onSessionSelect: isRunningTab ? handleRunningSessionClick : handleSessionClick,
     onDeleteSession: showDeleteSessionConfirmation,
     onForkSession: forkSession,
     onLoadMoreSessions: loadMoreSessionsForProject,
-    onNewSession,
+    onNewSession: isRunningTab ? handleRunningNewSession : onNewSession,
     onStartEditingSession: startEditingSession,
     onCancelEditingSession: cancelRename,
     onSaveEditingSession: handleSaveSessionName,
