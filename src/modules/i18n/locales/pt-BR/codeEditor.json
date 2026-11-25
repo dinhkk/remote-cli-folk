@@ -47,6 +47,7 @@
   "htmlPreview": {
     "untrustedLocal": "Conteúdo não confiável. Os scripts do arquivo rodam em um quadro isolado, sem rede e sem acesso a este app. Arquivos vinculados (CDN, outros arquivos do projeto) não são carregados.",
     "untrustedRemote": "Conteúdo não confiável. Os scripts do arquivo não rodam em uma aba remota.",
+    "untrustedRemoteIsolated": "Conteúdo não confiável do host remoto. Os scripts do arquivo rodam em um quadro isolado, sem rede e sem acesso a este app. Arquivos vinculados (CDN, outros arquivos do projeto) não são carregados.",
     "unsavedChanges": "Mostrando o arquivo salvo. Salve para ver as alterações não salvas.",
     "scriptsDisabled": "Conteúdo não confiável. Os scripts do arquivo não rodam aqui.",
     "tooLarge": "O arquivo tem mais de 10 MB, por isso seus scripts não rodam."

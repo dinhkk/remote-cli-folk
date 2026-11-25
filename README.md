@@ -371,6 +371,7 @@ the checks run normally and report missing or invalid documentation.
 - **Permission Safety**: Tool execution permissions match your security preferences and can be toggled per session or globally.
 - **Browser Sessions**: RemoteCLI keeps sign-in in an `HttpOnly`, `SameSite=Strict` cookie. The cookie expires 7 days after sign-in. When you sign out a device, its open tabs and terminals close too.
 - **Two-Factor Sign-in**: TOTP is optional. RemoteCLI encrypts authenticator seeds on disk. When you change the password or turn two-factor sign-in on or off, every other device is signed out. While two-factor sign-in is on, these actions also need a new authenticator code.
+- **HTML Preview Isolation**: When you preview a saved HTML file in the editor, its scripts run in an isolated frame with no network access and no access to RemoteCLI or your sign-in. In a Remote tab the Controller sets the policy of the preview page, and the Host cannot change it.
 
 ---
 

@@ -64,7 +64,6 @@ export const REMOTE_DENY_RULES: readonly RouteRule[] = [
   { pattern: '/api/providers/*/mcp/**', note: 'MCP server definitions carry commands and secret env/headers; listing and writing them is Host configuration' },
   { pattern: '/api/providers/mcp/**', note: 'adds an MCP server to every provider at once: global Host configuration write' },
   { pattern: '/api/providers/*/settings-permissions', note: 'contents of the Host Claude settings files; informational only (the permission panel degrades without it)' },
-  { pattern: '/api/file-tree/projects/*/files/html-preview', methods: ['GET'], note: 'the Local HTML preview runs the file\'s script; a Remote tab only displays HTML (srcdoc under the tab policy) and never loads this page' },
   { pattern: '/health', note: 'the Controller answers its own /health; the Host never serves it through the relay' },
   { pattern: '/r/**', note: 'Controller proxy mount: a Host must not be used as a hop to another Host' },
 ];
@@ -99,6 +98,7 @@ export const REMOTE_ALLOW_RULES: ReadonlyArray<RouteRule & { methods: readonly s
   allow('POST', '/api/file-tree/create-folder', 'folder picker of the new-project flow'),
   allow('GET', '/api/file-tree/projects/*/file', `${FILES}; reads ANY absolute path under WORKSPACES_ROOT (default: home), not only the project root`),
   allow('GET', '/api/file-tree/projects/*/files/content', 'raw file bytes of ANY absolute path under WORKSPACES_ROOT (default: home); the Controller forces nosniff + sandbox CSP on non-JSON answers'),
+  allow('GET', '/api/file-tree/projects/*/files/html-preview', 'HTML preview page: only a frame load of the signed-in browser gets its script-enabled sandbox policy (the Controller decides that); every other caller gets the plain sandbox policy'),
   allow('PUT', '/api/file-tree/projects/*/file', `${FILES}; writes inside the project root, which can include a repository's .git/config or hooks (they run under /api/git/* calls)`),
   allow('GET', '/api/file-tree/projects/*/files', FILES),
   allow('POST', '/api/file-tree/projects/*/files/create', FILES),

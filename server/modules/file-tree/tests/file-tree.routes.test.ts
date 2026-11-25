@@ -259,7 +259,7 @@ test('HP-02/HP-04: the HTML preview answers JSON errors and serves nothing witho
       throw new AppError('Path must be under project root', { statusCode: 403, code: 'PATH_OUTSIDE_PROJECT' });
     },
   });
-  for (const authKind of [null, 'loopback', 'platform']) {
+  for (const authKind of [null, 'platform']) {
     await withFileTreeServer(services, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/file-tree/projects/p1/files/html-preview?path=a.html`, { headers: FETCH_METADATA });
       assert.equal(response.status, 401, String(authKind));
@@ -277,6 +277,42 @@ test('HP-02/HP-04: the HTML preview answers JSON errors and serves nothing witho
     assert.equal(missing.status, 400);
     assert.match(missing.headers.get('content-type') ?? '', /application\/json/);
   });
+});
+
+test('a request that arrives through the Remote bridge is served without Fetch Metadata, with the same checks and headers', async () => {
+  const inputs: string[][] = [];
+  const services = createFakeServices({
+    openHtmlPreview: async (projectId, filePath, maximumBytes) => {
+      inputs.push([projectId, filePath]);
+      assert.equal(maximumBytes, 10 * 1024 * 1024, 'the preview size limit does not change');
+      if (filePath === '../../etc/x.html') throw new AppError('Path must be under project root', { statusCode: 403, code: 'PATH_OUTSIDE_PROJECT' });
+      if (filePath === 'notes.txt') throw new AppError('Only HTML files can be previewed', { statusCode: 400, code: 'HTML_PREVIEW_NOT_HTML' });
+      return { stream: Readable.from([Buffer.from('<p>bridge</p>')]) };
+    },
+  });
+  await withFileTreeServer(services, async (baseUrl) => {
+    // node:http so that no Fetch Metadata header is added: the bridge forwards none.
+    const get = (path: string) => new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>((resolve, reject) => {
+      http.get(`${baseUrl}/api/file-tree/projects/p1/files/html-preview${path}`, (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => resolve({ status: response.statusCode ?? 0, headers: response.headers, body: Buffer.concat(chunks).toString('utf8') }));
+      }).on('error', reject);
+    });
+    const served = await get(`?path=${encodeURIComponent('site/index.html')}`);
+    assert.equal(served.status, 200);
+    assert.equal(served.body, '<p>bridge</p>');
+    assert.equal(served.headers['content-type'], 'text/html; charset=utf-8');
+    assert.equal(served.headers['content-security-policy'], HTML_PREVIEW_CSP);
+    assert.equal(served.headers['x-content-type-options'], 'nosniff');
+    assert.equal(served.headers['cache-control'], 'no-store');
+    // The file checks of the page are unchanged for this caller.
+    assert.equal((await get(`?path=${encodeURIComponent('../../etc/x.html')}`)).status, 403);
+    assert.equal((await get('?path=notes.txt')).status, 400);
+    assert.equal((await get('')).status, 400);
+  }, 'loopback');
+  assert.deepEqual(inputs, [['p1', 'site/index.html'], ['p1', '../../etc/x.html'], ['p1', 'notes.txt']]);
+  // A browser session still needs Fetch Metadata (the test 'condition 2/6' above); the bridge exception is only for loopback.
 });
 
 test('HP-09: raw file content carries a sandbox policy and nosniff, and still streams the file', async () => {

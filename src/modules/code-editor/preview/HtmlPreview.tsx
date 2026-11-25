@@ -2,16 +2,16 @@ import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { api, htmlPreviewPath } from '@/shared/api';
-import { isTargetMode } from '@/shared/transport/target-context';
+import { httpUrl, isTargetMode } from '@/shared/transport/target-context';
 
-/** The saved file the Local preview loads from the server. */
+/** The saved file the isolated preview loads from the server. */
 export type HtmlPreviewSource = { projectId: string; filePath: string };
 
 type HtmlPreviewProps = {
   /** The editor's text: shown, without running its scripts, when the isolated page cannot be used. */
   content: string;
   title?: string;
-  /** Without a source (or in a Remote tab) the preview only displays the HTML. */
+  /** Without a source the preview only displays the HTML. */
   source?: HtmlPreviewSource | null;
   /** The editor holds changes the saved file does not have yet. */
   hasUnsavedChanges?: boolean;
@@ -24,20 +24,21 @@ type Mode = 'checking' | 'isolated' | 'display';
 /**
  * Inline preview for HTML files inside CodeEditor.
  *
- * Local: the frame loads the saved file from the server's preview page with `sandbox="allow-scripts"`. The
- * server sends that page with a sandbox policy and no network source, so the file's scripts run in an opaque
- * origin: no session, no access to this app, no request to anything.
+ * The frame loads the saved file from the server's preview page with `sandbox="allow-scripts"`. The server
+ * sends that page with a sandbox policy and no network source, so the file's scripts run in an opaque origin:
+ * no session, no access to this app, no request to anything. In a Remote tab the same page comes from the paired
+ * Host through the Controller (`/r/<peerId>/...`), which sets that policy itself.
  *
- * Remote tab, or when that page is not available (platform mode, a server error): the HTML is displayed from
- * the editor text; the app's page policy keeps its scripts from running. The frame never gets
- * `allow-same-origin`.
+ * When that page is not available (platform mode, an older Host, a server error, a file over the size limit):
+ * the HTML is displayed from the editor text. Local: the app's page policy keeps its scripts from running.
+ * Remote tab: the frame has an empty sandbox, so nothing in it runs. No frame ever gets `allow-same-origin`.
  */
 export const HtmlPreview = memo(({ content, title = 'HTML Preview', source = null, hasUnsavedChanges = false, reloadKey = 0 }: HtmlPreviewProps) => {
   const { t } = useTranslation('codeEditor');
   const remote = isTargetMode();
   const projectId = source?.projectId;
   const filePath = source?.filePath;
-  const canIsolate = !remote && Boolean(projectId && filePath);
+  const canIsolate = Boolean(projectId && filePath);
   // The answer of the last check, for the file and save it was made for.
   const checkKey = `${projectId ?? ''}\n${filePath ?? ''}\n${reloadKey}`;
   const [checked, setChecked] = useState<{ key: string; status: number } | null>(null);
@@ -62,7 +63,9 @@ export const HtmlPreview = memo(({ content, title = 'HTML Preview', source = nul
   }, [canIsolate, projectId, filePath, checkKey]);
 
   const notice = mode === 'isolated'
-    ? t('htmlPreview.untrustedLocal', "Untrusted content. The file's scripts run in an isolated frame with no network and no access to this app. Files it links to (CDN, other project files) do not load.")
+    ? remote
+      ? t('htmlPreview.untrustedRemoteIsolated', "Untrusted content from the Remote Host. The file's scripts run in an isolated frame with no network and no access to this app. Files it links to (CDN, other project files) do not load.")
+      : t('htmlPreview.untrustedLocal', "Untrusted content. The file's scripts run in an isolated frame with no network and no access to this app. Files it links to (CDN, other project files) do not load.")
     : remote
       ? t('htmlPreview.untrustedRemote', 'Untrusted content. Scripts in the file do not run in a Remote tab.')
       : t('htmlPreview.scriptsDisabled', 'Untrusted content. Scripts in the file do not run here.');
@@ -84,14 +87,14 @@ export const HtmlPreview = memo(({ content, title = 'HTML Preview', source = nul
             key={reloadKey}
             title={title}
             sandbox="allow-scripts"
-            src={htmlPreviewPath(projectId, filePath)}
+            src={httpUrl(htmlPreviewPath(projectId, filePath))}
             className="h-full w-full border-0 bg-white"
           />
         )}
         {mode === 'display' && (
           <iframe
             title={title}
-            sandbox="allow-scripts allow-forms allow-modals"
+            sandbox={remote ? '' : 'allow-scripts allow-forms allow-modals'}
             srcDoc={content}
             className="h-full w-full border-0 bg-white"
           />

@@ -172,6 +172,21 @@ test('HP-03/HP-10g: other file routes with the same frame headers still need the
   });
 });
 
+test('the Host bridge bearer reaches the preview page; a session secret or a URL token as a bearer never does', async () => {
+  await withServer(async (rig) => {
+    const bridge = await send(rig, PREVIEW, { Authorization: `Bearer ${issueLoopbackToken()}` });
+    assert.equal(bridge.status, 200);
+    assert.equal(await bridge.text(), PAGE);
+    assert.deepEqual(rig.served, ['preview index.html']);
+    const secret = rig.cookie.split('=', 2)[1];
+    const sessionAsBearer = await send(rig, PREVIEW, { Authorization: `Bearer ${secret}` });
+    assert.equal(sessionAsBearer.status, 401);
+    const wrongBearer = await send(rig, PREVIEW, { Authorization: 'Bearer not-a-valid-bridge-token' });
+    assert.equal(wrongBearer.status, 401);
+    assert.deepEqual(rig.served, ['preview index.html'], 'only the bridge request was served');
+  });
+});
+
 test('HP-02/HP-10b: no session 401, locked session 423, a URL token or a bearer never authenticates', async () => {
   await withServer(async (rig) => {
     const anonymous = await send(rig, PREVIEW, FRAME_LOAD);
@@ -181,10 +196,6 @@ test('HP-02/HP-10b: no session 401, locked session 423, a URL token or a bearer 
     assert.equal(urlToken.status, 401);
     const bearer = await send(rig, PREVIEW, { ...FRAME_LOAD, Authorization: `Bearer ${secret}` });
     assert.equal(bearer.status, 401);
-    // The Host bridge's loopback bearer is valid for the API, never for the preview page.
-    const loopback = await send(rig, PREVIEW, { ...FRAME_LOAD, Authorization: `Bearer ${issueLoopbackToken()}` });
-    assert.equal(loopback.status, 401);
-    assert.equal((await loopback.json()).error, 'The preview needs a browser session');
     // A locked session is refused like on every other route.
     // (The store locks only sessions of an MFA user; the row is marked directly to reach the same state.)
     const session = getSessionRuntime().store.authenticate(secret, true)!;
