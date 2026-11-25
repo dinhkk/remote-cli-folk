@@ -158,9 +158,3 @@ server/**/tests/file-tree-outside-*/
 __pycache__/
 *.py[cod]
 
-# Video generation temporary frames
-video/preview_*.png
-video/frame_*.png
-video/test_*.png
-video/verify_*.png
-
