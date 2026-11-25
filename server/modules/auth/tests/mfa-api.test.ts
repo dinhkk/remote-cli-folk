@@ -382,3 +382,13 @@ test('MR-05/MR-07: replacing recovery codes and disabling TOTP are recorded as s
     assert.deepEqual(events(), [{ kind: 'recovery-codes-replaced' }, { kind: 'mfa-disabled' }]);
   });
 });
+
+test('re-enrolling while TOTP is enabled needs the password and a fresh authenticator code', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_700_000_000_000 });
+  await fixture(async base => {
+    const a = cookieOf(await login(base))!; const e = await enroll(base, a);
+    assert.equal((await request(base, '/auth/mfa/enroll', { password: phrase }, a)).status, 403, 'password alone is not enough');
+    t.mock.timers.tick(30_000);
+    assert.equal((await request(base, '/auth/mfa/enroll', { password: phrase, code: otp(e.secret) }, a)).status, 200);
+  });
+});

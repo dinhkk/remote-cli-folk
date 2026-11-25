@@ -220,3 +220,36 @@ test('at most MAX_KILL_PIDS pids are sent in one go', async () => {
   assert.equal(machine.calls.length, MAX_KILL_PIDS);
   assert.equal(outcome.result, 'error', 'some are left, so the kill is not complete');
 });
+
+function posixKiller(table: RawProcess[], { immortal = [] as number[] } = {}) {
+  let live = [...table];
+  const order: number[] = [];
+  const killer = createProcessKiller({
+    readProcesses: async () => ({ takenAt: T0 + 60_000, processes: live }),
+    run: async (_command, args) => {
+      const pid = Number(args[1]);
+      order.push(pid);
+      if (!immortal.includes(pid)) live = live.filter((entry) => entry.pid !== pid);
+    },
+    serverPid: 10,
+    platform: 'linux',
+  });
+  return { killer, order, table: () => live };
+}
+
+test('POSIX tree kill takes a tree larger than MAX_KILL_PIDS down completely, root first', async () => {
+  const children = Array.from({ length: MAX_KILL_PIDS + 20 }, (_, index) => proc(1000 + index, 100, 'node'));
+  const machine = posixKiller([proc(1, 0, 'System'), proc(10, 1, 'node'), proc(100, 10, 'claude'), ...children]);
+  const outcome = await machine.killer.killTree(100, CTX);
+  assert.deepEqual(outcome, { result: 'killed', count: children.length + 1 });
+  assert.equal(machine.order[0], 100);
+  assert.deepEqual(machine.table().map((entry) => entry.pid), [1, 10]);
+});
+
+test('POSIX tree kill reports an error when a descendant survives even though the root is gone', async () => {
+  const machine = posixKiller(world(), { immortal: [103] });
+  const outcome = await machine.killer.killTree(100, CTX);
+  assert.equal(outcome.result, 'error');
+  assert.ok(machine.table().some((entry) => entry.pid === 103));
+  assert.ok(!machine.table().some((entry) => entry.pid === 100));
+});

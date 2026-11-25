@@ -174,6 +174,15 @@ test('two kills of one session at once run once and both get the answer', async 
   assert.equal(r.calls.filter((call) => call.startsWith('tree:')).length, 2, 'a later kill is a new one');
 });
 
+test('kills of different nodes of one session at once each run and get their own answer', async () => {
+  const r = rig({ treeOutcome: { result: 'killed', count: 3 }, groupOutcome: { result: 'gone', count: 0 } });
+  const [tree, group] = await Promise.all([kill(r, `orch:${SID}`), kill(r, `proc:${SID}:node`)]);
+  assert.equal(tree.result, 'killed');
+  assert.equal(group.result, 'gone');
+  assert.equal(r.calls.filter((call) => call.startsWith('tree:')).length, 1);
+  assert.equal(r.calls.filter((call) => call.startsWith('group:')).length, 1);
+});
+
 test('a killer that throws is an error, never a crash', async () => {
   const r = rig();
   const broken = createAgentMonitorKiller({

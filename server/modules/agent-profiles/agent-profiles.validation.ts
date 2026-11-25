@@ -68,6 +68,9 @@ function stringList(source: Obj, key: string, limits = { items: 100, length: 200
   return [...new Set(value.map((item: string) => item.trim()))];
 }
 
+/** Characters that make a name unsafe inside a `Task(<name>)` permission rule. */
+const UNSAFE_RULE_NAME_PATTERN = /[()*\u0000-\u001f\u007f]/;
+
 /** Device names Windows reserves in every folder (`con.md` is one too), so a file can never carry them. */
 const RESERVED_DEVICE_NAME_PATTERN = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 
@@ -236,7 +239,10 @@ export function parseTemplateIds(body: unknown): string[] {
  * Consumed by: claude-agents.service.ts.
  */
 export function parseHiddenNames(body: unknown): string[] {
-  return stringList(asObject(body, 'request body'), 'names', { items: 200, length: 100 }) ?? [];
+  const names = stringList(asObject(body, 'request body'), 'names', { items: 200, length: 100 }) ?? [];
+  // Each name becomes the `Task(<name>)` deny rule of every scoped session: parentheses and `*` would change what the rule matches.
+  if (names.some((name) => UNSAFE_RULE_NAME_PATTERN.test(name))) throw invalid('names must not contain parentheses, "*" or control characters');
+  return names;
 }
 
 /** Structural check of a memory block file (the part of `storedShapeProblem` for the `memory-blocks` kind). */

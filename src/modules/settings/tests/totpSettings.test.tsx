@@ -49,3 +49,22 @@ it('L-10/K-23: loading status preserves the expected Unicode text', () => {
   expect(container.querySelector('p')?.textContent).toBe('Loading\u2026');
   unmount();
 });
+
+it('replacing the authenticator while TOTP is enabled sends the password and a fresh code', async () => {
+  vi.spyOn(QRCode, 'toCanvas').mockResolvedValue(undefined);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const fetcher = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === '/api/auth/mfa/status') return reply({ enabled: true });
+    if (url === '/api/auth/mfa/enroll') return reply({ secret: 'synthetic-setup-key', uri: 'otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP', expiresAt: Date.now() + 600000 });
+    return new Response('{}', { status: 404 });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  render(<TotpSettings />);
+  await screen.findByText(/Enabled/);
+  fireEvent.change(screen.getAllByLabelText('Current password')[0], { target: { value: 'synthetic-password' } });
+  fireEvent.change(await screen.findByLabelText('Authenticator code'), { target: { value: '654321' } });
+  fireEvent.click(screen.getByRole('button', { name: /Replace authenticator/ }));
+  await waitFor(() => expect(fetcher.mock.calls.some(([url]) => url === '/api/auth/mfa/enroll')).toBe(true));
+  const call = fetcher.mock.calls.find(([url]) => url === '/api/auth/mfa/enroll');
+  expect(JSON.parse(String(call?.[1]?.body))).toEqual({ password: 'synthetic-password', code: '654321' });
+});

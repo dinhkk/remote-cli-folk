@@ -97,11 +97,15 @@ export default function TotpSettings() {
       <Button type="submit" disabled={busy}>{t('security.activate')}</Button>
       <Button type="button" variant="outline" disabled={busy} onClick={() => { setEnrollment(null); setCode(''); }}>{t('security.cancelSetup')}</Button>
     </form> : <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => {
-      const supplied = password; setPassword(''); setCodes([]);
-      setEnrollment(await readApiJson<Enrollment>(await api.auth.mfaEnroll(supplied)));
+      const supplied = password; const suppliedCode = code; setPassword(''); setCode(''); setCodes([]);
+      setEnrollment(await readApiJson<Enrollment>(await api.auth.mfaEnroll(supplied, enabled ? suppliedCode : undefined)));
     }); }}>
       <label htmlFor="totp-password" className="block text-sm">{t('security.currentPassword')}</label>
       <Input id="totp-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+      {enabled && <>
+        <label htmlFor="totp-replace-code" className="block text-sm">{t('security.code')}</label>
+        <Input id="totp-replace-code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value)} />
+      </>}
       <Button type="submit" disabled={busy || enabled === null}>{enabled ? t('security.replaceAuthenticator') : t('security.setupAuthenticator')}</Button>
     </form>}
     {enabled && <SessionLockSettings />}

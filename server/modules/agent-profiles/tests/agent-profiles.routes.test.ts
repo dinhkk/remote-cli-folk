@@ -188,6 +188,9 @@ test('Claude agents: listing with generated/handmade status and hide with rev', 
     assert.deepEqual(listing.body.hiddenNames, []);
     assert.deepEqual((await call('GET', '/claude-agents')).body.hiddenNames, ['Explore'], 'the raw stored list comes back for the client to edit');
     assert.equal((await call('PUT', '/claude-agents/hidden', { names: [], rev: listing.body.hiddenRev })).status, 409);
+    for (const unsafe of ['*', 'a)', 'Task(x', 'a\nb']) {
+      assert.equal((await call('PUT', '/claude-agents/hidden', { names: [unsafe], rev: hidden.body.rev })).status, 400, JSON.stringify(unsafe));
+    }
     assert.equal((await call('GET', '/claude-agents')).body.items[0].hidden, true);
   });
 });
