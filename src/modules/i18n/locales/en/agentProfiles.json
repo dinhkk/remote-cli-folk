@@ -297,5 +297,136 @@
       "project": "Project",
       "openChat": "Open a chat on {{name}}"
     }
+  },
+  "bundle": {
+    "open": {
+      "export": "Export",
+      "import": "Import",
+      "restore": "Restore"
+    },
+    "close": "Close",
+    "cancel": "Cancel",
+    "privacyWarning": "The file contains your prompts, memory block text and folder paths. They may be private: share it only with people you trust.",
+    "loading": "Loading...",
+    "export": {
+      "title": "Export agents and memory blocks",
+      "templates": "Templates",
+      "blocks": "Memory blocks",
+      "noTemplates": "No templates yet.",
+      "noBlocks": "No memory blocks yet.",
+      "includeContent": "Include block text (the text of every folder of project blocks, with its folder path)",
+      "format": "File format",
+      "formatYaml": "YAML (easy to edit by hand)",
+      "formatJson": "JSON",
+      "run": "Export",
+      "running": "Exporting...",
+      "done": "Saved as {{filename}}.",
+      "problems": "Not exported completely"
+    },
+    "import": {
+      "title": "Import agents and memory blocks",
+      "chooseFile": "Choose a file (YAML or JSON)",
+      "pasteLabel": "Or paste the bundle text",
+      "pastePlaceholder": "Paste a bundle written by you or by an AI",
+      "tooLarge": "This bundle is {{size}} MB, over the 5 MB limit. Split it into smaller bundles.",
+      "readFailed": "The file could not be read.",
+      "preview": "Preview",
+      "previewing": "Previewing...",
+      "previewAgain": "Preview again",
+      "apply": "Apply",
+      "applying": "Applying...",
+      "tableLabel": "Import preview",
+      "columns": {
+        "item": "Item",
+        "status": "Status",
+        "details": "Details"
+      },
+      "kind": {
+        "template": "Template",
+        "block": "Block"
+      },
+      "status": {
+        "new": "New",
+        "identical": "Identical",
+        "conflict": "Conflict",
+        "invalid": "Invalid",
+        "skipped": "Skipped"
+      },
+      "overwrite": "Overwrite {{name}}",
+      "overwriteShort": "Overwrite",
+      "overwriteFolder": "Overwrite folder {{directory}} of {{name}}",
+      "folderLabel": "Folder {{directory}}",
+      "sensitiveBadge": "Sensitive",
+      "sensitiveAllow": "Allow sensitive {{name}}",
+      "sensitiveHint": "Sensitive items change what an agent may do (tools, skills or MCP servers). Nothing is ticked by default: tick each one you trust.",
+      "selectAllSensitive": "Select all sensitive",
+      "position": "line {{line}}, column {{column}}",
+      "problemLevel": {
+        "error": "Error",
+        "warning": "Warning"
+      },
+      "mapping": {
+        "title": "Map folders to projects",
+        "hint": "The bundle carries text for folders of the machine it came from. Choose the project each folder goes to. A folder left on Skip is not imported; its block still is.",
+        "select": "Project for {{directory}}",
+        "skip": "Skip"
+      },
+      "noFolderNote": "A project block without folder text arrives as a definition only: agents see it only in folders that have text. Add folders in the Memory tab.",
+      "nothingToImport": "The bundle holds nothing to import."
+    },
+    "result": {
+      "title": "Result",
+      "list": "Import result",
+      "applied": "Applied",
+      "skipped": "Skipped",
+      "failed": "Failed",
+      "partialWarning": "Some items or folders were not applied. Check the list below.",
+      "snapshot": "A backup of what was overwritten was saved as {{name}}. You can put it back from the Restore list."
+    },
+    "restore": {
+      "title": "Restore a snapshot",
+      "intro": "A snapshot is the backup taken before an import overwrote something. Restoring puts its items back; items created since are kept, and a fresh snapshot is taken first.",
+      "empty": "No snapshots yet. One is taken when an import overwrites something.",
+      "counts": "Templates {{templates}}, blocks {{blocks}}, folders {{folders}}",
+      "size": "{{kb}} KB",
+      "action": "Restore {{name}}",
+      "confirm": "Restore {{name}}? Its items replace the current ones.",
+      "confirmButton": "Confirm restore",
+      "running": "Restoring..."
+    },
+    "codes": {
+      "CONFLICT": "Exists and differs. Tick Overwrite to replace it.",
+      "IDENTICAL": "Already the same: nothing to do.",
+      "SENSITIVE_NOT_ACCEPTED": "Sensitive: tick its Allow box to import it.",
+      "STALE": "It changed since the preview. Preview again.",
+      "BASIS_REQUIRED": "The preview data is missing. Preview again.",
+      "BLOCK_SCOPE_IMMUTABLE": "A block of this name already exists with the other scope kind (global or project). Delete or rename it first.",
+      "BLOCK_NAME_AMBIGUOUS": "More than one block has this name, so it cannot be overwritten.",
+      "BLOCK_NOT_MIGRATED": "This block was not moved to per-folder text yet, so it cannot be changed here.",
+      "BLOCK_CONTENT_CORRUPT": "The stored text of this block cannot be read.",
+      "BLOCK_LIMIT_REACHED": "The limit of memory blocks is reached.",
+      "BLOCK_CONTENT_LIMIT_REACHED": "The limit of folders with text for this block is reached.",
+      "BLOCK_TOO_LARGE": "The block text is longer than the block allows.",
+      "DUPLICATE_KEY": "The bundle lists this item more than once.",
+      "DUPLICATE_TARGET_FOLDER": "Two source folders map to the same project.",
+      "no-target-folder": "No project chosen for this folder: skipped.",
+      "FOLDER_TEXT_HOST_ONLY": "Folder text can only be imported on the host machine.",
+      "DEFINITION_NOT_APPLIED": "The block definition was not applied, so its folders were skipped.",
+      "BLOCK_READ_ONLY": "This block is read-only and cannot be written by an agent."
+    },
+    "sensitive": {
+      "mcpServers": "defines MCP servers",
+      "no-tools": "has no tool limit",
+      "skills": "uses skills",
+      "tool": "may use the tool {{name}}"
+    },
+    "errors": {
+      "BUNDLE_INVALID": "The bundle could not be read: {{message}}",
+      "BUNDLE_VERSION_UNSUPPORTED": "This bundle was written for a newer version of the format and cannot be imported.",
+      "SNAPSHOT_UNAVAILABLE": "Snapshots are unavailable right now: the backup folder cannot be read or written.",
+      "SNAPSHOT_NOT_FOUND": "That snapshot no longer exists.",
+      "position": "Line {{line}}, column {{column}}",
+      "path": "At {{path}}"
+    }
   }
 }

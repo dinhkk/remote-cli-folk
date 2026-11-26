@@ -2,7 +2,7 @@ import { requestMfaReauth,
   expireAuthSession,
   lockAuthSession,
   getStoredAuthToken } from '@/shared/authToken';
-import type { AgentMonitorKillRequest, AgentSessionScopePayload, GenerateAgentsRequest, MemoryBlockInput } from '@/shared/types';
+import type { AgentMonitorKillRequest, AgentSessionScopePayload, ExportBundleRequest, GenerateAgentsRequest, ImportOptions, MemoryBlockInput } from '@/shared/types';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { isBlockedInTargetMode } from '@/shared/transport/target-route-policy';
 import { TargetUrlError, httpUrl, isTargetMode } from '@/shared/transport/target-context';
@@ -598,6 +598,14 @@ export const api = {
     // Values remembered for a folder (no directory = the global scope); only used to pre-fill the Generate form.
     generateValues: (directory?: string | null) =>
       get(`/api/agent-profiles/generate/values${query({ directory })}`),
+
+    // Import / export of templates and memory blocks as YAML or JSON text (Host only). `text` is the file content, parsed on the server.
+    exportBundle: (body: Partial<ExportBundleRequest>) => post('/api/agent-profiles/bundle/export', body),
+    previewBundleImport: (text: string, projectMap?: Record<string, string>) =>
+      post('/api/agent-profiles/bundle/import/preview', { text, ...(projectMap ? { projectMap } : {}) }),
+    importBundle: (text: string, options: ImportOptions) => post('/api/agent-profiles/bundle/import', { text, ...options }),
+    listBundleSnapshots: () => get('/api/agent-profiles/bundle/snapshots'),
+    restoreBundleSnapshot: (snapshot: string) => post('/api/agent-profiles/bundle/restore', { snapshot }),
 
     // The only Agent Profiles route a Remote tab may call: the main agents a new chat in a sidebar project can start as
     // (`projectId` = `Project.projectId`, the id GET /api/projects returns); names only, no folders, prompts or values.

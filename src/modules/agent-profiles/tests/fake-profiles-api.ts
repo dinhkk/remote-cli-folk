@@ -4,6 +4,9 @@ import type {
   AgentProfileTemplate,
   ClaudeAgentEntry,
   GenerateTargetProject,
+  ImportFolderRow,
+  ImportPlanItem,
+  ImportResult,
   MemoryBlock,
   MemoryBlockInput,
   MemoryBlockProjectContent,
@@ -242,3 +245,29 @@ export const listing = (items: ClaudeAgentEntry[], overrides: Record<string, unk
   builtinSource: 'sdk',
   ...overrides,
 });
+
+// ---------- agent bundle fixtures ----------
+
+/** A preview item of the given key (`template:<slug>` / `block:<name>`): new, nothing sensitive, no problems unless overridden. */
+export const makePlanItem = (overrides: Partial<ImportPlanItem> & { key: string }): ImportPlanItem => ({
+  kind: overrides.key.startsWith('block:') ? 'block' : 'template',
+  label: overrides.key.split(':')[1] ?? overrides.key,
+  status: 'new',
+  overwritable: false,
+  problems: [],
+  sensitive: [],
+  basis: 'absent',
+  ...overrides,
+});
+
+/** A folder row of a project block in a preview. */
+export const makeFolderRow = (overrides: Partial<ImportFolderRow> & { key: string; sourceKey: string }): ImportFolderRow => ({
+  sourceDirectory: overrides.sourceKey,
+  status: 'new',
+  overwritable: false,
+  basis: 'absent',
+  ...overrides,
+});
+
+/** An apply or restore answer; every key applied by default. */
+export const makeImportResult = (overrides: Partial<ImportResult> = {}): ImportResult => ({ items: [], partial: false, snapshot: null, ...overrides });

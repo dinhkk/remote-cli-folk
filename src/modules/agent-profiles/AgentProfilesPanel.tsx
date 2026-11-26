@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePaletteOps } from '@/modules/command-palette';
+import { ExportBundleDialog } from '@/modules/agent-profiles/bundle/ExportBundleDialog';
+import { ImportBundleDialog } from '@/modules/agent-profiles/bundle/ImportBundleDialog';
+import { RestoreSnapshotDialog } from '@/modules/agent-profiles/bundle/RestoreSnapshotDialog';
 import { AgentsTab } from '@/modules/agent-profiles/agents/AgentsTab';
 import { GLOBAL_TARGET_ID, resolveGenerateTarget } from '@/modules/agent-profiles/agents/generate-target';
 import { CorruptFilesNotice } from '@/modules/agent-profiles/common/CorruptFilesNotice';
@@ -18,6 +21,8 @@ import { cn } from '@/shared/utils';
 import type { GenerateTargetProject } from '@/shared/types';
 
 type PanelTab = 'agents' | 'templates' | 'memory';
+
+type BundleDialogName = 'export' | 'import' | 'restore';
 
 const TABS: PanelTab[] = ['agents', 'templates', 'memory'];
 
@@ -56,6 +61,15 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
   const { project, target } = resolveGenerateTarget(projects, targetId);
   const claude = useClaudeAgents(target.directory);
 
+  // The bundle dialog on screen, if any.
+  const [bundleDialog, setBundleDialog] = useState<BundleDialogName | null>(null);
+  // Bumped after an import or restore: remounts the Memory tab, which loads its own list, so it shows the new blocks.
+  const [memoryRefresh, setMemoryRefresh] = useState(0);
+  const bundleApplied = () => {
+    void data.reload();
+    setMemoryRefresh((count) => count + 1);
+  };
+
   const { dismissed, dismiss } = useSetupGuideDismissed();
   // The guide: `auto` opens it by itself when the first agent list found no agent file and it was not dismissed before; `open` / `closed` are the user's explicit choices.
   const [guide, setGuide] = useState<'auto' | 'open' | 'closed'>('auto');
@@ -91,9 +105,15 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setBundleDialog('export')}>{t('bundle.open.export')}</Button>
+        <Button size="sm" variant="outline" onClick={() => setBundleDialog('import')}>{t('bundle.open.import')}</Button>
+        <Button size="sm" variant="outline" onClick={() => setBundleDialog('restore')}>{t('bundle.open.restore')}</Button>
         <Button size="sm" variant="outline" onClick={() => setGuide('open')}>{t('wizard.open')}</Button>
       </div>
+      {bundleDialog === 'export' && <ExportBundleDialog templates={data.templates} onClose={() => setBundleDialog(null)} />}
+      {bundleDialog === 'import' && <ImportBundleDialog projects={projects} onClose={() => setBundleDialog(null)} onApplied={bundleApplied} />}
+      {bundleDialog === 'restore' && <RestoreSnapshotDialog onClose={() => setBundleDialog(null)} onApplied={bundleApplied} />}
       <div role="tablist" aria-label={t('title')} className="flex flex-wrap gap-1 border-b border-border">
         {TABS.map((id) => (
           <button
@@ -147,6 +167,7 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
         {/* Memory loads its own list; it borrows the Agents tab's agent list only for the read-only lock notice. */}
         {tab === 'memory' && (
           <MemoryTab
+            key={memoryRefresh}
             projects={projects}
             agents={claude.entries}
             agentsReady={claude.status === 'ready'}

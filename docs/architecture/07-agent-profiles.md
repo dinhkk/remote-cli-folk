@@ -374,6 +374,7 @@ instead of guessing a folder, and the client must reload.
   Preview is disabled while remembered values load or failed; Apply needs a plan from a Preview.
 - **Templates**: list, editor (fields, params builder, `{{key}}` check, tools / MCP / skills / model pickers,
   `memory` select, `usesBlocks` switch, preview), delete with confirm. Corrupt files named in a notice.
+- **Header buttons Export / Import / Restore** (`src/modules/agent-profiles/bundle/`): Export picks templates and blocks, block text off by default, YAML or JSON download. Import takes a file or pasted text, previews (statuses, problems with line and column, per-conflict and per-sensitive ticks with *Select all sensitive*), maps each source folder to a sidebar project only when the bundle carries folder text, then applies and shows per-item results, a partial warning and the snapshot name. Restore lists snapshots newest first and asks before restoring. See [Import / export](#import--export).
 - **Memory**: the blocks of every scope (name, mode, scope; a global block also size, last writer, time of change), the form
   (name, description, mode, global or project, content for a global block, max characters; the scope is fixed once saved) and delete with confirm.
   A project block expands to its folders: each folder with content (size, last writer, time) has edit, empty and

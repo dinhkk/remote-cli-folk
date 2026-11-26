@@ -2772,6 +2772,8 @@ export type ImportPlanItem = {
   problems: ImportProblem[];
   sensitive: string[];
   basis: ImportBasis;
+  /** Scope kind of a block the bundle describes (absent for templates and for blocks too broken to read). */
+  scope?: 'global' | 'project';
   folders?: ImportFolderRow[];
 };
 

@@ -326,7 +326,7 @@ export function createBundleService(dependencies: Dependencies) {
         return { ...base, status: 'invalid', code: 'DUPLICATE_KEY', overwritable: false, problems };
       }
       const existing = live.blocks.get(entry.name);
-      const item: PlannedItem = { ...base, status: 'new', overwritable: false, problems: result.problems, block: entry, liveBlock: existing };
+      const item: PlannedItem = { ...base, status: 'new', overwritable: false, problems: result.problems, scope: entry.input.scope.kind, block: entry, liveBlock: existing };
       if (!existing) {
         if (live.allBlocks.length + created >= MAX_MEMORY_BLOCKS) {
           const problems = [...result.problems, { level: 'error' as const, code: 'BLOCK_LIMIT_REACHED', message: `At most ${MAX_MEMORY_BLOCKS} memory blocks can exist; delete one first`, path: `memoryBlocks[${index}]` }];
