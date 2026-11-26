@@ -795,3 +795,17 @@ describe('agent bundle snapshots and restore', () => {
 function projectBlockEntry(name: string): MemoryBlockBundleEntry {
   return projectBlock(name, { contents: [] });
 }
+
+describe('tool lists are read the way the agent file is', () => {
+  it('flags a sensitive tool hidden in a comma-joined entry, and keeps a rule with a comma whole', () => {
+    const rig = newRig();
+    const plan = rig.bundle.planImport(bundleOf([
+      template('joined', { tools: ['Read, Bash'] }),
+      template('rule', { tools: ['Read', 'Bash(git log, --oneline)'] }),
+      template('calm', { tools: ['Read, Grep'] }),
+    ]), {});
+    assert.deepEqual(itemOf(plan, 'template:joined').sensitive, ['tool:Bash']);
+    assert.deepEqual(itemOf(plan, 'template:rule').sensitive, ['tool:Bash(git log, --oneline)']);
+    assert.deepEqual(itemOf(plan, 'template:calm').sensitive, []);
+  });
+});

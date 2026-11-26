@@ -15,4 +15,4 @@ export const PROFILES_PROPOSE_TOOL = 'mcp__profiles__profiles_propose';
 export const PROFILES_TOOL_NAMES = [PROFILES_LIST_TOOL, PROFILES_GET_TOOL, PROFILES_PREVIEW_TOOL, PROFILES_PROPOSE_TOOL] as const;
 
 /** Tool-list entry that names the whole server (`mcp__profiles`) or any of its tools (`mcp__profiles__*`); matched case-insensitively. */
-export const PROFILES_TOOL_REFERENCE = /^mcp__profiles(__|$)/i;
+export const PROFILES_TOOL_REFERENCE = /^mcp__profiles/i;

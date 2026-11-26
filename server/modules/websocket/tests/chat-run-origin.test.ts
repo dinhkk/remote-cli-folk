@@ -117,7 +117,7 @@ test('the origin follows the connection that starts this turn, not the session (
   });
 });
 
-test('a detached turn is remote unless its caller passes local, and options cannot claim local', async () => {
+test('a detached turn is always remote: neither its caller nor its options can make it local', async () => {
   await withDatabase(async ({ runs, runtime, projectPath }) => {
     sessionsDb.createAppSession('s1', 'claude', projectPath, 'S1');
     const base = { sessionId: 's1', userId: 1, content: 'go' };
@@ -125,6 +125,6 @@ test('a detached turn is remote unless its caller passes local, and options cann
     await runDetachedChatTurn({ ...base, origin: 'local' }, { runtime });
     await runDetachedChatTurn({ ...base, origin: 'bogus' as never }, { runtime });
     await runDetachedChatTurn({ ...base, origin: 'local', options: { origin: 'remote' } }, { runtime });
-    assert.deepEqual(runs.map((run) => run.options.origin), ['remote', 'local', 'remote', 'local']);
+    assert.deepEqual(runs.map((run) => run.options.origin), ['remote', 'remote', 'remote', 'remote']);
   });
 });

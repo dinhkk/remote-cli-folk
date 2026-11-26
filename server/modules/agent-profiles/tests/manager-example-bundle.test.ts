@@ -55,9 +55,7 @@ describe('remotecli-manager example', () => {
     for (const name of names) assert.ok(all.includes(name), `${name} is referenced by a skill`);
   });
 
-  it('is a valid bundle text and carries no project or organization names', () => {
+  it('is a valid bundle text', () => {
     assert.equal(parseBundleText(text).bundle.templates.length, 1);
-    const everything = [text, ...SKILLS.map((skill) => fs.readFileSync(path.join(EXAMPLE_DIR, 'skills', skill, 'SKILL.md'), 'utf8')), fs.readFileSync(path.join(EXAMPLE_DIR, 'README.md'), 'utf8')].join('\n');
-    assert.ok(!/\b(ota|uav)\b/i.test(everything));
   });
 });

@@ -445,10 +445,8 @@ const addSessionModelColumn = (db: Database): void => {
 };
 
 /**
- * Adds the `effort` column that records a session's reasoning-effort choice.
- *
- * Existing rows stay NULL so clients can continue falling back to their
- * per-provider preference until the user selects an effort or sends a turn.
+ * Adds the nullable run-origin columns of scheduled and queued messages (`scheduled_messages.origin`,
+ * `session_drafts.queued_origin`). Existing rows stay NULL, which reads as a remote origin.
  */
 const addRunOriginColumns = (db: Database): void => {
   addColumnToTableIfNotExists(
@@ -459,6 +457,12 @@ const addRunOriginColumns = (db: Database): void => {
   );
 };
 
+/**
+ * Adds the `effort` column that records a session's reasoning-effort choice.
+ *
+ * Existing rows stay NULL so clients can continue falling back to their
+ * per-provider preference until the user selects an effort or sends a turn.
+ */
 const addSessionEffortColumn = (db: Database): void => {
   const sessionsTableInfo = getTableInfo(db, 'sessions');
   const columnNames = sessionsTableInfo.map((column) => column.name);

@@ -10,6 +10,9 @@ import type { BundleService } from './agent-profiles.bundle.service.js';
 import type { PendingService } from './agent-profiles.pending.service.js';
 import { escapeValue } from './agent-profiles.resolve.js';
 
+/** A value as JSON inside an XML attribute, escaped and long enough for a template's whole parameter list (the generic attribute cuts at 200 characters). */
+const jsonAttribute = (value: unknown): string => escapeValue(JSON.stringify(value), 6000).replace(/"/g, '&quot;');
+
 /** Longest line of a summary or an error returned to the model. */
 const MAX_LINE_CHARS = 1000;
 /** Longest template instructions or block text `profiles_get` returns. */
@@ -88,7 +91,7 @@ export function createProfilesToolHandlers(services: { bundle: BundleService; pe
           return reply(
             `<template slug="${attribute(template.slug)}" name="${attribute(template.name)}" family="${template.family}" rev="${template.rev}" description="${attribute(template.description)}"`
             + ` tools="${list(template.tools)}" disallowedTools="${list(template.disallowedTools)}" skills="${list(template.skills)}" mcpServers="${list(template.mcpServers)}"`
-            + ` model="${attribute(template.model ?? '')}" memory="${template.memory ?? ''}" usesBlocks="${template.usesBlocks === true}" params="${attribute(template.params.map((param) => param.key).join(', '))}">`
+            + ` model="${attribute(template.model ?? '')}" memory="${template.memory ?? ''}" usesBlocks="${template.usesBlocks === true}" params="${jsonAttribute(template.params)}" bindings="${jsonAttribute(template.bindings)}" group="${attribute(template.group ?? '')}">`
             + `${escapeValue(template.instructions, MAX_TEXT_CHARS)}</template>`,
           );
         }

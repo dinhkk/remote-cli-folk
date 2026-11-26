@@ -6,7 +6,7 @@ import type {
 
 import { isValidBlockName } from './agent-profiles.blocks.validation.js';
 import { BUNDLE_FORMAT, BUNDLE_VERSION } from './agent-profiles.bundle.format.js';
-import { validateBlockEntry, validateTemplateEntry } from './agent-profiles.bundle.validation.js';
+import { toolNamesOf, validateBlockEntry, validateTemplateEntry } from './agent-profiles.bundle.validation.js';
 import { PROFILES_TOOL_REFERENCE } from './agent-profiles.profiles.tool-names.js';
 import { SLUG_PATTERN } from './agent-profiles.validation.js';
 
@@ -181,10 +181,10 @@ function reviewTemplateUpsert(raw: unknown, index: number, plan: ImportPlanItem,
   const input = validateTemplateEntry(raw, index).input as AgentProfileTemplateInput;
   if (plan.status === 'identical') return { ...base, action: 'identical', needsTick: false, lines: ['Already exists with the same content; nothing to do.'], changes: [] };
   if (input.mcpServers && input.mcpServers.length > 0) return refused(base, 'TEMPLATE_MCP_SERVERS', 'A template an agent proposes cannot attach MCP servers (mcpServers).');
-  if (!input.tools || input.tools.length === 0) {
+  if (!input.tools || toolNamesOf(input.tools).length === 0) {
     return refused(base, 'TEMPLATE_NO_TOOLS', 'A template an agent proposes must state its tools: without a tools line the agent would inherit every tool.');
   }
-  if (input.tools.some((tool) => PROFILES_TOOL_REFERENCE.test(tool.trim()))) {
+  if (toolNamesOf(input.tools).some((tool) => PROFILES_TOOL_REFERENCE.test(tool))) {
     return refused(base, 'TEMPLATE_PROFILES_TOOL', 'A template an agent proposes cannot grant the profiles tools (mcp__profiles__*).');
   }
   if (context.managers.has(input.slug)) {

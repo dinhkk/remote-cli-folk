@@ -172,6 +172,27 @@ export function validateBlockEntry(raw: unknown, index: number): { name: string 
 }
 
 /**
+ * The tool names a `tools` list really names: the generated agent file joins the entries with commas into one line that
+ * Claude Code splits again, so an entry such as "Read, Bash" grants two tools. Splits on commas outside parentheses
+ * (a `Bash(git log, x)` rule stays whole) and drops empty parts.
+ * Consumed by: this file (sensitivity), agent-profiles.changeset.ts (guardrails).
+ */
+export function toolNamesOf(tools: readonly string[]): string[] {
+  const names: string[] = [];
+  for (const entry of tools) {
+    let depth = 0;
+    let current = '';
+    for (const char of entry) {
+      if (char === '(') depth += 1;
+      if (char === ')') depth = Math.max(0, depth - 1);
+      if (char === ',' && depth === 0) { names.push(current); current = ''; } else current += char;
+    }
+    names.push(current);
+  }
+  return names.map((name) => name.trim()).filter(Boolean);
+}
+
+/**
  * Why importing this template deserves its own tick: it grants powers the user should look at. `mcpServers` set, no
  * `tools` line (the agent inherits every tool), a tool that runs commands or writes (`Bash`, `Bash(...)`, `Write`,
  * `Edit`, `NotebookEdit`, any `mcp__*`), or non-empty `skills`. Empty list = safe.
@@ -181,7 +202,7 @@ export function templateSensitivity(input: AgentProfileTemplateInput): string[] 
   const reasons: string[] = [];
   if (input.mcpServers && input.mcpServers.length > 0) reasons.push('mcpServers');
   if (!input.tools || input.tools.length === 0) reasons.push('no-tools');
-  for (const tool of input.tools ?? []) {
+  for (const tool of toolNamesOf(input.tools ?? [])) {
     if (/^(Bash|Write|Edit|NotebookEdit)\s*(\(|$)/i.test(tool.trim()) || tool.trim().toLowerCase().startsWith('mcp__')) reasons.push(`tool:${tool}`);
   }
   if (input.skills && input.skills.length > 0) reasons.push('skills');

@@ -119,6 +119,9 @@ describe('guardrails (review)', () => {
       ['own', { tools: ['Read', 'mcp__profiles__profiles_propose'] }, 'TEMPLATE_PROFILES_TOOL'],
       ['upper', { tools: ['MCP__Profiles__profiles_list'] }, 'TEMPLATE_PROFILES_TOOL'],
       ['server', { tools: ['mcp__profiles'] }, 'TEMPLATE_PROFILES_TOOL'],
+      ['joined', { tools: ['Read, Bash, mcp__profiles__profiles_propose'] }, 'TEMPLATE_PROFILES_TOOL'],
+      ['joined-empty', { tools: [' , '] }, 'TEMPLATE_NO_TOOLS'],
+      ['glob', { tools: ['mcp__profiles*'] }, 'TEMPLATE_PROFILES_TOOL'],
     ];
     for (const [slug, overrides, expected] of cases) {
       const [item] = review(rig, { upsert: upsert([template(slug, overrides)]) });

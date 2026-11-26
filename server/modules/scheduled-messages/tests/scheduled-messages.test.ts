@@ -544,7 +544,7 @@ test('a socket that cannot be written to does not stop a claimed message from be
 
 const PAST = () => new Date(Date.now() - 60_000).toISOString();
 
-test('a schedule created locally fires as local, one created through the bridge as remote, one without origin as remote', async () => {
+test('a schedule keeps the origin it was created with, but an unattended run is remote whatever it stored', async () => {
   await withIsolatedDatabase(async (userId) => {
     const base = { userId, sessionId: SESSION_ID, scheduledFor: PAST() };
     scheduledMessagesService.schedule({ ...base, content: 'local one', origin: 'local' });
@@ -554,9 +554,7 @@ test('a schedule created locally fires as local, one created through the bridge 
     const runs: RunCall[] = [];
     await dispatchDueScheduledMessages(createRuntime(runs));
     const originOf = (command: string) => runs.find((run) => run.command === command)?.options.origin;
-    assert.equal(originOf('local one'), 'local');
-    assert.equal(originOf('bridged one'), 'remote');
-    assert.equal(originOf('no origin'), 'remote');
+    for (const command of ['local one', 'bridged one', 'no origin']) assert.equal(originOf(command), 'remote', command);
   });
 });
 
@@ -590,36 +588,32 @@ test('options saved with a schedule or a queued message cannot claim local', asy
   });
 });
 
-test('a queued message keeps the origin it was queued with, and a merged one is local only if every part was', async () => {
+test('a queued message keeps the origin it was queued with (a merge is local only if every part was), and its run is remote', async () => {
   await withIsolatedDatabase(async (userId) => {
     const message = (content: string) => ({ content, attachments: [] });
+    const stored = () => sessionDraftsDb.listQueuedMessages()[0]?.origin;
+    const dispatched = async (): Promise<unknown> => {
+      const runs: RunCall[] = [];
+      await dispatchQueuedMessages(createRuntime(runs));
+      return runs[0].options.origin;
+    };
     sessionDraftsDb.saveDraft(userId, SESSION_ID, { text: '', queuedMessage: message('saved locally') }, 'local');
-    let runs: RunCall[] = [];
-    await dispatchQueuedMessages(createRuntime(runs));
-    assert.equal(runs[0].options.origin, 'local');
+    assert.equal(stored(), 'local');
+    assert.equal(await dispatched(), 'remote', 'an unattended run never gets the local origin');
 
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('first'), 'local');
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('second'), 'local');
-    runs = [];
-    await dispatchQueuedMessages(createRuntime(runs));
-    assert.equal(runs[0].options.origin, 'local');
+    assert.equal(stored(), 'local');
+    await dispatched();
 
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('local part'), 'local');
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('bridged part'), 'remote');
-    runs = [];
-    await dispatchQueuedMessages(createRuntime(runs));
-    assert.equal(runs[0].options.origin, 'remote');
-
-    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('bridged first'), 'remote');
-    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('local second'), 'local');
-    runs = [];
-    await dispatchQueuedMessages(createRuntime(runs));
-    assert.equal(runs[0].options.origin, 'remote');
+    assert.equal(stored(), 'remote');
+    await dispatched();
 
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('no origin given'));
-    runs = [];
-    await dispatchQueuedMessages(createRuntime(runs));
-    assert.equal(runs[0].options.origin, 'remote');
+    assert.equal(stored() ?? 'remote', 'remote');
+    assert.equal(await dispatched(), 'remote');
   });
 });
 
