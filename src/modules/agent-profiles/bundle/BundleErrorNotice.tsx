@@ -8,7 +8,7 @@ type BundleErrorNoticeProps = {
   error: unknown;
 };
 
-const BUNDLE_CODES = ['BUNDLE_VERSION_UNSUPPORTED', 'SNAPSHOT_UNAVAILABLE', 'SNAPSHOT_NOT_FOUND'];
+const BUNDLE_CODES = ['BUNDLE_VERSION_UNSUPPORTED', 'SNAPSHOT_NOT_FOUND'];
 
 /** Reads `{ line, column, path }` out of the details of a BUNDLE_INVALID error; each part is optional. */
 const readPosition = (details: unknown): { line?: number; column?: number; path?: string } => {
@@ -39,6 +39,10 @@ export function BundleErrorNotice({ error }: BundleErrorNoticeProps) {
         {path && <p className="font-mono text-xs">{t('bundle.errors.path', { path })}</p>}
       </div>
     );
+  }
+  // The server says why a backup was refused (disk problem, or an unreadable stored file to repair first): its wording is the useful one.
+  if (code === 'SNAPSHOT_UNAVAILABLE') {
+    return <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{(error as ApiRequestError).message}</div>;
   }
   if (code && BUNDLE_CODES.includes(code)) {
     return <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{t(`bundle.errors.${code}`)}</div>;

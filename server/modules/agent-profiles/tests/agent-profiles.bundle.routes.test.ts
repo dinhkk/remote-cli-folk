@@ -10,7 +10,7 @@ import { agentProfilesBundleBodyParser, createAgentProfilesRouter } from '../age
 
 import { makeServiceRig, templateBody } from './service-rig.js';
 
-type Call = (method: string, url: string, body?: unknown, raw?: string) => Promise<{ status: number; body: any }>;
+type Call = (method: string, url: string, body?: unknown, raw?: string, contentType?: string) => Promise<{ status: number; body: any }>;
 
 /** The bundle parser is mounted before the global 50 MB parser, in the order server/index.ts uses. */
 async function withApi(run: (call: Call, rig: ReturnType<typeof makeServiceRig>) => Promise<void>) {
@@ -18,21 +18,22 @@ async function withApi(run: (call: Call, rig: ReturnType<typeof makeServiceRig>)
   const app = express();
   app.use('/api/agent-profiles/bundle', agentProfilesBundleBodyParser);
   app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.use('/api/agent-profiles', createAgentProfilesRouter(rig.service, rig.claudeAgents, rig.blocks, rig.bundle));
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (err instanceof AppError) {
       res.status(err.statusCode).json({ success: false, error: { code: err.code, message: err.message, details: err.details } });
       return;
     }
-    const status = (err as { status?: number }).status ?? 500;
-    res.status(status).json({ success: false, error: { code: (err as { type?: string }).type ?? 'INTERNAL_ERROR' } });
+    // Same as the app's error middleware: anything that is not an AppError is a plain 500.
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR' } });
   });
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>((resolve) => server.once('listening', resolve));
   const { port } = server.address() as AddressInfo;
-  const call: Call = async (method, url, body, raw) => {
+  const call: Call = async (method, url, body, raw, contentType) => {
     const response = await fetch(`http://127.0.0.1:${port}/api/agent-profiles${url}`, {
-      method, headers: { 'content-type': 'application/json' }, body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
+      method, headers: { 'content-type': contentType ?? 'application/json' }, body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
     });
     return { status: response.status, body: await response.json().catch(() => null) };
   };
@@ -142,7 +143,11 @@ test('a body over 5 MB gets 413 on the bundle routes without being handled; a 3 
     for (const url of ['/bundle/import/preview', '/bundle/import', '/bundle/export', '/bundle/restore']) {
       const response = await call('POST', url, undefined, huge);
       assert.equal(response.status, 413, url);
+      assert.equal(response.body.error.code, 'BUNDLE_TOO_LARGE');
     }
+    // A form post would otherwise reach the 50 MB urlencoded parser.
+    const form = await call('POST', '/bundle/import/preview', undefined, `text=${'x'.repeat(8 * 1024 * 1024)}`, 'application/x-www-form-urlencoded');
+    assert.equal(form.status, 415);
     const large = await call('POST', '/bundle/import/preview', { text: `#${'x'.repeat(3 * 1024 * 1024)}\n${BUNDLE_TEXT}` });
     assert.equal(large.status, 200);
     // The rest of the API keeps the 50 MB cap (a 6 MB template create is a validation error, not 413).

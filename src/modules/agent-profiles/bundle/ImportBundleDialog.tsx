@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -68,7 +68,11 @@ export function ImportBundleDialog({ projects, onClose, onApplied }: ImportBundl
   const folders = useMemo(() => (plan ? sourceFolders(plan) : []), [plan]);
   const needsFolderNote = plan?.items.some((item) => item.kind === 'block' && item.scope === 'project' && item.status !== 'invalid' && !item.folders?.length) ?? false;
 
+  // The text the table on screen was previewed from; a preview that returns for older text is dropped.
+  const currentText = useRef(text);
+
   const changeText = (next: string) => {
+    currentText.current = next;
     setText(next);
     setRefusedBytes(null);
     setFileFailed(false);
@@ -97,7 +101,7 @@ export function ImportBundleDialog({ projects, onClose, onApplied }: ImportBundl
   const runPreview = async (map: Record<string, string>, keepTicks: boolean) => {
     const chosen = Object.fromEntries(Object.entries(map).filter(([, projectId]) => projectId !== SKIP_FOLDER));
     const next = await actions.preview(text, Object.keys(chosen).length > 0 ? chosen : undefined);
-    if (!next) return;
+    if (!next || currentText.current !== text) return;
     const keys = new Set(next.items.flatMap((item) => [item.key, ...(item.folders ?? []).map((folder) => folder.key)]));
     setPlan(next);
     setResult(null);

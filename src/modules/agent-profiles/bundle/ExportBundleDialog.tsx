@@ -102,7 +102,7 @@ export function ExportBundleDialog({ templates, onClose }: ExportBundleDialogPro
         </div>
       )}
 
-      <Button type="button" size="sm" disabled={actions.busy || (templateIds.length === 0 && blockIds.length === 0)} onClick={() => void run()}>
+      <Button type="button" size="sm" disabled={actions.busy || blocksStatus === 'loading' || (templateIds.length === 0 && blockIds.length === 0)} onClick={() => void run()}>
         {actions.busy ? t('bundle.export.running') : t('bundle.export.run')}
       </Button>
     </BundleDialogFrame>

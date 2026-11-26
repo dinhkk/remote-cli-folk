@@ -56,7 +56,7 @@ export function provenanceOf(value: unknown): Exclude<MemoryBlockWriter, null> {
   return 'user';
 }
 
-/** Whether `directory` looks absolute (consumed by: this file only) on any OS (`/x`, `C:\x`, `C:/x`, `\\server`): relative paths would depend on this server's working directory. */
+/** Whether `directory` looks absolute (used inside this file only) on any OS (`/x`, `C:\x`, `C:/x`, `\\server`): relative paths would depend on this server's working directory. */
 const looksAbsolute = (directory: string): boolean => /^(\/|[A-Za-z]:[\\/]|\\\\)/.test(directory);
 
 function unknownFieldWarnings(source: Record<string, unknown>, known: Set<string>, base: string): ImportProblem[] {

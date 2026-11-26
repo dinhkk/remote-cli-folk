@@ -402,12 +402,12 @@ describe('RestoreSnapshotDialog', () => {
   it('shows a refused restore in place', async () => {
     installFakeProfilesApi({
       [`GET ${SNAPSHOTS}`]: reply([NEW]),
-      [`POST ${RESTORE}`]: failure(409, 'SNAPSHOT_UNAVAILABLE', 'unavailable'),
+      [`POST ${RESTORE}`]: failure(409, 'SNAPSHOT_UNAVAILABLE', 'A stored file is unreadable; repair it first'),
     });
     render(<RestoreSnapshotDialog onClose={() => {}} onApplied={() => {}} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Restore snapshot-new.json' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm restore' }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(/cannot be read|unavailable/i);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/stored file is unreadable; repair it first/);
   });
 });
 

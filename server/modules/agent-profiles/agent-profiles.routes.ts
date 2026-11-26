@@ -23,15 +23,31 @@ const parseOptionalRev = (value: unknown): number | undefined => {
 };
 
 /**
- * JSON body parser of the bundle routes: at most 5 MB (bundles are text; the global parser allows 50 MB). Mount it on
- * `/api/agent-profiles/bundle` before the global parser, which skips a body that is already parsed, so the bundle routes
- * never parse more than 5 MB.
+ * Body handling of the bundle routes: JSON of at most 5 MB (bundles are text; the global parsers allow 50 MB). Mount it on
+ * `/api/agent-profiles/bundle` before the global parsers, which skip a body that is already parsed, so these routes never
+ * parse more than 5 MB. A body of another type (a form post would reach the 50 MB urlencoded parser) is refused with 415,
+ * and an oversize body is a 413 `BUNDLE_TOO_LARGE` (not the generic 500 the app answers for unknown errors).
  * Consumed by: server/index.ts, agent-profiles.bundle.routes.test.ts.
  */
-export const agentProfilesBundleBodyParser = express.json({
-  limit: '5mb',
-  type: (req) => (req.headers['content-type'] || '').includes('json'),
-});
+export const agentProfilesBundleBodyParser: express.RequestHandler[] = [
+  (req, _res, next) => {
+    const contentType = String(req.headers['content-type'] || '');
+    if (req.method !== 'GET' && req.method !== 'HEAD' && contentType && !contentType.includes('json')) {
+      next(new AppError('Send the bundle as a JSON body', { code: 'UNSUPPORTED_MEDIA_TYPE', statusCode: 415 }));
+      return;
+    }
+    next();
+  },
+  (req, res, next) => {
+    express.json({ limit: '5mb', type: (request) => String(request.headers['content-type'] || '').includes('json') })(req, res, (error?: unknown) => {
+      if ((error as { type?: string } | null | undefined)?.type === 'entity.too.large') {
+        next(new AppError('The bundle is larger than 5 MB', { code: 'BUNDLE_TOO_LARGE', statusCode: 413 }));
+        return;
+      }
+      next(error);
+    });
+  },
+];
 
 /**
  * REST routes of the agent profiles (templates, Generate, Claude agents, scope options). Routes

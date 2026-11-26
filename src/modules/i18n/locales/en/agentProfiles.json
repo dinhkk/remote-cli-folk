@@ -422,7 +422,7 @@
     },
     "errors": {
       "BUNDLE_INVALID": "The bundle could not be read: {{message}}",
-      "BUNDLE_VERSION_UNSUPPORTED": "This bundle was written for a newer version of the format and cannot be imported.",
+      "BUNDLE_VERSION_UNSUPPORTED": "This bundle uses a format version this app does not read (it reads version 1).",
       "SNAPSHOT_UNAVAILABLE": "Snapshots are unavailable right now: the backup folder cannot be read or written.",
       "SNAPSHOT_NOT_FOUND": "That snapshot no longer exists.",
       "position": "Line {{line}}, column {{column}}",
