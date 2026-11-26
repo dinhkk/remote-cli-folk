@@ -11,7 +11,7 @@ type ProfileErrorNoticeProps = {
 };
 
 // Codes whose cause and fix the notice explains in its own words; anything else shows the server's message.
-const KNOWN_CODES = ['PROFILE_STALE', 'SLUG_TAKEN', 'DIRECTORY_NOT_FOUND', 'DIRECTORY_NOT_A_DIRECTORY', 'PROFILE_CORRUPT', 'BLOCK_NAME_TAKEN', 'BLOCK_LIMIT_REACHED'];
+const KNOWN_CODES = ['PROFILE_STALE', 'SLUG_TAKEN', 'DIRECTORY_NOT_FOUND', 'DIRECTORY_NOT_A_DIRECTORY', 'PROFILE_CORRUPT', 'BLOCK_NAME_TAKEN', 'BLOCK_LIMIT_REACHED', 'BLOCK_CONTENT_LIMIT_REACHED', 'BLOCK_CONTENT_EXISTS'];
 
 /**
  * Used by every list and form of the agent-profiles module to show a failed request next to the place

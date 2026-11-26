@@ -31,7 +31,9 @@
     "DIRECTORY_NOT_A_DIRECTORY": "The project folder is not a folder. Check the project's path.",
     "PROFILE_CORRUPT": "A stored profile file could not be read, so nothing was written. Fix or remove the file named under Templates, then try again.",
     "BLOCK_NAME_TAKEN": "Another memory block already has this name. Block names are unique across all scopes (global and every project), because agents ask for a block by name alone. Pick a different name.",
-    "BLOCK_LIMIT_REACHED": "The limit of 50 memory blocks is reached. Delete one before creating another."
+    "BLOCK_LIMIT_REACHED": "The limit of 50 memory blocks is reached. Delete one before creating another.",
+    "BLOCK_CONTENT_LIMIT_REACHED": "The limit of 200 folders for this memory block is reached. Remove a folder before adding another.",
+    "BLOCK_CONTENT_EXISTS": "This folder already has content for this memory block."
   },
   "picker": {
     "remove": "Remove {{name}}",
@@ -120,7 +122,7 @@
   },
   "memory": {
     "intro": "Memory blocks are named notes your agents can read, and update when the block is writable, across sessions. Turn on \"Memory blocks\" in a template and generate its agents again so they use them.",
-    "limits": "A block is visible by scope only: global (every chat) or one project. It cannot be limited to one agent. Blocks exist only inside chats of this app; the claude command on this computer does not see them.",
+    "limits": "A block applies by scope only: global (every chat) or per project, where each folder has its own content and agents see the block only in folders that have it. It cannot be limited to one agent. Blocks exist only inside chats of this app; the claude command on this computer does not see them.",
     "new": "New block",
     "empty": "No memory blocks yet. Create one to give your agents a shared note.",
     "deleteConfirm": "Delete memory block \"{{name}}\"? Its content is lost.",
@@ -153,9 +155,10 @@
       "description": "Description",
       "descriptionHint": "Optional. Shown to agents in the block list (at most 500 characters).",
       "scope": "Scope",
-      "scopeHint": "Global blocks are visible in every chat; a project block only in chats on that project.",
-      "keptFolder": "{{directory}} (not in the sidebar)",
-      "noProjects": "No project in the sidebar yet. Add one there to scope a block to it; global is available meanwhile.",
+      "scopeHint": {
+        "global": "Visible in every chat. Its text is kept in the block itself.",
+        "project": "One definition, separate content per project folder. Agents see the block only in folders you add after saving."
+      },
       "content": "Content",
       "contentCount": "{{used}} of {{max}} characters used.",
       "contentTooLong": "The content is longer than the limit of {{max}} characters.",
@@ -163,7 +166,31 @@
       "maxCharsHint": "A whole number from 1 to {{max}}. An agent write that would pass it is refused, nothing is cut. Length is counted in UTF-16 units, so an emoji counts as 2.",
       "stale": "This block was changed after you opened it (last writer: {{writer}}), so your save was not applied. Your edits are still in the form: save again to replace that change with yours, or Cancel to discard them.",
       "staleUnknownWriter": "This block was changed after you opened it, so your save was not applied. Your edits are still in the form: save again to replace that change with yours, or Cancel to discard them.",
-      "maxCharsInvalid": "Enter a whole number from 1 to {{max}}."
+      "maxCharsInvalid": "Enter a whole number from 1 to {{max}}.",
+      "scopeFixedHint": "The scope of an existing block cannot be changed; create a new block instead.",
+      "projectContentHint": "A project block has no text of its own. Save it, then open its Folders to add a project folder and write that folder's content.",
+      "maxCharsHintProject": "A whole number from 1 to {{max}}. The most the content of one folder can hold; an agent write that would pass it is refused, nothing is cut. Length is counted in UTF-16 units, so an emoji counts as 2."
+    },
+    "scopeProject": "Per project (each folder has its own content)",
+    "limitPerFolder": "at most {{max}} chars per folder",
+    "needsAttention": "Needs attention: {{reason}}",
+    "folders": {
+      "title": "Folders",
+      "toggle": "Folders of {{name}}",
+      "visibility": "Agents see this block only in the folders listed here. A folder without content does not show the block at all, not even its name.",
+      "empty": "No folder has content yet. Add a folder to make this block visible there.",
+      "pickProject": "Project to add",
+      "pickPlaceholder": "Pick a project…",
+      "add": "Add folder",
+      "noProjects": "No project in the sidebar yet. Add one there to give its folder content.",
+      "edit": "Edit {{directory}}",
+      "emptyAction": "Empty {{directory}}",
+      "remove": "Remove folder {{directory}}",
+      "contentOf": "Content of {{directory}}",
+      "emptyConfirm": "Empty the content of {{directory}}? The folder stays listed and agents there keep the block, with no text.",
+      "removeConfirm": "Remove folder {{directory}} from \"{{name}}\"? Its content is lost and agents in that folder no longer see the block.",
+      "corrupt_one": "{{count}} content file could not be read. The block is hidden from agents only in that folder; fix or remove the file in the agent-profiles store.",
+      "corrupt_other": "{{count}} content files could not be read. The block is hidden from agents only in those folders; fix or remove the files in the agent-profiles store."
     }
   },
   "generate": {

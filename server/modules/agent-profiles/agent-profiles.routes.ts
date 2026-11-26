@@ -1,5 +1,8 @@
 import express from 'express';
 
+import { AppError } from '@/shared/utils.js';
+
+import { parseExpectedBlockRev } from './agent-profiles.blocks.validation.js';
 import type { BlocksService } from './agent-profiles.blocks.service.js';
 import type { AgentProfilesService } from './agent-profiles.service.js';
 import type { ClaudeAgentsService } from './claude-agents.service.js';
@@ -8,6 +11,14 @@ const param = (value: string | string[] | undefined): string => (Array.isArray(v
 
 /** A single optional query string value; empty or repeated values count as absent. */
 const queryValue = (value: unknown): string | undefined => (typeof value === 'string' && value ? value : undefined);
+
+/** Optional `expectedRev` query value: absent = undefined, otherwise a non-negative integer (400 when not). */
+const parseOptionalRev = (value: unknown): number | undefined => {
+  if (value === undefined) return undefined;
+  const rev = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN;
+  if (!Number.isSafeInteger(rev)) throw new AppError('expectedRev must be a non-negative integer', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+  return rev;
+};
 
 /**
  * REST routes of the agent profiles (templates, Generate, Claude agents, scope options). Routes
@@ -47,6 +58,21 @@ export function createAgentProfilesRouter(
   router.post('/memory-blocks', respond((req) => blocks.create(req.body), 201));
   router.put('/memory-blocks/:id', respond((req) => blocks.update(param(req.params.id), req.body)));
   router.delete('/memory-blocks/:id', respond((req) => blocks.remove(param(req.params.id))));
+
+  // Per-folder content of a project block (Host only). `directory` is any absolute folder (normalized server-side, not limited to sidebar projects).
+  // POST gives a folder an empty content file; PUT edits it (`expectedRev` = the content rev loaded); DELETE empties it (file and rev stay),
+  // DELETE with `?remove=true` removes the file; both take an optional `?expectedRev=` (stale = 409).
+  router.get('/memory-blocks/:id/contents', respond((req) => blocks.listContents(param(req.params.id))));
+  router.post('/memory-blocks/:id/contents', respond((req) => blocks.addContent(param(req.params.id), req.body?.directory), 201));
+  router.put('/memory-blocks/:id/contents', respond((req) => blocks.updateContent(
+    param(req.params.id), req.body?.directory, req.body?.content, parseExpectedBlockRev(req.body),
+  )));
+  router.delete('/memory-blocks/:id/contents', respond((req) => {
+    const id = param(req.params.id);
+    const directory = queryValue(req.query.directory);
+    const expectedRev = parseOptionalRev(req.query.expectedRev);
+    return req.query.remove === 'true' ? blocks.removeFolder(id, directory, expectedRev) : blocks.emptyContent(id, directory, expectedRev);
+  }));
 
   return router;
 }

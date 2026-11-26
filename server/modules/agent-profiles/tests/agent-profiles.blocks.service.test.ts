@@ -14,7 +14,15 @@ const OTHER = path.resolve(path.sep, 'work', 'other');
 const globalBlock = (overrides: Record<string, unknown> = {}) => ({
   name: 'style-guide', description: 'House style', mode: 'read-only', scope: { kind: 'global' }, content: 'Be brief.', ...overrides,
 });
-const projectBlock = (directory: string, overrides: Record<string, unknown> = {}) => globalBlock({ scope: { kind: 'project', directory }, ...overrides });
+const projectBlock = (overrides: Record<string, unknown> = {}) => globalBlock({ scope: { kind: 'project' }, ...overrides });
+
+type Rig = ReturnType<typeof makeServiceRig>;
+/** Creates a project block and gives each folder an (empty) content file, like the user does in the UI. */
+const projectBlockIn = (rig: Rig, name: string, folders: string[], overrides: Record<string, unknown> = {}) => {
+  const { block } = rig.blocks.create(projectBlock({ name, mode: 'writable', ...overrides }));
+  for (const folder of folders) rig.blocks.addContent(block.id, folder);
+  return block;
+};
 
 const codeOf = (run: () => unknown): string | undefined => {
   try { run(); } catch (error) { return error instanceof AppError ? error.code : `not-an-app-error: ${String(error)}`; }
@@ -41,7 +49,7 @@ test('input rules: slug name, mode, scope, maxChars hard cap, content within max
     const bad: Record<string, unknown>[] = [
       { name: 'Has Space' }, { name: 'UPPER' }, { name: '' }, { name: 'a'.repeat(41) }, { name: 'double--hyphen' },
       { mode: 'rw' }, { mode: undefined },
-      { scope: undefined }, { scope: { kind: 'project' } }, { scope: { kind: 'project', directory: 'relative/dir' } }, { scope: { kind: 'team' } },
+      { scope: undefined }, { scope: { kind: 'project', directory: ALPHA } }, { scope: { kind: 'project', directory: 'relative/dir' } }, { scope: { kind: 'team' } },
       { maxChars: 0 }, { maxChars: 20001 }, { maxChars: 1.5 }, { maxChars: '10' },
       { content: 'x'.repeat(11), maxChars: 10 }, { content: 5 },
     ];
@@ -53,42 +61,50 @@ test('input rules: slug name, mode, scope, maxChars hard cap, content within max
   } finally { rig.cleanup(); }
 });
 
-test('names are unique across all scopes: a name used globally or in one project cannot be used again anywhere', () => {
+test('names are unique across all scopes: a name used globally or by a project block cannot be used again', () => {
   const rig = makeServiceRig();
   try {
     rig.blocks.create(globalBlock());
     assert.equal(codeOf(() => rig.blocks.create(globalBlock())), 'BLOCK_NAME_TAKEN');
-    assert.equal(codeOf(() => rig.blocks.create(projectBlock(ALPHA))), 'BLOCK_NAME_TAKEN', 'a project block cannot reuse a global name');
-    assert.equal(codeOf(() => rig.blocks.create(projectBlock(OTHER))), 'BLOCK_NAME_TAKEN');
-    rig.blocks.create(projectBlock(ALPHA, { name: 'alpha-notes' }));
-    assert.equal(codeOf(() => rig.blocks.create(projectBlock(ALPHA, { name: 'alpha-notes' }))), 'BLOCK_NAME_TAKEN');
-    // The same folder typed differently is the same scope; either way the name is taken.
-    assert.equal(codeOf(() => rig.blocks.create(projectBlock(`${ALPHA}${path.sep}`, { name: 'alpha-notes' }))), 'BLOCK_NAME_TAKEN');
-    assert.equal(codeOf(() => rig.blocks.create(projectBlock(OTHER, { name: 'alpha-notes' }))), 'BLOCK_NAME_TAKEN', 'another project cannot reuse it');
+    assert.equal(codeOf(() => rig.blocks.create(projectBlock())), 'BLOCK_NAME_TAKEN', 'a project block cannot reuse a global name');
+    rig.blocks.create(projectBlock({ name: 'alpha-notes' }));
+    assert.equal(codeOf(() => rig.blocks.create(projectBlock({ name: 'alpha-notes' }))), 'BLOCK_NAME_TAKEN');
     assert.equal(codeOf(() => rig.blocks.create(globalBlock({ name: 'alpha-notes' }))), 'BLOCK_NAME_TAKEN', 'a global block cannot reuse a project name');
-    rig.blocks.create(projectBlock(OTHER, { name: 'other-notes' }));
-    assert.equal(rig.blocks.list().blocks.length, 3);
+    assert.equal(rig.blocks.list().blocks.length, 2);
     const refusal = (() => { try { rig.blocks.create(globalBlock()); } catch (error) { return error as AppError; } return null; })();
     assert.equal(refusal?.statusCode, 409);
     assert.match(refusal?.message ?? '', /unique across global and all project scopes/);
   } finally { rig.cleanup(); }
 });
 
-test('update: renaming into a name used in another scope is refused; keeping the own name never clashes with itself', () => {
+test('update: renaming into a name used elsewhere is refused; keeping the own name never clashes with itself; the scope cannot change', () => {
   const rig = makeServiceRig();
   try {
     rig.blocks.create(globalBlock());
-    const project = rig.blocks.create(projectBlock(ALPHA, { name: 'alpha-notes', mode: 'writable' })).block;
+    const project = rig.blocks.create(projectBlock({ name: 'alpha-notes', mode: 'writable' })).block;
     const edit = (overrides: Record<string, unknown>, expectedRev = project.rev) =>
-      rig.blocks.update(project.id, { ...projectBlock(ALPHA, { name: 'alpha-notes', mode: 'writable' }), expectedRev, ...overrides });
+      rig.blocks.update(project.id, { ...projectBlock({ name: 'alpha-notes', mode: 'writable' }), expectedRev, ...overrides });
 
     assert.equal(codeOf(() => edit({ name: 'style-guide' })), 'BLOCK_NAME_TAKEN', 'a global name');
-    assert.equal(codeOf(() => edit({ name: 'style-guide', scope: { kind: 'global' } })), 'BLOCK_NAME_TAKEN', 'also when moving scope');
-    const kept = edit({ content: 'same name, new text' }).block;
+    const kept = edit({ description: 'new description' }).block;
     assert.equal(kept.name, 'alpha-notes');
-    const moved = edit({ scope: { kind: 'project', directory: OTHER } }, kept.rev).block;
-    assert.deepEqual(moved.scope.kind === 'project' && path.resolve(moved.scope.directory), OTHER, 'keeping the name while changing scope is fine');
-    assert.equal(edit({ name: 'fresh-name' }, moved.rev).block.name, 'fresh-name');
+    assert.equal(kept.rev, 2, 'the definition rev');
+    assert.equal(codeOf(() => edit({ scope: { kind: 'global' } }, kept.rev)), 'BLOCK_SCOPE_IMMUTABLE', 'project to global');
+    const global = rig.blocks.list().blocks.find((block) => block.name === 'style-guide');
+    assert.equal(codeOf(() => rig.blocks.update(global!.id, { ...globalBlock(), scope: { kind: 'project' }, expectedRev: global!.rev })), 'BLOCK_SCOPE_IMMUTABLE', 'global to project');
+    assert.equal(edit({ name: 'fresh-name' }, kept.rev).block.name, 'fresh-name');
+  } finally { rig.cleanup(); }
+});
+
+test('a project definition holds no content: create and update ignore content, the definition stays empty', () => {
+  const rig = makeServiceRig();
+  try {
+    const { block } = rig.blocks.create(projectBlock({ content: 'ignored' }));
+    assert.equal(block.content, '');
+    assert.equal(block.lastWriter, null);
+    const updated = rig.blocks.update(block.id, { ...projectBlock({ content: 'ignored too' }), expectedRev: block.rev }).block;
+    assert.equal(updated.content, '');
+    assert.equal(rig.blocks.update(block.id, { ...projectBlock({ content: undefined, description: 'x' }), expectedRev: updated.rev }).block.description, 'x', 'content is not required for a project block');
   } finally { rig.cleanup(); }
 });
 
@@ -108,10 +124,13 @@ test('blocks stored before names became unique across scopes stay (never deleted
 
     // Each can still be saved under its own name (no self-collision, no collision with its twin).
     const body = (block: MemoryBlock, content: string) => ({
-      name: block.name, description: block.description, mode: block.mode, scope: block.scope, content, maxChars: block.maxChars, expectedRev: block.rev,
+      name: block.name, description: block.description, mode: block.mode, scope: { kind: block.scope.kind }, content, maxChars: block.maxChars, expectedRev: block.rev,
     });
     assert.equal(rig.blocks.update(globalRules.id, body(globalRules, 'GLOBAL 2')).block.content, 'GLOBAL 2');
-    assert.equal(rig.blocks.update(projectRules.id, body(projectRules, 'PROJECT 2')).block.content, 'PROJECT 2');
+    const savedProject = rig.blocks.update(projectRules.id, body(projectRules, 'PROJECT 2')).block;
+    assert.equal(savedProject.rev, 2);
+    assert.equal(rig.blocks.readForRun({ directory: ALPHA }, 'rules').content, 'PROJECT', 'a project definition ignores content; the old folder keeps its text');
+    assert.equal(savedProject.needsAttention !== undefined, true, 'still flagged: not moved because of the clash');
     // But a third one, or a rename onto the shared name, is refused.
     assert.equal(codeOf(() => rig.blocks.create(globalBlock({ name: 'rules' }))), 'BLOCK_NAME_TAKEN');
     const other = rig.blocks.create(globalBlock({ name: 'other' })).block;
@@ -124,7 +143,7 @@ test('at most 50 blocks exist in total', () => {
   try {
     for (let index = 0; index < 50; index += 1) rig.blocks.create(globalBlock({ name: `block-${index}` }));
     assert.equal(codeOf(() => rig.blocks.create(globalBlock({ name: 'one-too-many' }))), 'BLOCK_LIMIT_REACHED');
-    assert.equal(codeOf(() => rig.blocks.create(projectBlock(ALPHA, { name: 'other-scope' }))), 'BLOCK_LIMIT_REACHED', 'the limit counts every scope');
+    assert.equal(codeOf(() => rig.blocks.create(projectBlock({ name: 'other-scope' }))), 'BLOCK_LIMIT_REACHED', 'the limit counts every scope');
     const [first] = rig.blocks.list().blocks;
     rig.blocks.remove(first.id);
     assert.doesNotThrow(() => rig.blocks.create(globalBlock({ name: 'fits-again' })));
@@ -234,41 +253,74 @@ test('agent write: unknown or invalid names are refused and no block is created'
   } finally { rig.cleanup(); }
 });
 
-test('scope isolation: a run sees the global blocks and its own project blocks, never another project\'s', () => {
+test('scope isolation: a run sees the global blocks and project blocks that have content in its folder, never another folder\'s', () => {
   const rig = makeServiceRig();
   try {
     rig.blocks.create(globalBlock({ name: 'shared' }));
-    rig.blocks.create(projectBlock(ALPHA, { name: 'alpha-only', mode: 'writable' }));
-    rig.blocks.create(projectBlock(OTHER, { name: 'other-only', mode: 'writable' }));
+    projectBlockIn(rig, 'alpha-only', [ALPHA]);
+    projectBlockIn(rig, 'other-only', [OTHER]);
+    projectBlockIn(rig, 'both', [ALPHA, OTHER]);
+    projectBlockIn(rig, 'nowhere', []);
     const names = (directory: string | null) => rig.blocks.listForRun({ directory }).map((block: MemoryBlock) => block.name);
 
-    assert.deepEqual(names(ALPHA), ['alpha-only', 'shared']);
-    assert.deepEqual(names(`${ALPHA}${path.sep}`), ['alpha-only', 'shared'], 'the same folder typed with a trailing separator');
-    assert.deepEqual(names(OTHER), ['other-only', 'shared']);
+    assert.deepEqual(names(ALPHA), ['alpha-only', 'both', 'shared']);
+    assert.deepEqual(names(`${ALPHA}${path.sep}`), ['alpha-only', 'both', 'shared'], 'the same folder typed with a trailing separator');
+    assert.deepEqual(names(OTHER), ['both', 'other-only', 'shared']);
     assert.deepEqual(names(null), ['shared'], 'no project folder: global blocks only');
-    assert.deepEqual(names(path.resolve(path.sep, 'work', 'third')), ['shared']);
+    assert.deepEqual(names(path.resolve(path.sep, 'work', 'third')), ['shared'], 'a folder without content files sees no project block');
 
     const context = { directory: ALPHA, agentName: 'orchestrator' };
     assert.equal(codeOf(() => rig.blocks.readForRun(context, 'other-only')), 'BLOCK_NOT_FOUND');
+    assert.equal(codeOf(() => rig.blocks.readForRun(context, 'nowhere')), 'BLOCK_NOT_FOUND', 'a definition without a file is invisible');
     assert.equal(codeOf(() => rig.blocks.writeForRun(context, 'other-only', 'x', 'replace')), 'BLOCK_NOT_FOUND');
-    assert.equal(rig.blocks.list().blocks.find((block) => block.name === 'other-only')?.content, 'Be brief.', 'the other project\'s block is untouched');
+    assert.equal(rig.blocks.listContents(rig.blocks.list().blocks.find((block) => block.name === 'other-only')!.id).contents[0].content, '', 'the other folder is untouched');
   } finally { rig.cleanup(); }
 });
 
-test('hasProjectBlocks is true only for the exact folder of a project block; global blocks alone, other folders and no folder are false', () => {
+test('one project block, separate text per folder: writes land in the run\'s own content file only', () => {
   const rig = makeServiceRig();
   try {
-    assert.equal(rig.blocks.hasProjectBlocks(ALPHA), false, 'empty store');
+    const block = projectBlockIn(rig, 'notes', [ALPHA, OTHER]);
+    rig.blocks.writeForRun({ directory: ALPHA, agentName: 'a' }, 'notes', 'alpha text', 'replace');
+    rig.blocks.writeForRun({ directory: OTHER, agentName: 'b' }, 'notes', 'other text', 'replace');
+    rig.blocks.writeForRun({ directory: OTHER, agentName: 'b' }, 'notes', 'more', 'append');
+    assert.equal(rig.blocks.readForRun({ directory: ALPHA }, 'notes').content, 'alpha text');
+    const other = rig.blocks.readForRun({ directory: OTHER }, 'notes');
+    assert.equal(other.content, 'other text\nmore');
+    assert.equal(other.rev, 3, 'create = 1, then two writes');
+    assert.equal(other.lastWriter, 'agent:b');
+    assert.equal(other.definitionRev, 1);
+    const { contents } = rig.blocks.listContents(block.id);
+    assert.deepEqual(contents.map((item) => item.content).sort(), ['alpha text', 'other text\nmore']);
+    assert.equal(rig.blocks.list().blocks[0].content, '', 'the definition never holds the text');
+  } finally { rig.cleanup(); }
+});
+
+test('an agent never creates a content file: a folder without one cannot write the block', () => {
+  const rig = makeServiceRig();
+  try {
+    projectBlockIn(rig, 'notes', [ALPHA]);
+    assert.equal(codeOf(() => rig.blocks.writeForRun({ directory: OTHER, agentName: 'a' }, 'notes', 'x', 'replace')), 'BLOCK_NOT_FOUND');
+    assert.equal(rig.blocks.hasProjectContent(OTHER), false);
+  } finally { rig.cleanup(); }
+});
+
+test('hasProjectContent is true only for the exact folder of a content file (empty counts); global blocks alone, other folders and no folder are false', () => {
+  const rig = makeServiceRig();
+  try {
+    assert.equal(rig.blocks.hasProjectContent(ALPHA), false, 'empty store');
     rig.blocks.create(globalBlock({ name: 'shared' }));
-    assert.equal(rig.blocks.hasProjectBlocks(ALPHA), false, 'a global block alone does not count');
-    rig.blocks.create(projectBlock(ALPHA, { name: 'alpha-only', mode: 'writable' }));
-    assert.equal(rig.blocks.hasProjectBlocks(ALPHA), true);
-    assert.equal(rig.blocks.hasProjectBlocks(`${ALPHA}${path.sep}`), true, 'the same folder typed with a trailing separator');
-    assert.equal(rig.blocks.hasProjectBlocks(OTHER), false, 'another project\'s folder');
-    assert.equal(rig.blocks.hasProjectBlocks(path.join(ALPHA, 'src')), false, 'exact folder only: a subfolder is not the project');
-    assert.equal(rig.blocks.hasProjectBlocks(null), false);
-    assert.equal(rig.blocks.hasProjectBlocks(undefined), false);
-    assert.equal(rig.blocks.hasProjectBlocks(''), false);
+    assert.equal(rig.blocks.hasProjectContent(ALPHA), false, 'a global block alone does not count');
+    projectBlockIn(rig, 'alpha-only', []);
+    assert.equal(rig.blocks.hasProjectContent(ALPHA), false, 'a definition without a file does not count');
+    projectBlockIn(rig, 'alpha-notes', [ALPHA]);
+    assert.equal(rig.blocks.hasProjectContent(ALPHA), true);
+    assert.equal(rig.blocks.hasProjectContent(`${ALPHA}${path.sep}`), true, 'the same folder typed with a trailing separator');
+    assert.equal(rig.blocks.hasProjectContent(OTHER), false, 'another project\'s folder');
+    assert.equal(rig.blocks.hasProjectContent(path.join(ALPHA, 'src')), false, 'exact folder only: a subfolder is not the project');
+    assert.equal(rig.blocks.hasProjectContent(null), false);
+    assert.equal(rig.blocks.hasProjectContent(undefined), false);
+    assert.equal(rig.blocks.hasProjectContent(''), false);
   } finally { rig.cleanup(); }
 });
 

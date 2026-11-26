@@ -253,7 +253,9 @@ function memoryBlockShapeProblem(record: Obj): string | null {
   if (!Number.isInteger(record.maxChars) || (record.maxChars as number) < 1) return 'maxChars is invalid';
   const scope = record.scope as Obj | null | undefined;
   if (typeof scope !== 'object' || scope === null) return 'scope is not an object';
-  if (scope.kind !== 'global' && !(scope.kind === 'project' && typeof scope.directory === 'string' && scope.directory)) return 'scope is invalid';
+  // A project scope carries no folder; `directory` is only present on blocks saved before per-folder content and is read by the migration.
+  const legacyDirectory = scope.directory === undefined || (typeof scope.directory === 'string' && scope.directory !== '');
+  if (scope.kind !== 'global' && !(scope.kind === 'project' && legacyDirectory)) return 'scope is invalid';
   const writer = record.lastWriter;
   if (writer !== null && writer !== 'user' && !(typeof writer === 'string' && writer.startsWith('agent:'))) return 'lastWriter is invalid';
   return null;

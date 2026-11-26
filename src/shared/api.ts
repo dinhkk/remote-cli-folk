@@ -580,6 +580,17 @@ export const api = {
       put(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}`, body),
     deleteMemoryBlock: (id: string) => del(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}`),
 
+    // Per-folder content of a project block. `directory` is any absolute folder; `expectedRev` is the content `rev` that was loaded.
+    listMemoryBlockContents: (id: string) => get(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}/contents`),
+    addMemoryBlockContent: (id: string, directory: string) =>
+      post(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}/contents`, { directory }),
+    updateMemoryBlockContent: (id: string, body: { directory: string; content: string; expectedRev: number }) =>
+      put(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}/contents`, body),
+    emptyMemoryBlockContent: (id: string, directory: string, expectedRev: number) =>
+      del(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}/contents?directory=${encodeURIComponent(directory)}&expectedRev=${expectedRev}`),
+    removeMemoryBlockFolder: (id: string, directory: string, expectedRev: number) =>
+      del(`/api/agent-profiles/memory-blocks/${encodeURIComponent(id)}/contents?directory=${encodeURIComponent(directory)}&expectedRev=${expectedRev}&remove=true`),
+
     // Generate agent files from templates into `<directory>/.claude/agents` (no directory = `~/.claude/agents`).
     // `values` must be sent in full on every call: the server does not merge remembered values.
     previewGenerate: (body: GenerateAgentsRequest) => post('/api/agent-profiles/generate/preview', body),
