@@ -260,6 +260,7 @@ export default function ChatComposer({
 
   const hasQueuedDraft = Boolean(queuedDraft);
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
+  const stopUnavailable = isLoading && !canQueueDraft && activity?.canInterrupt === false;
   const submitHint = canQueueDraft
     ? hasQueuedDraft
       ? t('input.hintText.appendQueued', { defaultValue: 'Enter to add to the queued message' })
@@ -272,7 +273,9 @@ export default function ChatComposer({
       ? t('input.queue.append', { defaultValue: 'Add to queued message' })
       : t('input.queue.sendNext', { defaultValue: 'Queue next message' })
     : isLoading
-      ? t('input.stop')
+      ? stopUnavailable
+        ? t('input.stopUnavailable')
+        : t('input.stop')
       : t('input.send');
 
   return (
@@ -466,7 +469,7 @@ export default function ChatComposer({
                 }
                 disabled={
                   isLoading
-                    ? false
+                    ? stopUnavailable
                     : isRecording
                       ? false
                       : isTranscribing

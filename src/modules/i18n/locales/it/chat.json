@@ -131,6 +131,7 @@
     "attachImages": "Allega immagini",
     "send": "Invia",
     "stop": "Ferma",
+    "stopUnavailable": "Questa sessione non può essere interrotta qui",
     "hintText": {
       "ctrlEnter": "Ctrl+Invio per inviare • Shift+Invio per nuova riga • Tab per cambiare modalità • / per comandi",
       "enter": "Invio per inviare • Shift+Invio per nuova riga • Tab per cambiare modalità • / per comandi",

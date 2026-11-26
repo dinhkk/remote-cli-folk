@@ -188,6 +188,8 @@ export const sessionsService = {
           canInterrupt: false,
           tasks,
         });
+        // Keep the runtime entry authoritative when the CLI also reports busy.
+        runningById.set(sessionId, entries[entries.length - 1]);
       }
     }
 

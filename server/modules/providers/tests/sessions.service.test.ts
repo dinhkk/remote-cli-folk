@@ -284,6 +284,31 @@ test('running sessions list a session whose background work outlived its turn', 
   });
 });
 
+test('background work keeps its tasks when the same Claude CLI session is busy', { concurrency: false }, async () => {
+  await withIsolatedDatabase(async () => {
+    sessionsDb.createAppSession('background-session', 'claude', '/tmp/running-project');
+    sessionsDb.assignProviderSessionId('background-session', 'claude-native-background');
+    const tasks = [task('pending-task', 2_000)];
+    await withClaudeCliRegistry(
+      [{ pid: process.pid, sessionId: 'claude-native-background', status: 'busy', entrypoint: 'remotecli', startedAt: 1_000 }],
+      async () => await withProviders(
+        { claude: { run: async () => undefined, abort: () => false, listBackgroundWork: () => [{ sessionId: 'background-session', tasks }] } },
+        async () => {
+          assert.deepEqual(await sessionsService.listRunningSessions(), [{
+            sessionId: 'background-session',
+            provider: 'claude',
+            startedAt: 2_000,
+            lastSeq: 0,
+            background: true,
+            canInterrupt: false,
+            tasks,
+          }]);
+        },
+      ),
+    );
+  });
+});
+
 test('running sessions carry their tasks on a chat run that is still going', { concurrency: false }, async () => {
   await withIsolatedDatabase(async () => {
     sessionsDb.createAppSession('busy-session', 'claude', '/tmp/running-project');

@@ -153,6 +153,7 @@
     "attachImages": "Anexar imagens",
     "send": "Enviar",
     "stop": "Parar",
+    "stopUnavailable": "Esta sessão não pode ser interrompida aqui",
     "hintText": {
       "ctrlEnter": "Ctrl+Enter para enviar • Shift+Enter para nova linha • Tab para alternar modos • / para slash commands",
       "enter": "Enter para enviar • Shift+Enter para nova linha • Tab para alternar modos • / para slash commands",
