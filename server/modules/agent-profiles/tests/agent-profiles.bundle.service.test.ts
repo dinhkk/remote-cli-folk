@@ -330,6 +330,47 @@ describe('agent bundle import: apply', () => {
     assert.equal(rig.service.listTemplates().items[0].name, 'Edited meanwhile');
   });
 
+  it('refuses a block or folder overwrite without a basis, and a block that changed since the preview (STALE)', () => {
+    const rig = newRig();
+    addProject(rig, 'p1', '/target/one');
+    const stored = rig.blocks.create({ name: 'beta', description: 'Old', mode: 'writable', scope: { kind: 'global' }, content: 'stored', maxChars: 2000 }).block;
+    seedProjectBlock(rig, 'notes', { '/target/one': 'folder stored' });
+    const bundle = bundleOf([], [
+      globalBlock('beta', { description: 'New', content: 'from bundle' }),
+      projectBlock('notes', { contents: [{ directory: '/source/a', content: 'folder new' }] }),
+    ]);
+    const projectMap = { [valuesKeyOf('/source/a')]: 'p1' };
+    const plan = rig.bundle.planImport(bundle, { projectMap });
+    const folderKey = (itemOf(plan, 'block:notes').folders as { key: string }[])[0].key;
+    const keys = ['block:beta', folderKey];
+    const bare = rig.bundle.applyImport(bundle, { overwrite: keys, projectMap });
+    assert.equal(resultOf(bare, 'block:beta').code, 'BASIS_REQUIRED');
+    assert.equal(resultOf(bare, 'block:notes').folders?.[0].code, 'BASIS_REQUIRED');
+    assert.equal(bare.snapshot, null);
+    assert.equal(blockByName(rig, 'beta').content, 'stored');
+    // The definition changed after the preview: only that item is stale.
+    rig.blocks.update(stored.id, { name: 'beta', description: 'Edited meanwhile', mode: 'writable', scope: { kind: 'global' }, content: 'stored', maxChars: 2000, expectedRev: stored.rev });
+    const stale = rig.bundle.applyImport(bundle, { overwrite: keys, projectMap, basis: basisOf(plan) });
+    assert.equal(resultOf(stale, 'block:beta').code, 'STALE');
+    assert.equal(blockByName(rig, 'beta').description, 'Edited meanwhile');
+    assert.equal(resultOf(stale, 'block:notes').folders?.[0].status, 'applied');
+    assert.equal(folderText(rig, 'notes', '/target/one')?.content, 'folder new');
+  });
+
+  it('migrates a block saved by an older version before comparing, so the preview revision stays valid', () => {
+    const rig = newRig();
+    writeLegacyBlock(rig, 'old-notes', '/work/old', 'legacy text');
+    const bundle = bundleOf([], [projectBlock('old-notes', { description: 'Updated' })]);
+    const plan = rig.bundle.planImport(bundle, {});
+    const row = itemOf(plan, 'block:old-notes');
+    assert.equal(row.status, 'conflict');
+    assert.equal(row.overwritable, true, 'moved to per-folder content by the plan itself');
+    const result = rig.bundle.applyImport(bundle, { overwrite: ['block:old-notes'], basis: basisOf(plan) });
+    assert.equal(resultOf(result, 'block:old-notes').status, 'applied', JSON.stringify(result));
+    assert.equal(blockByName(rig, 'old-notes').description, 'Updated');
+    assert.equal(folderText(rig, 'old-notes', '/work/old')?.content, 'legacy text', 'the legacy text became that folder\'s text and was kept');
+  });
+
   it('applies a sensitive item only when its own key is ticked', () => {
     const rig = newRig();
     const bundle = bundleOf([template('risky', { tools: ['Bash'] }), template('calm')]);
@@ -635,6 +676,15 @@ describe('agent bundle snapshots and restore', () => {
     const young = newRig();
     for (let index = 0; index < 55; index += 1) young.snapshots.write(bundle);
     assert.equal(young.snapshots.list().length, 55);
+  });
+
+  it('still writes a snapshot, exclusively, on a file system without hard links', (context) => {
+    const rig = newRig();
+    const bundle = rig.bundle.exportBundle({ includeBlockContent: true }).bundle;
+    context.mock.method(fs, 'linkSync', () => { throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' }); });
+    const first = rig.snapshots.write(bundle);
+    assert.ok(snapshotNames(rig).includes(first));
+    assert.deepEqual(fs.readdirSync(path.join(rig.root, 'agent-profiles', 'backups')).filter((entry) => entry.startsWith('.tmp-')), [], 'no temp file left');
   });
 
   it('restores an overwritten template and block and a deleted folder text from a snapshot, taking its own snapshot first', () => {

@@ -1,7 +1,7 @@
 import { AppError } from '@/shared/utils.js';
 import type {
-  AgentBundle, AgentBundleSnapshot, AgentProfileTemplate, AgentProfileTemplateInput, ImportActor, ImportBasis, ImportFolderResult,
-  ImportFolderRow, ImportItemResult, ImportPlan, ImportPlanItem, ImportProblem, ImportResult, MemoryBlockBundleEntry,
+  AgentBundle, AgentBundleSnapshot, AgentProfileTemplate, AgentProfileTemplateInput, ExportProblem, ImportActor, ImportBasis, ImportFolderResult,
+  ImportFolderRow, ImportItemResult, ImportOptions, ImportPlan, ImportPlanItem, ImportProblem, ImportResult, MemoryBlockBundleEntry,
   MemoryBlockDefinition, MemoryBlockProjectContent, MemoryBlockWriter, RawAgentBundle,
 } from '@/shared/types.js';
 
@@ -26,20 +26,6 @@ type Dependencies = {
   resolveProjectDirectory: (projectId: string) => string | null;
   now?: () => Date;
 };
-
-/** What the importer changes: the user's choices, all optional. Keys are `template:<slug>`, `block:<name>`, `block:<name>#<sourceKey>`. */
-export type ImportOptions = {
-  overwrite?: string[];
-  acceptSensitive?: string[];
-  /** `{[source folder key]: sidebar project id}`; the only way a folder entry gets a target. */
-  projectMap?: Record<string, string>;
-  /** What the preview saw of each ticked item (see `ImportBasis`); required for every overwrite. */
-  basis?: Record<string, ImportBasis>;
-  actor?: ImportActor;
-};
-
-/** A problem found while exporting (a block that cannot be exported completely); the export still succeeds. */
-export type ExportProblem = { key: string; code: string; message: string };
 
 const TEMPLATE_ORDER = [
   'slug', 'family', 'name', 'description', 'instructions', 'params', 'bindings', 'tools', 'disallowedTools', 'mcpServers', 'skills',
@@ -201,8 +187,7 @@ export function createBundleService(dependencies: Dependencies) {
    * cannot be exported completely (not yet moved to per-folder content, unreadable folder file) is exported as far as
    * possible and listed in `problems`.
    */
-  function exportBundle(options: { templateIds?: string[]; blockIds?: string[]; includeBlockContent?: boolean } = {}): { bundle: AgentBundle; problems: ExportProblem[] } {
-    const live = readLive();
+  function exportFrom(live: LiveState, options: { templateIds?: string[]; blockIds?: string[]; includeBlockContent?: boolean }): { bundle: AgentBundle; problems: ExportProblem[] } {
     const problems: ExportProblem[] = [];
     const templateIds = options.templateIds ? new Set(options.templateIds) : null;
     const blockIds = options.blockIds ? new Set(options.blockIds) : null;
@@ -218,6 +203,9 @@ export function createBundleService(dependencies: Dependencies) {
       problems,
     };
   }
+
+  const exportBundle = (options: { templateIds?: string[]; blockIds?: string[]; includeBlockContent?: boolean } = {}): { bundle: AgentBundle; problems: ExportProblem[] } =>
+    exportFrom(readLive(), options);
 
   // ---------- plan ----------
 
@@ -505,18 +493,19 @@ export function createBundleService(dependencies: Dependencies) {
     if (actor.kind === 'agent' && !actor.name.trim()) throw new AppError('An agent actor needs a name', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
     const projectMap = cleanProjectMap(options.projectMap);
     // Stage 1: the legacy block migration runs here, once, before anything is compared.
-    const before = buildPlan(raw, readLive(), { projectMap, mode });
+    const liveBefore = readLive();
+    const before = buildPlan(raw, liveBefore, { projectMap, mode });
     const overwrite = mode === 'restore' ? allKeysOf(before) : new Set(options.overwrite ?? []);
     // Stage 2: snapshot first (it reads every block), then the plan the writes use, then the writes: no await in between.
     let snapshot: string | null = null;
     if (overwrites(before, overwrite, options.basis ?? {}, mode)) {
-      if (readLive().corruptRecords > 0) {
+      if (liveBefore.corruptRecords > 0) {
         throw new AppError(
           'Some stored templates or blocks are unreadable, so a backup would be incomplete. Nothing was changed; repair or delete those files first.',
           { code: 'SNAPSHOT_UNAVAILABLE', statusCode: 409 },
         );
       }
-      snapshot = snapshots.write(exportBundle({ includeBlockContent: true }).bundle);
+      snapshot = snapshots.write(exportFrom(liveBefore, { includeBlockContent: true }).bundle);
     }
     const plan = buildPlan(raw, readLive(), { projectMap, mode });
     const context: ApplyContext = {

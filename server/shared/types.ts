@@ -2794,6 +2794,18 @@ export type ImportItemResult = {
 /** Result of applying an import or restore. `partial`: at least one item (or folder entry) was not applied (identical items do not count). `snapshot`: file name of the backup taken before overwriting, or null. */
 export type ImportResult = { items: ImportItemResult[]; partial: boolean; snapshot: string | null };
 
+/** What an import changes: the user's choices, all optional. Keys are `template:<slug>`, `block:<name>`, `block:<name>#<sourceKey>`. `projectMap` maps a source folder key to a sidebar project id (the only way a folder entry gets a target); `basis` is what the preview saw of each ticked key (required for every overwrite). */
+export type ImportOptions = {
+  overwrite?: string[];
+  acceptSensitive?: string[];
+  projectMap?: Record<string, string>;
+  basis?: Record<string, ImportBasis>;
+  actor?: ImportActor;
+};
+
+/** A problem found while exporting (a block that cannot be exported completely); the export still succeeds. */
+export type ExportProblem = { key: string; code: string; message: string };
+
 /** One server-written snapshot (backup) listed for restore. */
 export type AgentBundleSnapshot = { name: string; createdAt: string; templates: number; blocks: number; folders: number; bytes: number };
 

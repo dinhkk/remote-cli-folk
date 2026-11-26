@@ -3,15 +3,15 @@ import { LineCounter, isAlias, isNode, parseDocument, stringify, visit, type Doc
 import { AppError } from '@/shared/utils.js';
 import type { AgentBundle, RawAgentBundle } from '@/shared/types.js';
 
-/** Value of `format` in every bundle. */
+/** Value of `format` in every bundle. Consumed by: agent-profiles.bundle.service.ts (export envelope). */
 export const BUNDLE_FORMAT = 'remotecli.agent-bundle';
-/** Newest (and only) bundle version this build reads and writes. */
+/** Newest (and only) bundle version this build reads and writes. Consumed by: agent-profiles.bundle.service.ts (export envelope). */
 export const BUNDLE_VERSION = 1;
 /** Deepest nesting a bundle may have (a valid bundle needs 5). */
 const MAX_NESTING_DEPTH = 8;
 /** Folder-text entries one bundle may carry in total (the importer writes them in one synchronous section). */
-export const MAX_FOLDER_ENTRIES_PER_BUNDLE = 500;
-/** Folder-text entries one block may carry (the store's per-block file cap). */
+const MAX_FOLDER_ENTRIES_PER_BUNDLE = 500;
+/** Folder-text entries one block may carry (the store's per-block file cap). Consumed by: agent-profiles.bundle.validation.ts. */
 export const MAX_FOLDER_ENTRIES_PER_BLOCK = 200;
 
 type Position = { line: number; column: number };

@@ -13,6 +13,8 @@ const SNAPSHOT_NAME_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3
 const KEEP_DAYS = 14;
 const KEEP_NEWEST = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Errors of `link` on a file system that cannot hard link (FAT, some network and container mounts). */
+const LINK_UNSUPPORTED = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EXDEV', 'EACCES']);
 
 const unavailable = (reason: string): AppError => new AppError(
   `No backup could be written (${reason}); nothing was changed. Free disk space or fix the folder permissions and try again.`,
@@ -64,6 +66,20 @@ export function createSnapshotStore(options: { directory: string; now?: () => Da
     });
   }
 
+  /**
+   * Gives the finished temp file its final name without ever replacing a file: a hard link fails with EEXIST when the name
+   * is taken. A file system without hard links falls back to an exclusive create (`wx`), which fails the same way.
+   */
+  function publish(temp: string, target: string, data: string): void {
+    try {
+      fs.linkSync(temp, target);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST' || !code || !LINK_UNSUPPORTED.has(code)) throw error;
+      fs.writeFileSync(target, data, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    }
+  }
+
   return {
     /** Writes `bundle` as a new snapshot and returns its file name; `SNAPSHOT_UNAVAILABLE` (409) when it cannot be written. */
     write(bundle: AgentBundle): string {
@@ -76,8 +92,8 @@ export function createSnapshotStore(options: { directory: string; now?: () => Da
           for (let attempt = 0; attempt < 8; attempt += 1) {
             const name = `${stamp(now())}-${randomBytes(2).toString('hex')}.json`;
             try {
-              fs.linkSync(temp, path.join(directory, name));
-              prune();
+              publish(temp, path.join(directory, name), data);
+              try { prune(); } catch (error) { console.warn('[agent-profiles] old snapshots could not be pruned:', error); }
               return name;
             } catch (error) {
               if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
