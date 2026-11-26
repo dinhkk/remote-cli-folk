@@ -318,6 +318,19 @@ Three surprises, all of them intended:
 
 ## Run lifecycle and busy state
 
+The running-sessions poll returns one entry per session. In
+`server/modules/providers/services/sessions.service.ts`, `listRunningSessions` gives
+runtime entries priority over Claude CLI liveness records. If a turn has finished but
+its background tasks remain, the entry keeps `background: true`, `canInterrupt: false`
+and `tasks`. A CLI process that still reports busy must not replace that entry.
+The composer can then send another turn, and each task can be stopped through
+`chat.stop-task`.
+
+If an external CLI turn cannot be interrupted, `ChatComposer` disables its Stop button
+and labels it with the reason. Typing a draft still enables Queue next message. This
+restriction does not disable Send for background-only work.
+
+
 The activity indicator, the abort button and the status text all derive from one
 `Map<sessionId, SessionActivity>` in `useSessionProtection`. Nothing in the transcript
 feeds it. It is written in exactly four places:
