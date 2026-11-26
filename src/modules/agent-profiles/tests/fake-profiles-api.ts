@@ -6,6 +6,7 @@ import type {
   GenerateTargetProject,
   MemoryBlock,
   MemoryBlockInput,
+  MemoryBlockProjectContent,
 } from '@/shared/types';
 
 /**
@@ -120,21 +121,54 @@ export const makeMemoryBlock = (overrides: Partial<MemoryBlock> & { id: string }
   ...overrides,
 });
 
+export const makeProjectContent = (overrides: Partial<MemoryBlockProjectContent> & { directory: string }): MemoryBlockProjectContent => ({
+  content: '',
+  rev: 1,
+  lastWriter: null,
+  updatedAt: '2026-11-21T00:00:00.000Z',
+  ...overrides,
+});
+
 /**
  * Stateful handlers of `/api/agent-profiles/memory-blocks` that behave like the server: list sorted by name, create (201,
- * `BLOCK_NAME_TAKEN` across all scopes), update (`expectedRev` must match, else 409 `PROFILE_STALE`; the rev moves on; a rename into
- * another block's name is `BLOCK_NAME_TAKEN`) and delete.
- * Pass the result to `installFakeProfilesApi` / `api.set`; `blocks` is the live store the test can read back.
+ * `BLOCK_NAME_TAKEN` across all scopes; a project block keeps no content), update (`expectedRev` must match, else 409
+ * `PROFILE_STALE`; the rev moves on; a rename into another block's name is `BLOCK_NAME_TAKEN`; the scope kind cannot change), delete,
+ * and the per-folder content of project blocks (list, add = empty file, edit with its own `expectedRev`, empty = keep file and
+ * bump `rev`, `?remove=true` = drop the file and continue its `rev` on a later add).
+ * Pass the result to `installFakeProfilesApi` / `api.set`; `blocks` and `contents` (block id -> files) are the live stores the
+ * test can read back.
  */
-export const memoryBlockRoutes = (initial: MemoryBlock[] = []) => {
+export const memoryBlockRoutes = (initial: MemoryBlock[] = [], initialContents: Record<string, MemoryBlockProjectContent[]> = {}) => {
   const blocks = [...initial];
+  const contents: Record<string, MemoryBlockProjectContent[]> = Object.fromEntries(
+    Object.entries(initialContents).map(([id, items]) => [id, [...items]]),
+  );
+  const tombs = new Map<string, number>();
   let nextId = 1;
+  const query = (call: FakeCall) => new URLSearchParams(call.path.split('?')[1] ?? '');
+  const blockIdOf = (call: FakeCall): string => call.path.split('?')[0]!.split('/')[4]!;
+  const files = (id: string) => (contents[id] ??= []);
+  const projectBlock = (call: FakeCall): MemoryBlock | FakeReply => {
+    const block = blocks.find((candidate) => candidate.id === blockIdOf(call));
+    if (!block) return failure(404, 'PROFILE_NOT_FOUND', 'Memory block not found');
+    if (block.scope.kind !== 'project') return failure(400, 'BLOCK_NOT_PROJECT_SCOPE', 'Only a project memory block has content per folder');
+    return block;
+  };
+  const contentsRoute = (call: FakeCall, run: (id: string, directory: string) => FakeReply): FakeReply => {
+    const block = projectBlock(call);
+    if (!('id' in block)) return block;
+    const directory = query(call).get('directory') ?? (call.body?.directory as string | undefined);
+    if (!directory) return failure(400, 'INVALID_PROFILE_INPUT', 'directory is required');
+    return run(block.id, directory);
+  };
+  const noContent = () => failure(404, 'PROFILE_NOT_FOUND', 'No content for this folder');
   const routes: Record<string, FakeHandler> = {
     'GET /api/agent-profiles/memory-blocks': () => reply({ blocks: [...blocks].sort((a, b) => a.name.localeCompare(b.name)) }),
     'POST /api/agent-profiles/memory-blocks': (call) => {
       const body = call.body as unknown as MemoryBlockInput;
       if (blocks.some((block) => block.name === body.name)) return failure(409, 'BLOCK_NAME_TAKEN', 'taken');
-      const block = makeMemoryBlock({ ...body, id: `b-${nextId++}`, lastWriter: body.content ? 'user' : null });
+      const content = body.scope.kind === 'project' ? '' : body.content ?? '';
+      const block = makeMemoryBlock({ ...body, content, id: `b-${nextId++}`, lastWriter: content ? 'user' : null });
       blocks.push(block);
       return reply({ block }, 201);
     },
@@ -143,20 +177,61 @@ export const memoryBlockRoutes = (initial: MemoryBlock[] = []) => {
       const body = call.body as unknown as MemoryBlockInput & { expectedRev: number };
       const index = blocks.findIndex((block) => block.id === id);
       if (index < 0) return failure(404, 'PROFILE_NOT_FOUND', 'Memory block not found');
+      if (body.scope.kind !== blocks[index].scope.kind) return failure(409, 'BLOCK_SCOPE_IMMUTABLE', 'The scope of a memory block cannot be changed');
       if (body.name !== blocks[index].name && blocks.some((block) => block.name === body.name)) return failure(409, 'BLOCK_NAME_TAKEN', 'taken');
       if (blocks[index].rev !== body.expectedRev) return failure(409, 'PROFILE_STALE', 'stale', { currentRev: blocks[index].rev });
-      const { expectedRev: _ignored, ...fields } = body;
-      blocks[index] = { ...blocks[index], ...fields, rev: blocks[index].rev + 1, lastWriter: fields.content !== blocks[index].content ? 'user' : blocks[index].lastWriter };
+      const { expectedRev: _ignored, content, ...fields } = body;
+      const isProject = blocks[index].scope.kind === 'project';
+      blocks[index] = {
+        ...blocks[index],
+        ...fields,
+        content: isProject ? '' : content ?? blocks[index].content,
+        rev: blocks[index].rev + 1,
+        lastWriter: !isProject && content !== blocks[index].content ? 'user' : blocks[index].lastWriter,
+      };
       return reply({ block: blocks[index] });
     },
     'DELETE /api/agent-profiles/memory-blocks/:id': (call) => {
       const index = blocks.findIndex((block) => block.id === call.path.split('/').pop());
       if (index < 0) return failure(404, 'PROFILE_NOT_FOUND', 'Memory block not found');
+      delete contents[blocks[index].id];
       blocks.splice(index, 1);
       return reply({ ok: true });
     },
+    'GET /api/agent-profiles/memory-blocks/:id/contents': (call) => {
+      const block = projectBlock(call);
+      if (!('id' in block)) return block;
+      return reply({ contents: [...files(block.id)].sort((a, b) => a.directory.localeCompare(b.directory)), corrupt: [] });
+    },
+    'POST /api/agent-profiles/memory-blocks/:id/contents': (call) => contentsRoute(call, (id, directory) => {
+      if (files(id).some((file) => file.directory === directory)) return failure(409, 'BLOCK_CONTENT_EXISTS', 'This folder already has content for the memory block');
+      const created = makeProjectContent({ directory, rev: (tombs.get(`${id}|${directory}`) ?? 0) + 1 });
+      files(id).push(created);
+      return reply({ content: created }, 201);
+    }),
+    'PUT /api/agent-profiles/memory-blocks/:id/contents': (call) => contentsRoute(call, (id, directory) => {
+      const index = files(id).findIndex((file) => file.directory === directory);
+      if (index < 0) return noContent();
+      const body = call.body as { content: string; expectedRev: number };
+      if (files(id)[index].rev !== body.expectedRev) return failure(409, 'PROFILE_STALE', 'stale', { currentRev: files(id)[index].rev });
+      files(id)[index] = { ...files(id)[index], content: body.content, rev: body.expectedRev + 1, lastWriter: 'user' };
+      return reply({ content: files(id)[index] });
+    }),
+    'DELETE /api/agent-profiles/memory-blocks/:id/contents': (call) => contentsRoute(call, (id, directory) => {
+      const index = files(id).findIndex((file) => file.directory === directory);
+      if (index < 0) return noContent();
+      const expected = query(call).get('expectedRev');
+      if (expected !== null && Number(expected) !== files(id)[index].rev) return failure(409, 'PROFILE_STALE', 'stale', { currentRev: files(id)[index].rev });
+      if (query(call).get('remove') === 'true') {
+        tombs.set(`${id}|${directory}`, files(id)[index].rev);
+        files(id).splice(index, 1);
+        return reply({ ok: true });
+      }
+      files(id)[index] = { ...files(id)[index], content: '', rev: files(id)[index].rev + 1, lastWriter: 'user' };
+      return reply({ content: files(id)[index] });
+    }),
   };
-  return { blocks, routes };
+  return { blocks, contents, routes };
 };
 
 /** The `GET /claude-agents` answer for a list of entries. */

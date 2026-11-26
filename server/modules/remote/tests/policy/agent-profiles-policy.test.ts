@@ -35,6 +35,13 @@ test('every other agent-profiles route is refused for every method', () => {
     // App-owned memory blocks: list, create, edit and delete are Host-only.
     '/api/agent-profiles/memory-blocks', '/api/agent-profiles/memory-blocks/', '/api/agent-profiles/memory-blocks/b1',
     '/API/Agent-Profiles/Memory-Blocks/b1', '/api/agent-profiles/memory-blocks/b1?x=1', '/api/agent-profiles/memory%2Dblocks/b1',
+    // Per-folder content of a project block: the folder paths and texts are Host-only too.
+    '/api/agent-profiles/memory-blocks/b1/contents', '/api/agent-profiles/memory-blocks/b1/contents/',
+    '/api/agent-profiles/memory-blocks/b1/contents?directory=%2Fwork%2Falpha', '/api/agent-profiles/memory-blocks/b1/contents?directory=%2Fwork%2Falpha&remove=true',
+    '/api/agent-profiles/memory-blocks/b1/contents?scope-options', '/api/agent-profiles/memory-blocks/b1%2Fcontents',
+    '/api/agent-profiles/memory-blocks/%2e%2e/contents', '/api/agent-profiles/memory-blocks/%2E%2E/scope-options',
+    '/api/agent-profiles/memory-blocks/b1/%2e%2e/%2e%2e/scope-options', '/api/agent-profiles/memory-blocks/b1/contents%00',
+    '/API/Agent-Profiles/Memory-Blocks/B1/Contents',
     '/api/agent-profiles/lint', '/api/agent-profiles/lint?projectId=p1',
     // The memory/learning routes no longer exist; a Controller must still get nothing from them.
     '/api/agent-profiles/memory', '/api/agent-profiles/memory/learning', '/api/agent-profiles/memory/session/s1',
@@ -55,7 +62,10 @@ test('the denied agent-profiles families are explicit deny rules (not just unkno
 
 test('memory blocks are an explicit deny rule for every method, and the scope picker stays reachable next to it', () => {
   for (const method of METHODS) {
-    for (const path of ['/api/agent-profiles/memory-blocks', '/api/agent-profiles/memory-blocks/b1']) {
+    for (const path of [
+      '/api/agent-profiles/memory-blocks', '/api/agent-profiles/memory-blocks/b1',
+      '/api/agent-profiles/memory-blocks/b1/contents', '/api/agent-profiles/memory-blocks/b1/contents?directory=%2Fwork%2Falpha&remove=true',
+    ]) {
       assert.deepEqual(evaluateRemoteHttpRequest(method, path), { allowed: false, reason: 'route-denied' }, `${method} ${path}`);
     }
   }

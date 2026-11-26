@@ -19,8 +19,12 @@ const seed = (rig: ReturnType<typeof makeServiceRig>) => {
   const base = { description: 'desc', content: 'text' };
   rig.blocks.create({ ...base, name: 'style-guide', mode: 'read-only', scope: { kind: 'global' }, content: 'Be brief.' });
   rig.blocks.create({ ...base, name: 'notes', mode: 'writable', scope: { kind: 'global' }, content: 'first' });
-  rig.blocks.create({ ...base, name: 'alpha-only', mode: 'writable', scope: { kind: 'project', directory: ALPHA } });
-  rig.blocks.create({ ...base, name: 'other-only', mode: 'writable', scope: { kind: 'project', directory: OTHER } });
+  // A project block has text per folder: the user gives each folder its content file.
+  for (const [name, folder] of [['alpha-only', ALPHA], ['other-only', OTHER]]) {
+    const { block } = rig.blocks.create({ ...base, name, mode: 'writable', scope: { kind: 'project' } });
+    rig.blocks.addContent(block.id, folder);
+    rig.blocks.updateContent(block.id, folder, 'text', 1);
+  }
 };
 
 const textOf = (result: { content: { text: string }[] }): string => result.content.map((part) => part.text).join('\n');
@@ -136,7 +140,7 @@ test('block_write refusals are tool errors the model can read, and change nothin
     const byName = Object.fromEntries(rig.blocks.list().blocks.map((block) => [block.name, block]));
     assert.equal(byName['style-guide'].content, 'Be brief.');
     assert.equal(byName.tiny.content, 'abc');
-    assert.equal(byName['other-only'].content, 'text');
+    assert.equal(rig.blocks.listContents(byName['other-only'].id).contents[0].content, 'text');
     assert.equal(byName['style-guide'].rev, 1);
   } finally { rig.cleanup(); }
 });

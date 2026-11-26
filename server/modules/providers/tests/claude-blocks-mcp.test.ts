@@ -7,13 +7,20 @@ import test, { mock } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
+// Seeding goes through the real store and service on purpose: the agent-profiles barrel exports no test-only helpers.
+// oxlint-disable-next-line boundaries/dependencies
+import { createBlocksService } from '@/modules/agent-profiles/agent-profiles.blocks.service.js';
+// oxlint-disable-next-line boundaries/dependencies
+import { blockContentKey, createAgentProfileStore } from '@/modules/agent-profiles/agent-profiles.store.js';
+// oxlint-disable-next-line boundaries/dependencies
+import { storedShapeProblem } from '@/modules/agent-profiles/agent-profiles.validation.js';
 import type { AnyRecord, SessionAgentSnapshot } from '@/shared/types.js';
 
 // The agent-profiles module reads its data directory when it is first imported (on the first call below), so
 // the environment is prepared before any run is built.
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-blocks-mcp-'));
-const blocksDirectory = path.join(dataRoot, 'agent-profiles', 'memory-blocks');
-process.env.AGENT_PROFILES_DIR = path.join(dataRoot, 'agent-profiles');
+const profilesRoot = path.join(dataRoot, 'agent-profiles');
+process.env.AGENT_PROFILES_DIR = profilesRoot;
 const { resolveBlocksAgentName, withBlocksMcpServer, withBlocksToolsAllowed } = await import('@/modules/providers/list/claude/claude-blocks-mcp.js');
 
 test.after(() => fs.rmSync(dataRoot, { recursive: true, force: true }));
@@ -25,17 +32,32 @@ const PROJECT_C = path.resolve(path.sep, 'work', 'project-c');
 const scoped: SessionAgentSnapshot = { agentName: 'orchestrator', hiddenClaudeAgents: [] };
 const MAIN_AGENT = 'orchestrator';
 
-/** A block file in the real store format (what the REST routes write), so the run's server reads real data. */
-function seedBlock(id: string, name: string, scope: AnyRecord, content: string, mode = 'writable'): void {
-  fs.mkdirSync(blocksDirectory, { recursive: true });
-  fs.writeFileSync(path.join(blocksDirectory, `${id}.json`), JSON.stringify({
-    id, rev: 1, updatedAt: '2026-11-24T00:00:00.000Z', name, description: '', mode, scope, content, maxChars: 2000, lastWriter: 'user',
-  }));
+/** Seeds through the real service on the same store directory the run's module reads (the way the REST routes write). */
+const seedStore = createAgentProfileStore({ rootDir: profilesRoot, checkShape: storedShapeProblem });
+const seeder = createBlocksService({ store: seedStore });
+
+function seedGlobal(name: string, content: string, mode = 'read-only'): string {
+  return seeder.create({ name, description: '', mode, scope: { kind: 'global' }, content, maxChars: 2000 }).block.id;
 }
 
-seedBlock('g1', 'shared', { kind: 'global' }, 'GLOBAL-TEXT', 'read-only');
-seedBlock('a1', 'a-notes', { kind: 'project', directory: PROJECT_A }, 'A-TEXT');
-seedBlock('b1', 'b-notes', { kind: 'project', directory: PROJECT_B }, 'B-TEXT');
+/** A project block with a content file (holding `content`) in each of `directories`; an empty `content` leaves the files empty. */
+function seedProject(name: string, directories: string[], content = ''): string {
+  const { id } = seeder.create({ name, description: '', mode: 'writable', scope: { kind: 'project' }, maxChars: 2000 }).block;
+  for (const directory of directories) {
+    const { content: created } = seeder.addContent(id, directory);
+    if (content) seeder.updateContent(id, directory, content, created.rev);
+  }
+  return id;
+}
+
+/** The stored content file of a block in a folder. */
+const contentFile = (id: string, directory: string) => seedStore.getContent(id, blockContentKey(directory));
+
+const globalId = seedGlobal('shared', 'GLOBAL-TEXT');
+const aId = seedProject('a-notes', [PROJECT_A], 'A-TEXT');
+const bId = seedProject('b-notes', [PROJECT_B], 'B-TEXT');
+// A definition with no content file anywhere: invisible everywhere, so it must not attach or leak.
+seedProject('unplaced-notes', []);
 
 type BlocksServer = { type: string; name: string; instance: { connect(transport: unknown): Promise<void>; close(): Promise<void> } };
 
@@ -144,13 +166,14 @@ test('the attached server serves the run\'s project and the global blocks, and n
 test('the attached server enforces read-only and records the session\'s main agent as the writer', async () => {
   const denied = await callTool(await blocksOfRun(MAIN_AGENT, PROJECT_A), 'block_write', { name: 'shared', content: 'HACKED', how: 'replace' });
   assert.equal(denied.isError, true);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(blocksDirectory, 'g1.json'), 'utf8')).content, 'GLOBAL-TEXT');
+  assert.equal(seedStore.get<{ content: string }>('memory-blocks', globalId)?.content, 'GLOBAL-TEXT');
 
   const written = await callTool(await blocksOfRun('lead', PROJECT_A), 'block_write', { name: 'a-notes', content: 'new line', how: 'append' });
   assert.equal(written.isError, false);
-  const stored = JSON.parse(fs.readFileSync(path.join(blocksDirectory, 'a1.json'), 'utf8'));
-  assert.equal(stored.content, 'A-TEXT\nnew line');
-  assert.equal(stored.lastWriter, 'agent:lead');
+  const stored = contentFile(aId, PROJECT_A);
+  assert.equal(stored?.content, 'A-TEXT\nnew line');
+  assert.equal(stored?.lastWriter, 'agent:lead');
+  assert.equal(contentFile(bId, PROJECT_B)?.content, 'B-TEXT', 'the same block in another folder is untouched');
 });
 
 test('a plain chat\'s server serves the folder\'s project block and records agent:claude-code as the writer; read-only still holds', async () => {
@@ -162,9 +185,9 @@ test('a plain chat\'s server serves the folder\'s project block and records agen
   assert.equal(denied.isError, true, 'a read-only global block stays read-only for plain chat');
   const written = await callTool(await blocksOfRun('claude-code', PROJECT_B), 'block_write', { name: 'b-notes', content: 'from plain chat', how: 'append' });
   assert.equal(written.isError, false);
-  const stored = JSON.parse(fs.readFileSync(path.join(blocksDirectory, 'b1.json'), 'utf8'));
-  assert.equal(stored.content, 'B-TEXT\nfrom plain chat');
-  assert.equal(stored.lastWriter, 'agent:claude-code');
+  const stored = contentFile(bId, PROJECT_B);
+  assert.equal(stored?.content, 'B-TEXT\nfrom plain chat');
+  assert.equal(stored?.lastWriter, 'agent:claude-code');
 });
 
 test('only block_list and block_read are pre-approved, only for a run with the server; block_write is left to the approval flow', () => {
@@ -189,10 +212,86 @@ test('the Claude runtime resolves the blocks agent and attaches the server on ev
   assert.equal(source.match(/sdkOptions\.mcpServers\s*=/g)?.length, 1, 'one place sets the servers, so no run path can skip the merge');
 });
 
+test('one project block with a content file in two folders: each run reads and writes its own file, neither sees the other', async () => {
+  const shared = seedProject('twin-notes', [PROJECT_A, PROJECT_B], 'TWIN-SEED');
+  await callTool(await blocksOfRun('claude-code', PROJECT_A), 'block_write', { name: 'twin-notes', content: 'only-in-a', how: 'replace' });
+  assert.equal(contentFile(shared, PROJECT_A)?.content, 'only-in-a');
+  assert.equal(contentFile(shared, PROJECT_B)?.content, 'TWIN-SEED');
+  const readInB = await callTool(await blocksOfRun('claude-code', PROJECT_B), 'block_read', { name: 'twin-notes' });
+  assert.match(readInB.text, /TWIN-SEED/);
+  assert.ok(!readInB.text.includes('only-in-a'));
+});
+
+test('a definition without a content file in the folder is invisible there (list and read), also for a main agent', async () => {
+  const listInC = await callTool(await blocksOfRun(MAIN_AGENT, PROJECT_C), 'block_list', {});
+  assert.match(listInC.text, /name="shared"/);
+  for (const hidden of ['a-notes', 'b-notes', 'unplaced-notes']) assert.ok(!listInC.text.includes(hidden), `${hidden} is not listed`);
+  const read = await callTool(await blocksOfRun(MAIN_AGENT, PROJECT_C), 'block_read', { name: 'a-notes' });
+  assert.equal(read.isError, true);
+  assert.ok(!read.text.includes('A-TEXT'));
+  const write = await callTool(await blocksOfRun(MAIN_AGENT, PROJECT_C), 'block_write', { name: 'unplaced-notes', content: 'x', how: 'replace' });
+  assert.equal(write.isError, true, 'an agent cannot create a content file by writing');
+  assert.equal(seedStore.listContents(seeder.list().blocks.find((block) => block.name === 'unplaced-notes')!.id).items.length, 0);
+});
+
+test('an empty content file attaches the server for plain chat, and stays attached after the text is emptied between turns', async () => {
+  const folder = path.resolve(path.sep, 'work', 'project-empty');
+  const id = seedProject('empty-notes', [folder]);
+  assert.equal(await resolveBlocksAgentName(undefined, folder), 'claude-code');
+  seeder.updateContent(id, folder, 'some text', contentFile(id, folder)!.rev);
+  assert.equal(await resolveBlocksAgentName(undefined, folder), 'claude-code');
+  seeder.emptyContent(id, folder);
+  assert.equal(await resolveBlocksAgentName(undefined, folder), 'claude-code', 'the resumed run keeps its tools');
+  const read = await callTool(await blocksOfRun('claude-code', folder), 'block_read', { name: 'empty-notes' });
+  assert.equal(read.isError, false);
+  assert.match(read.text, /<block name="empty-notes"[^>]*><\/block>/);
+});
+
+test('removing the last content file of a folder detaches the tool for plain chat, a main agent keeps it', async () => {
+  const folder = path.resolve(path.sep, 'work', 'project-removed');
+  const id = seedProject('removed-notes', [folder]);
+  assert.equal(await resolveBlocksAgentName(undefined, folder), 'claude-code');
+  seeder.removeFolder(id, folder);
+  assert.equal(await resolveBlocksAgentName(undefined, folder), undefined);
+  assert.equal(await resolveBlocksAgentName(scoped, folder), 'orchestrator');
+  const list = await callTool(await blocksOfRun(MAIN_AGENT, folder), 'block_list', {});
+  assert.ok(!list.text.includes('removed-notes'));
+});
+
+test('the folder is matched by its normalized key: a differently written path reaches the same content file', async () => {
+  const folder = path.resolve(path.sep, 'work', 'project-key');
+  seedProject('key-notes', [folder], 'KEY-TEXT');
+  const messy = path.join(folder, 'sub', '..') + path.sep;
+  assert.equal(await resolveBlocksAgentName(undefined, messy), 'claude-code');
+  const read = await callTool(await blocksOfRun('claude-code', messy), 'block_read', { name: 'key-notes' });
+  assert.match(read.text, /KEY-TEXT/);
+});
+
+test('a corrupt content file hides only that block in that folder; the others still work', async () => {
+  const warn = mock.method(console, 'warn', () => undefined);
+  try {
+    const folder = path.resolve(path.sep, 'work', 'project-corrupt');
+    const goodId = seedProject('good-notes', [folder], 'GOOD');
+    const badId = seedProject('bad-notes', [folder], 'BAD');
+    const badDirectory = path.join(profilesRoot, 'memory-block-contents', badId);
+    for (const file of fs.readdirSync(badDirectory)) fs.writeFileSync(path.join(badDirectory, file), '{ not json');
+    assert.equal(await resolveBlocksAgentName(undefined, folder), 'claude-code', 'the readable block still attaches the server');
+    const list = await callTool(await blocksOfRun('claude-code', folder), 'block_list', {});
+    assert.match(list.text, /name="good-notes"/);
+    assert.ok(!list.text.includes('bad-notes'));
+    const good = await callTool(await blocksOfRun('claude-code', folder), 'block_read', { name: 'good-notes' });
+    assert.match(good.text, /GOOD/);
+    assert.equal(contentFile(goodId, folder)?.content, 'GOOD');
+  } finally {
+    warn.mock.restore();
+  }
+});
+
 // Last on purpose: it breaks the block store (a file where the folder should be) to prove a read error never fails a run.
 test('a store read error is logged and the run goes on without the blocks server', async () => {
   const warn = mock.method(console, 'warn', () => undefined);
   try {
+    const blocksDirectory = path.join(profilesRoot, 'memory-blocks');
     fs.rmSync(blocksDirectory, { recursive: true, force: true });
     fs.writeFileSync(blocksDirectory, 'not a folder');
     assert.equal(await resolveBlocksAgentName(undefined, PROJECT_A), undefined);

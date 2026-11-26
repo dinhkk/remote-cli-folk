@@ -28,8 +28,8 @@ afterEach(() => {
 
 const NOTES = makeMemoryBlock({ id: 'b-notes', name: 'notes', description: 'Shared scratch notes.', content: 'hello', lastWriter: 'agent:orchestrator', updatedAt: '2026-11-24T08:30:00.000Z' });
 const RULES = makeMemoryBlock({ id: 'b-rules', name: 'house-rules', mode: 'read-only', content: 'Be kind.', lastWriter: 'user', maxChars: 500 });
-const CRM_BLOCK = makeMemoryBlock({ id: 'b-crm', name: 'crm-facts', scope: { kind: 'project', directory: 'c:/work/crm' } });
-const GONE_BLOCK = makeMemoryBlock({ id: 'b-gone', name: 'old-project', scope: { kind: 'project', directory: '/work/removed' } });
+const CRM_BLOCK = makeMemoryBlock({ id: 'b-crm', name: 'crm-facts', scope: { kind: 'project' }, maxChars: 800 });
+const FLAGGED_BLOCK = makeMemoryBlock({ id: 'b-flag', name: 'legacy-notes', scope: { kind: 'project' }, needsAttention: 'Another block already has this name; it stays visible only in its old folder.' });
 
 const PERSONAL_BASH = makeClaudeAgent({ source: 'user', name: 'shell-helper', tools: ['Read', 'Bash'] });
 const PERSONAL_UNRESTRICTED = makeClaudeAgent({ source: 'project', name: 'free-agent' });
@@ -80,8 +80,10 @@ describe('block list', () => {
     expect(rules.textContent).toContain('you');
 
     const crm = rowOf('crm-facts');
-    expect(crm.textContent).toContain('c:/work/crm');
-    expect(crm.textContent).toContain('nobody yet');
+    // A project block has no text of its own: its size limit applies per folder and writer/time live in the folder list.
+    expect(crm.textContent).toContain('Per project');
+    expect(crm.textContent).toContain('at most 800 chars per folder');
+    expect(crm.textContent).not.toContain('Last writer');
   });
 
   it('says what a block is: global or project scope only, never per agent, only in this app\'s chats', async () => {
@@ -89,10 +91,22 @@ describe('block list', () => {
     await screen.findByText('notes');
 
     const text = screen.getByRole('note').textContent ?? '';
-    expect(text).toContain('global (every chat) or one project');
+    expect(text).toContain('global (every chat) or per project');
+    expect(text).toContain('agents see the block only in folders that have it');
     expect(text).toContain('cannot be limited to one agent');
     expect(text).toContain('only inside chats of this app');
     expect(text).toContain('claude command on this computer does not see them');
+  });
+
+  it('flags a block an older version saved that could not be moved, with the reason, and offers no folder list for it', async () => {
+    setup({ blocks: [FLAGGED_BLOCK, CRM_BLOCK] });
+    await screen.findByText('legacy-notes');
+
+    const flagged = rowOf('legacy-notes');
+    expect(within(flagged).getByRole('status').textContent).toContain('Needs attention: Another block already has this name');
+    expect(within(flagged).queryByRole('button', { name: 'Folders of legacy-notes' })).toBeNull();
+    expect(within(rowOf('crm-facts')).queryByRole('status')).toBeNull();
+    expect(within(rowOf('crm-facts')).getByRole('button', { name: 'Folders of crm-facts' })).toBeTruthy();
   });
 
   it('shows an empty state, and a loading state first', async () => {
@@ -139,34 +153,32 @@ describe('creating a block', () => {
     expect(api.to('GET', '/api/agent-profiles/memory-blocks')).toHaveLength(2);
   });
 
-  it('creates a read-only block scoped to a sidebar project picked from the list, with a custom limit', async () => {
+  it('creates a read-only project block: no folder picker and no content in the request, the text is written per folder afterwards', async () => {
     const { api } = setup({ blocks: [] });
     await screen.findByText(/No memory blocks yet/);
 
     fireEvent.click(screen.getByRole('button', { name: 'New block' }));
     type('Name', 'alpha-rules');
     type('Mode', 'read-only');
-    type('Scope', SIDEBAR_ALPHA.projectId);
+    type('Scope', 'project');
     type('Size limit (characters)', '500');
-    type('Content', 'No force pushes.');
+    expect(screen.queryByLabelText('Content')).toBeNull();
+    expect(screen.getByText(/A project block has no text of its own/)).toBeTruthy();
     fireEvent.click(saveButton());
 
     await screen.findByText('alpha-rules');
-    expect(api.to('POST', '/api/agent-profiles/memory-blocks')[0].body).toMatchObject({
-      mode: 'read-only',
-      scope: { kind: 'project', directory: '/work/alpha' },
-      maxChars: 500,
-    });
-    expect(rowOf('alpha-rules').textContent).toContain('/work/alpha');
+    const body = api.to('POST', '/api/agent-profiles/memory-blocks')[0].body;
+    expect(body).toEqual({ name: 'alpha-rules', description: '', mode: 'read-only', scope: { kind: 'project' }, maxChars: 500 });
+    expect(rowOf('alpha-rules').textContent).toContain('Per project');
   });
 
-  it('offers global and the sidebar projects only: there is no free-text path', async () => {
+  it('offers global and project scope only: no sidebar project list, no free-text path', async () => {
     setup({ blocks: [] });
     await screen.findByText(/No memory blocks yet/);
     fireEvent.click(screen.getByRole('button', { name: 'New block' }));
 
     const scope = screen.getByLabelText('Scope') as HTMLSelectElement;
-    expect([...scope.options].map((option) => option.textContent)).toEqual(['Global (every chat)', 'Alpha', 'CRM']);
+    expect([...scope.options].map((option) => option.textContent)).toEqual(['Global (every chat)', 'Per project (each folder has its own content)']);
     expect(screen.queryByLabelText(/folder|path|directory/i)).toBeNull();
   });
 
@@ -207,9 +219,9 @@ describe('creating a block', () => {
     expect(taken).toContain('already has this name');
     expect(taken).toContain('unique across all scopes');
 
-    api.set('POST /api/agent-profiles/memory-blocks', failure(400, 'INVALID_PROFILE_INPUT', 'scope.directory must be an absolute folder path'));
+    api.set('POST /api/agent-profiles/memory-blocks', failure(400, 'INVALID_PROFILE_INPUT', 'maxChars must be a whole number from 1 to 20000'));
     fireEvent.click(saveButton());
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('scope.directory must be an absolute folder path'));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('maxChars must be a whole number from 1 to 20000'));
 
     api.set('POST /api/agent-profiles/memory-blocks', failure(409, 'BLOCK_LIMIT_REACHED', 'limit'));
     fireEvent.click(saveButton());
@@ -244,6 +256,37 @@ describe('creating a block', () => {
 
     expect(screen.getByRole('button', { name: 'New block' })).toBeTruthy();
     expect(api.to('POST', '/api/agent-profiles/memory-blocks')).toHaveLength(0);
+  });
+});
+
+describe('project block folders', () => {
+  it('creates a project block, expands it, and adds a sidebar project folder that then lists with an empty content file', async () => {
+    const { api, store } = setup({ blocks: [] });
+    await screen.findByText(/No memory blocks yet/);
+    fireEvent.click(screen.getByRole('button', { name: 'New block' }));
+    type('Name', 'crm-facts');
+    type('Scope', 'project');
+    fireEvent.click(saveButton());
+    await screen.findByText('crm-facts');
+
+    // The folder list is not read until it is opened.
+    expect(api.calls.some((call) => call.path.endsWith('/contents'))).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Folders of crm-facts' }));
+    expect(await screen.findByText(/No folder has content yet/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Project to add'), { target: { value: SIDEBAR_CRM.projectId } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add folder' }));
+
+    await waitFor(() => expect(screen.queryByText(/No folder has content yet/)).toBeNull());
+    expect(store.contents['b-1']).toEqual([expect.objectContaining({ directory: 'C:\\Work\\CRM', content: '', rev: 1 })]);
+    fireEvent.click(screen.getByRole('button', { name: 'Folders of crm-facts' }));
+    expect(screen.queryByLabelText('Project to add')).toBeNull();
+  });
+
+  it('a global block has no folder list', async () => {
+    setup();
+    await screen.findByText('notes');
+
+    expect(within(rowOf('notes')).queryByRole('button', { name: /^Folders of/ })).toBeNull();
   });
 });
 
@@ -284,26 +327,30 @@ describe('editing a block', () => {
     expect(api.to('PUT', '/api/agent-profiles/memory-blocks/b-rules')[0].body).toMatchObject({ mode: 'writable', content: 'Be kind.' });
   });
 
-  it('preselects the sidebar project of a project block, however its folder was typed', async () => {
-    setup({ blocks: [CRM_BLOCK] });
+  it('a project block opens with its scope fixed and no content field, and its save sends no content', async () => {
+    const { api } = setup({ blocks: [CRM_BLOCK] });
     await screen.findByText('crm-facts');
 
     await openEditor('crm-facts');
-    expect((screen.getByLabelText('Scope') as HTMLSelectElement).value).toBe(SIDEBAR_CRM.projectId);
-  });
-
-  it('keeps the folder of a block whose project left the sidebar instead of moving it to global', async () => {
-    const { api } = setup({ blocks: [GONE_BLOCK] });
-    await screen.findByText('old-project');
-
-    await openEditor('old-project');
     const scope = screen.getByLabelText('Scope') as HTMLSelectElement;
-    expect([...scope.options].map((option) => option.textContent)).toContain('/work/removed (not in the sidebar)');
-    type('Description', 'still here');
+    expect(scope.value).toBe('project');
+    expect(scope.disabled).toBe(true);
+    expect(screen.queryByLabelText('Content')).toBeNull();
+    type('Description', 'CRM facts');
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(api.to('PUT', '/api/agent-profiles/memory-blocks/b-gone')).toHaveLength(1));
-    expect(api.to('PUT', '/api/agent-profiles/memory-blocks/b-gone')[0].body).toMatchObject({ scope: { kind: 'project', directory: '/work/removed' } });
+    await waitFor(() => expect(api.to('PUT', '/api/agent-profiles/memory-blocks/b-crm')).toHaveLength(1));
+    const body = api.to('PUT', '/api/agent-profiles/memory-blocks/b-crm')[0].body;
+    expect(body).toEqual({ name: 'crm-facts', description: 'CRM facts', mode: 'writable', scope: { kind: 'project' }, maxChars: 800, expectedRev: 1 });
+  });
+
+  it('a global block cannot be switched to project scope', async () => {
+    setup();
+    await screen.findByText('notes');
+
+    await openEditor('notes');
+    expect((screen.getByLabelText('Scope') as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.getByText(/scope of an existing block cannot be changed/)).toBeTruthy();
   });
 
   it('reads the list again before opening the editor and edits the block as the server has it now', async () => {

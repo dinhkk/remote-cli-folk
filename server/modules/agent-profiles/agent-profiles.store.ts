@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -9,6 +9,8 @@ import type {
   AgentProfileMeta,
   AgentProfileSettings,
   AgentProfileValues,
+  MemoryBlockProjectContent,
+  MemoryBlockWriter,
   StoredShapeCheck,
 } from '@/shared/types.js';
 
@@ -27,6 +29,32 @@ export function valuesKeyOf(directory: string | null | undefined): string {
   if (!normalized) return GLOBAL_VALUES_KEY;
   return /^([A-Za-z]:|\/\/)/.test(normalized) ? normalized.toLowerCase() : normalized;
 }
+
+/**
+ * The folder a project memory block keeps content for: resolved to an absolute path (Windows-style paths are taken as
+ * typed: `path.resolve` would graft them onto the server's cwd), normalized, plus its `valuesKeyOf` key. One function for
+ * REST, the blocks service and the attach rule, so a folder typed differently always lands on the same file.
+ */
+export function blockFolderOf(directory: string): { directory: string; key: string } {
+  const typed = directory.trim();
+  const normalized = normalizeProjectPath(/^([A-Za-z]:|\\\\|\/\/)/.test(typed) ? typed : path.resolve(typed));
+  return { directory: normalized, key: valuesKeyOf(normalized) };
+}
+
+/** Key of the content file of a folder (see {@link blockFolderOf}). */
+export const blockContentKey = (directory: string): string => blockFolderOf(directory).key;
+
+/** Folder of the per-folder contents of project memory blocks, under the store root. */
+const CONTENTS_DIR = 'memory-block-contents';
+/** At most this many content files (folders) per project block. */
+export const MAX_CONTENTS_PER_BLOCK = 200;
+const CONTENT_FILE_PATTERN = /^[0-9a-f]{16}\.json$/;
+
+/** File name stem of a folder key: the first 16 hex characters of its sha1. */
+const contentHashOf = (key: string): string => createHash('sha1').update(key).digest('hex').slice(0, 16);
+
+const isWriter = (writer: unknown): writer is MemoryBlockWriter =>
+  writer === null || writer === 'user' || (typeof writer === 'string' && writer.startsWith('agent:'));
 
 function corruptError(fileName: string, reason: string): AppError {
   // The file is left untouched so the user can repair or delete it by hand.
@@ -120,6 +148,53 @@ export function createAgentProfileStore(options: {
     return value as Record<string, AgentProfileValues>;
   }
 
+  // ---------- per-folder content of project memory blocks ----------
+
+  const contentPathsOf = (blockId: string, key: string) => {
+    assertValidProfileId(blockId);
+    const directory = path.join(rootDir, CONTENTS_DIR, blockId);
+    const hash = contentHashOf(key);
+    return { directory, file: path.join(directory, `${hash}.json`), tomb: path.join(directory, `${hash}.tomb`), hash };
+  };
+
+  function requireDefinition(blockId: string): void {
+    if (!readRecord('memory-blocks', blockId)) {
+      throw new AppError('Memory block not found', { code: 'PROFILE_NOT_FOUND', statusCode: 404 });
+    }
+  }
+
+  /** A content file; PROFILE_CORRUPT unless it has the content shape and its `directory` maps back to the file name. */
+  function readContentFile(file: string, hash: string): MemoryBlockProjectContent | null {
+    const value = readJson(file);
+    if (value === null) return null;
+    const name = path.basename(file);
+    if (typeof value !== 'object' || Array.isArray(value)) throw corruptError(name, 'not an object');
+    const record = value as Partial<MemoryBlockProjectContent>;
+    if (typeof record.directory !== 'string' || !record.directory || typeof record.content !== 'string'
+      || typeof record.updatedAt !== 'string' || !Number.isInteger(record.rev) || (record.rev as number) < 1 || !isWriter(record.lastWriter)) {
+      throw corruptError(name, 'unexpected shape');
+    }
+    if (contentHashOf(valuesKeyOf(record.directory)) !== hash) throw corruptError(name, 'directory does not match the file name');
+    return record as MemoryBlockProjectContent;
+  }
+
+  /** `rev` a removed content file left in its tomb (0 when none). */
+  function readTombRev(tomb: string): number {
+    const value = readJson(tomb) as { rev?: unknown } | null;
+    if (value === null) return 0;
+    if (typeof value !== 'object' || !Number.isInteger(value.rev) || (value.rev as number) < 0) throw corruptError(path.basename(tomb), 'unexpected shape');
+    return value.rev as number;
+  }
+
+  const contentFileNames = (directory: string): string[] => {
+    try {
+      return fs.readdirSync(directory).filter((entry) => CONTENT_FILE_PATTERN.test(entry)).sort();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+  };
+
   return {
     /** Readable records of a collection; broken files are reported in `corrupt`, not thrown. */
     list<T extends AgentProfileMeta>(kind: AgentProfileKind): AgentProfileList<T> {
@@ -186,6 +261,133 @@ export function createAgentProfileStore(options: {
       const file = path.join(rootDir, kind, `${id}.json`);
       if (!fs.existsSync(file)) return false;
       fs.rmSync(file);
+      return true;
+    },
+
+    /** Content of a project block in one folder, null when no file; PROFILE_CORRUPT for an unreadable file. */
+    getContent(blockId: string, key: string): MemoryBlockProjectContent | null {
+      const paths = contentPathsOf(blockId, key);
+      return readContentFile(paths.file, paths.hash);
+    },
+
+    /** Readable content files of a block (tombs and temp files ignored); broken ones are reported in `corrupt` (id = file name stem). */
+    listContents(blockId: string): { items: MemoryBlockProjectContent[]; corrupt: { id: string; error: string }[] } {
+      assertValidProfileId(blockId);
+      const directory = path.join(rootDir, CONTENTS_DIR, blockId);
+      const result: { items: MemoryBlockProjectContent[]; corrupt: { id: string; error: string }[] } = { items: [], corrupt: [] };
+      for (const name of contentFileNames(directory)) {
+        const hash = name.slice(0, -'.json'.length);
+        try {
+          const content = readContentFile(path.join(directory, name), hash);
+          if (content) result.items.push(content);
+        } catch (error) {
+          if (!(error instanceof AppError) || error.code !== 'PROFILE_CORRUPT') throw error;
+          result.corrupt.push({ id: hash, error: error.message });
+        }
+      }
+      return result;
+    },
+
+    /**
+     * Creates the content file of a folder; never replaces one (409 `BLOCK_CONTENT_EXISTS`, also for an unreadable file) and
+     * enforces the cap (409 `BLOCK_CONTENT_LIMIT_REACHED`). `rev` is 1, or the last `rev` of a removed file + 1, so a stale
+     * edit from before the removal can never match; `init.rev` / `init.updatedAt` carry a migrated block's own values.
+     */
+    createContent(
+      blockId: string, key: string,
+      init: { directory: string; content: string; lastWriter: MemoryBlockWriter; rev?: number; updatedAt?: string },
+    ): MemoryBlockProjectContent {
+      const paths = contentPathsOf(blockId, key);
+      requireDefinition(blockId);
+      if (valuesKeyOf(init.directory) !== key) {
+        throw new AppError('directory does not match the content key', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+      }
+      if (fs.existsSync(paths.file)) {
+        throw new AppError('This folder already has content for the memory block', { code: 'BLOCK_CONTENT_EXISTS', statusCode: 409 });
+      }
+      if (contentFileNames(paths.directory).length >= MAX_CONTENTS_PER_BLOCK) {
+        throw new AppError(`A memory block can have content for at most ${MAX_CONTENTS_PER_BLOCK} folders; remove one first`, {
+          code: 'BLOCK_CONTENT_LIMIT_REACHED', statusCode: 409,
+        });
+      }
+      const created: MemoryBlockProjectContent = {
+        directory: init.directory, content: init.content, rev: init.rev ?? readTombRev(paths.tomb) + 1,
+        lastWriter: init.lastWriter, updatedAt: init.updatedAt ?? now().toISOString(),
+      };
+      writeAtomic(paths.file, created);
+      fs.rmSync(paths.tomb, { force: true });
+      return created;
+    },
+
+    /**
+     * Rewrites the content of an existing file (404 when absent, 409 `PROFILE_STALE` when `expectedRev` is not its `rev`) and
+     * bumps `rev`. `build` receives the current content and returns the new `content` and `lastWriter`.
+     */
+    updateContent(
+      blockId: string, key: string, expectedRev: number,
+      build: (current: MemoryBlockProjectContent) => { content: string; lastWriter: MemoryBlockWriter },
+    ): MemoryBlockProjectContent {
+      const paths = contentPathsOf(blockId, key);
+      requireDefinition(blockId);
+      const current = readContentFile(paths.file, paths.hash);
+      if (!current) throw new AppError('No content for this folder', { code: 'PROFILE_NOT_FOUND', statusCode: 404 });
+      if (current.rev !== expectedRev) {
+        throw new AppError('This content was changed since you loaded it. Reload and try again.', {
+          code: 'PROFILE_STALE', statusCode: 409, details: { currentRev: current.rev, currentUpdatedAt: current.updatedAt },
+        });
+      }
+      const { content, lastWriter } = build(current);
+      const next: MemoryBlockProjectContent = { directory: current.directory, content, lastWriter, rev: current.rev + 1, updatedAt: now().toISOString() };
+      writeAtomic(paths.file, next);
+      return next;
+    },
+
+    /**
+     * Deletes the content file of a folder and leaves `<hash>.tomb` with its last `rev` (see `createContent`); true when a
+     * file was removed. Works on an unreadable file too (its `rev` is then unknown and the tomb keeps the earlier one).
+     */
+    removeContent(blockId: string, key: string): boolean {
+      const paths = contentPathsOf(blockId, key);
+      requireDefinition(blockId);
+      if (!fs.existsSync(paths.file)) return false;
+      let lastRev = readTombRev(paths.tomb);
+      try {
+        lastRev = Math.max(lastRev, readContentFile(paths.file, paths.hash)?.rev ?? 0);
+      } catch (error) {
+        if (!(error instanceof AppError) || error.code !== 'PROFILE_CORRUPT') throw error;
+      }
+      writeAtomic(paths.tomb, { rev: lastRev });
+      fs.rmSync(paths.file);
+      return true;
+    },
+
+    /** Deletes every content file and tomb of a block (its folder under `memory-block-contents/`); idempotent. */
+    removeAllContents(blockId: string): void {
+      assertValidProfileId(blockId);
+      const base = path.resolve(rootDir, CONTENTS_DIR);
+      const target = path.resolve(base, blockId);
+      if (path.dirname(target) !== base) {
+        throw new AppError('Invalid profile id', { code: 'INVALID_PROFILE_ID', statusCode: 400 });
+      }
+      fs.rmSync(target, { recursive: true, force: true });
+    },
+
+    /** Copies a record file to `<rootDir>/<backupFolder>/<id>.json` unless the copy exists; true when it exists afterwards. */
+    backupRecord(kind: AgentProfileKind, id: string, backupFolder: string): boolean {
+      assertValidProfileId(id);
+      const source = path.join(rootDir, kind, `${id}.json`);
+      const target = path.join(rootDir, backupFolder, `${id}.json`);
+      if (fs.existsSync(target)) return true;
+      if (!fs.existsSync(source)) return false;
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      const temp = `${target}.${randomUUID()}.tmp`;
+      try {
+        fs.copyFileSync(source, temp);
+        fs.renameSync(temp, target);
+      } catch (error) {
+        fs.rmSync(temp, { force: true });
+        throw error;
+      }
       return true;
     },
 

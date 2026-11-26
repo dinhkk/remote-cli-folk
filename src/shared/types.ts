@@ -2108,13 +2108,17 @@ export type AgentProfileTemplateInput = Omit<AgentProfileTemplate, keyof AgentPr
 /** `read-only`: agents cannot write the block (only the user can); `writable`: agents may replace or append. Mirrors the server's `MemoryBlockMode`. */
 export type MemoryBlockMode = 'read-only' | 'writable';
 
-/** Where a block is visible to agents: every run (`global`) or only runs in that project folder. Mirrors the server's `MemoryBlockScope`. */
-export type MemoryBlockScope = { kind: 'global' } | { kind: 'project'; directory: string };
+/** Where a block applies: every run (`global`) or per project folder (`project`, one content file per folder). Mirrors the server's `MemoryBlockScope`. */
+export type MemoryBlockScope = { kind: 'global' } | { kind: 'project' };
 
 /** Who wrote the content last: the user, an agent (`agent:<main agent name>`) or nobody yet. Mirrors the server's `MemoryBlockWriter`. */
 export type MemoryBlockWriter = 'user' | `agent:${string}` | null;
 
-/** App-owned memory block (`/api/agent-profiles/memory-blocks`). `rev` is sent back as `expectedRev` on update. Mirrors the server's `MemoryBlock`. */
+/**
+ * App-owned memory block definition (`/api/agent-profiles/memory-blocks`). `rev` is sent back as `expectedRev` on update. A project
+ * block holds no content here; see `MemoryBlockProjectContent`. `needsAttention` is the reason an older block could not be moved
+ * to per-folder content. Mirrors the server's `MemoryBlockDefinition`.
+ */
 export type MemoryBlock = AgentProfileMeta & {
   name: string;
   description: string;
@@ -2123,10 +2127,23 @@ export type MemoryBlock = AgentProfileMeta & {
   content: string;
   maxChars: number;
   lastWriter: MemoryBlockWriter;
+  needsAttention?: string;
 };
 
-/** Body of a block create request (an update adds `expectedRev`). Mirrors the server's `MemoryBlockInput`. */
-export type MemoryBlockInput = Omit<MemoryBlock, keyof AgentProfileMeta | 'lastWriter'>;
+/** Content of a project block in one folder. Mirrors the server's `MemoryBlockProjectContent`. */
+export type MemoryBlockProjectContent = {
+  directory: string;
+  content: string;
+  rev: number;
+  lastWriter: MemoryBlockWriter;
+  updatedAt: string;
+};
+
+/**
+ * Body of a block create request (an update adds `expectedRev`). A project block's text lives per folder, so its body carries no
+ * `content`. Mirrors the server's `MemoryBlockInput`.
+ */
+export type MemoryBlockInput = Omit<MemoryBlock, keyof AgentProfileMeta | 'lastWriter' | 'needsAttention' | 'content'> & { content?: string };
 
 /** A stored file the server could not read as a profile; listed so the user can find and fix it. */
 export type AgentProfileCorruptEntry = { id: string; error: string };
