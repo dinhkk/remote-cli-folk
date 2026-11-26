@@ -139,13 +139,7 @@ Terms that mean something specific here and are easy to guess wrong.
 
 ## Cross-cutting invariants
 
-- **One running entry per session.** Runtime background tasks take priority over CLI
-  liveness records. Background-only work keeps the composer usable; an external turn
-  with `canInterrupt: false` cannot expose an enabled Stop action. See
-  [Run lifecycle and busy state](02-realtime-stream.md#run-lifecycle-and-busy-state).
-
-
-Five rules that hold across the whole subsystem. Breaking one causes bugs that look
+Six rules that hold across the whole subsystem. Breaking one causes bugs that look
 unrelated to the change that caused them.
 
 1. **The browser never learns a provider session id from a chat frame.** Every outbound
@@ -158,6 +152,10 @@ unrelated to the change that caused them.
    duplicate rows and a transcript that flashes empty.
 5. **The persisted transcript is the source of truth.** Realtime rows are an overlay,
    pruned against REST whenever a run completes.
+6. **One running entry per session.** Runtime background tasks take priority over CLI
+  liveness records. Background-only work keeps the composer usable; an external turn
+  with `canInterrupt: false` cannot expose an enabled Stop action. See
+  [Run lifecycle and busy state](02-realtime-stream.md#run-lifecycle-and-busy-state).
 
 ---
 

@@ -330,7 +330,6 @@ If an external CLI turn cannot be interrupted, `ChatComposer` disables its Stop 
 and labels it with the reason. Typing a draft still enables Queue next message. This
 restriction does not disable Send for background-only work.
 
-
 The activity indicator, the abort button and the status text all derive from one
 `Map<sessionId, SessionActivity>` in `useSessionProtection`. Nothing in the transcript
 feeds it. It is written in exactly four places:
