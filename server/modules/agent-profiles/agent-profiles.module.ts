@@ -4,8 +4,10 @@ import path from 'node:path';
 import { projectsDb } from '@/modules/database/index.js';
 import type { SessionAgentScope, SessionAgentSnapshot } from '@/shared/types.js';
 
+import { createSnapshotStore } from './agent-profiles.backup.js';
 import { createBlocksMcpServer } from './agent-profiles.blocks.mcp.js';
 import { createBlocksService, type BlocksRunContext } from './agent-profiles.blocks.service.js';
+import { createBundleService } from './agent-profiles.bundle.service.js';
 import { createAgentProfilesRouter } from './agent-profiles.routes.js';
 import { createSessionScopeResolver } from './agent-profiles.session-scope.js';
 import { createAgentProfilesService } from './agent-profiles.service.js';
@@ -34,9 +36,17 @@ const agentProfilesService = createAgentProfilesService({
 });
 const sessionScope = createSessionScopeResolver({ claudeAgents });
 const blocksService = createBlocksService({ store });
+// Snapshots taken before an import overwrites something live next to the records (`<root>/backups`).
+const bundleService = createBundleService({
+  profiles: agentProfilesService,
+  blocks: blocksService,
+  store,
+  snapshots: createSnapshotStore({ directory: path.join(rootDir, 'backups') }),
+  resolveProjectDirectory: (projectId) => projectsDb.getProjectPathById(projectId),
+});
 
 /** Agent profile router assembled with the file store and the Claude SDK adapter. */
-export const agentProfilesRoutes = createAgentProfilesRouter(agentProfilesService, claudeAgents, blocksService);
+export const agentProfilesRoutes = createAgentProfilesRouter(agentProfilesService, claudeAgents, blocksService, bundleService);
 
 /**
  * The in-process MCP server `blocks` for one run of a session with a main agent: `directory` is the project

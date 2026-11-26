@@ -3,6 +3,8 @@ import express from 'express';
 import { AppError } from '@/shared/utils.js';
 
 import { parseExpectedBlockRev } from './agent-profiles.blocks.validation.js';
+import { parseExportRequest, parseImportRequest, parseRestoreRequest } from './agent-profiles.bundle.validation.js';
+import type { BundleService } from './agent-profiles.bundle.service.js';
 import type { BlocksService } from './agent-profiles.blocks.service.js';
 import type { AgentProfilesService } from './agent-profiles.service.js';
 import type { ClaudeAgentsService } from './claude-agents.service.js';
@@ -21,13 +23,24 @@ const parseOptionalRev = (value: unknown): number | undefined => {
 };
 
 /**
+ * JSON body parser of the bundle routes: at most 5 MB (bundles are text; the global parser allows 50 MB). Mount it on
+ * `/api/agent-profiles/bundle` before the global parser, which skips a body that is already parsed, so the bundle routes
+ * never parse more than 5 MB.
+ * Consumed by: server/index.ts, agent-profiles.bundle.routes.test.ts.
+ */
+export const agentProfilesBundleBodyParser = express.json({
+  limit: '5mb',
+  type: (req) => (req.headers['content-type'] || '').includes('json'),
+});
+
+/**
  * REST routes of the agent profiles (templates, Generate, Claude agents, scope options). Routes
  * only parse transport input and call the services; every rule lives in the services. Errors go to
  * the app error middleware.
  * Mounted behind `authenticateToken`; Remote reaches only `GET /scope-options`.
  */
 export function createAgentProfilesRouter(
-  service: AgentProfilesService, claudeAgents: ClaudeAgentsService, blocks: BlocksService,
+  service: AgentProfilesService, claudeAgents: ClaudeAgentsService, blocks: BlocksService, bundle: BundleService,
 ): express.Router {
   const router = express.Router();
   const respond = (operation: (req: express.Request) => unknown | Promise<unknown>, status = 200) =>
@@ -73,6 +86,21 @@ export function createAgentProfilesRouter(
     const expectedRev = parseOptionalRev(req.query.expectedRev);
     return req.query.remove === 'true' ? blocks.removeFolder(id, directory, expectedRev) : blocks.emptyContent(id, directory, expectedRev);
   }));
+
+  // Import / export of templates and memory blocks as a YAML or JSON text bundle (Host only, denied for Remote). The bundle is parsed
+  // on the server from `text` (mounted with a 5 MB body cap in server/index.ts). Apply answers 200 with `partial`: a mixed result must not look like plain success.
+  router.post('/bundle/export', respond((req) => bundle.exportText(parseExportRequest(req.body))));
+  router.post('/bundle/import/preview', respond((req) => {
+    const request = parseImportRequest(req.body);
+    return bundle.previewText(request.text, { projectMap: request.projectMap });
+  }));
+  router.post('/bundle/import', respond((req) => {
+    const { text, ...options } = parseImportRequest(req.body);
+    return bundle.applyText(text, options);
+  }));
+  // Snapshots the server wrote before an overwrite, newest first; restore names one by file name (never a path).
+  router.get('/bundle/snapshots', respond(() => bundle.listSnapshots()));
+  router.post('/bundle/restore', respond((req) => bundle.restoreSnapshot(parseRestoreRequest(req.body).snapshot)));
 
   return router;
 }

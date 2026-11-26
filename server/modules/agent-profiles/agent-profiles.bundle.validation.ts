@@ -187,3 +187,82 @@ export function templateSensitivity(input: AgentProfileTemplateInput): string[] 
   if (input.skills && input.skills.length > 0) reasons.push('skills');
   return [...new Set(reasons)];
 }
+
+// ---------- request bodies of the bundle routes ----------
+
+const MAX_LIST_ITEMS = 2000;
+const MAX_KEY_CHARS = 5000;
+
+const invalidRequest = (message: string): AppError => new AppError(message, { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+
+function optionalIdList(value: unknown, field: string): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_LIST_ITEMS || value.some((id) => typeof id !== 'string' || !id || id.length > 200)) {
+    throw invalidRequest(`${field} must be a list of ids`);
+  }
+  return value as string[];
+}
+
+function keyList(value: unknown, field: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > MAX_LIST_ITEMS || value.some((key) => typeof key !== 'string' || key.length > MAX_KEY_CHARS)) {
+    throw invalidRequest(`${field} must be a list of keys`);
+  }
+  return value as string[];
+}
+
+function stringMap(value: unknown, field: string): Record<string, string> {
+  if (value === undefined || value === null) return {};
+  if (!isRecord(value) || Object.keys(value).length > MAX_LIST_ITEMS) throw invalidRequest(`${field} must be an object`);
+  const entries = Object.entries(value);
+  if (entries.some(([key, item]) => key.length > MAX_KEY_CHARS || typeof item !== 'string' || item.length > 200)) throw invalidRequest(`${field} must map text to text`);
+  return Object.fromEntries(entries) as Record<string, string>;
+}
+
+/** What the export route carries: optional id lists (omitted = all), whether block text is included, and the file format. */
+export function parseExportRequest(body: unknown): { templateIds?: string[]; blockIds?: string[]; includeBlockContent: boolean; format: 'yaml' | 'json' } {
+  const source = body === undefined || body === null ? {} : body;
+  if (!isRecord(source)) throw invalidRequest('request body must be an object');
+  if (source.includeBlockContent !== undefined && typeof source.includeBlockContent !== 'boolean') throw invalidRequest('includeBlockContent must be true or false');
+  if (source.format !== undefined && source.format !== 'yaml' && source.format !== 'json') throw invalidRequest('format must be "yaml" or "json"');
+  return {
+    templateIds: optionalIdList(source.templateIds, 'templateIds'),
+    blockIds: optionalIdList(source.blockIds, 'blockIds'),
+    includeBlockContent: source.includeBlockContent === true,
+    format: source.format === 'json' ? 'json' : 'yaml',
+  };
+}
+
+/**
+ * What the import preview and import routes carry: the bundle `text` (YAML or JSON, parsed by the server) and the user's
+ * choices. `projectMap` maps a source folder key to a sidebar project id; `basis` is what the preview saw per ticked key.
+ */
+export function parseImportRequest(body: unknown): {
+  text: string; projectMap: Record<string, string>; overwrite: string[]; acceptSensitive: string[]; basis: Record<string, number | 'absent'>;
+} {
+  const source = isRecord(body) ? body : null;
+  if (!source) throw invalidRequest('request body must be an object');
+  if (typeof source.text !== 'string' || !source.text.trim()) throw invalidRequest('text is required (the bundle as YAML or JSON)');
+  const basis: Record<string, number | 'absent'> = {};
+  if (source.basis !== undefined && source.basis !== null) {
+    if (!isRecord(source.basis) || Object.keys(source.basis).length > MAX_LIST_ITEMS) throw invalidRequest('basis must be an object');
+    for (const [key, value] of Object.entries(source.basis)) {
+      if (key.length > MAX_KEY_CHARS || !(value === 'absent' || (Number.isInteger(value) && (value as number) >= 0))) throw invalidRequest('basis values must be a revision number or "absent"');
+      basis[key] = value as number | 'absent';
+    }
+  }
+  return {
+    text: source.text,
+    projectMap: stringMap(source.projectMap, 'projectMap'),
+    overwrite: keyList(source.overwrite, 'overwrite'),
+    acceptSensitive: keyList(source.acceptSensitive, 'acceptSensitive'),
+    basis,
+  };
+}
+
+/** The restore route's body: the snapshot's file name (checked against the snapshot name pattern by the snapshot store). */
+export function parseRestoreRequest(body: unknown): { snapshot: string } {
+  const snapshot = isRecord(body) ? body.snapshot : undefined;
+  if (typeof snapshot !== 'string' || !snapshot || snapshot.length > 200) throw invalidRequest('snapshot is required (a snapshot file name)');
+  return { snapshot };
+}
