@@ -9,7 +9,7 @@ import { useRemoteTabs } from '@/modules/remote/hooks/useRemoteTabs';
 /**
  * useRemoteTabs is the one place the Remote tab bar learns about pairings. It
  * must cost nothing for someone who never pairs (one request, then silence) and
- * keep up with link state, every 2 s, once a pairing exists.
+ * keep up with link state, every 5 s, once a pairing exists.
  */
 
 const peer = { peerId: 'peer_one11111', name: 'Laptop', state: 'online', lastConnectedAt: null };
@@ -70,7 +70,7 @@ test('with no pairing it asks once and then stays quiet', async () => {
   assert.equal(peerCalls().length, 1);
 });
 
-test('with a pairing it follows the link state every 2 seconds', async () => {
+test('with a pairing it follows the link state every 5 seconds', async () => {
   peersReply = () => new Response(JSON.stringify([peer]), { status: 200 });
   const { result } = renderHook(() => useRemoteTabs());
   await act(async () => {
@@ -80,7 +80,7 @@ test('with a pairing it follows the link state every 2 seconds', async () => {
 
   peersReply = () => new Response(JSON.stringify([{ ...peer, state: 'offline' }]), { status: 200 });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(5100);
   });
 
   assert.equal(result.current.peers[0]?.state, 'offline');
@@ -96,7 +96,7 @@ test('polling stops again when the last pairing is removed', async () => {
 
   peersReply = () => new Response('[]', { status: 200 });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(5100);
   });
   const settled = peerCalls().length;
   await act(async () => {
@@ -157,10 +157,10 @@ test('a transient failure (network, 5xx, 401) keeps the last known peers and ret
     assert.deepEqual(result.current.peers.map((entry) => entry.peerId), ['peer_one11111'], 'peers survive the failure');
   }
 
-  // Backoff: after a failure the next attempt is not due after the normal 2 s...
+  // Backoff: after a failure the next attempt is not due after the normal 5 s...
   const afterFailures = peerCalls().length;
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(5100);
   });
   assert.equal(peerCalls().length, afterFailures);
   // ...but it does come, and a healthy answer brings new data.
@@ -232,7 +232,7 @@ test('the tab bar and the Remote settings share one /peers request per cycle', a
   });
   const first = peerCalls().length;
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(5100);
   });
 
   assert.equal(peerCalls().length - first, 1);

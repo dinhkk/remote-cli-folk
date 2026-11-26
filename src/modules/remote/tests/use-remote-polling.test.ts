@@ -8,7 +8,7 @@ import { failure, installFakeRemoteApi, reply, settle } from '@/modules/remote/t
 
 /**
  * One poll feeds the whole Remote UI: `GET /host/status` plus `GET /peers`
- * every 2 s (contracts.md section 2). It backs off while the server fails,
+ * every 5 s. It backs off while the server fails,
  * sleeps while the tab is hidden, and costs nothing for someone who never
  * turned Remote on.
  */
@@ -44,7 +44,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test('full mode reads host status and peers once per cycle, every 2 seconds', async () => {
+test('full mode reads host status and peers once per cycle, every 5 seconds', async () => {
   const { result } = renderHook(() => useRemotePolling('full'));
   await settle();
 
@@ -54,7 +54,7 @@ test('full mode reads host status and peers once per cycle, every 2 seconds', as
   assert.equal(api.to('GET', HOST).length, 1);
   assert.equal(api.to('GET', PEERS).length, 1);
 
-  await settle(2100);
+  await settle(5100);
   assert.equal(api.to('GET', HOST).length, 2);
   assert.equal(api.to('GET', PEERS).length, 2);
 });
@@ -63,33 +63,33 @@ test('two screens using the poll share one request per cycle', async () => {
   renderHook(() => useRemotePolling('full'));
   renderHook(() => useRemotePolling('full'));
   await settle();
-  await settle(2100);
+  await settle(5100);
 
   assert.equal(api.to('GET', HOST).length, 2);
   assert.equal(api.to('GET', PEERS).length, 2);
 });
 
-test('it backs off while the server fails and returns to 2 seconds once it answers', async () => {
+test('it backs off while the server fails and returns to 5 seconds once it answers', async () => {
   api.set(`GET ${HOST}`, failure(500, 'REMOTE_INTERNAL'));
   const { result } = renderHook(() => useRemotePolling('full'));
   await settle();
   assert.equal(api.to('GET', HOST).length, 1);
   assert.equal(result.current.snapshot.failure?.status, 500);
 
-  await settle(2100); // the first retry is not due yet: the gap doubled to 4 s
+  await settle(5100); // the first retry is not due yet: the gap doubled to 10 s
   assert.equal(api.to('GET', HOST).length, 1);
-  await settle(2000);
+  await settle(5000);
   assert.equal(api.to('GET', HOST).length, 2);
 
-  await settle(4100); // second failure: 8 s
+  await settle(10_100); // second failure: 20 s
   assert.equal(api.to('GET', HOST).length, 2);
   api.set(`GET ${HOST}`, reply(status()));
-  await settle(4000);
+  await settle(10_000);
   assert.equal(api.to('GET', HOST).length, 3);
   assert.equal(result.current.snapshot.failure, null);
 
-  await settle(2100);
-  assert.equal(api.to('GET', HOST).length, 4, 'a healthy answer resets the gap to 2 s');
+  await settle(5100);
+  assert.equal(api.to('GET', HOST).length, 4, 'a healthy answer resets the gap to 5 s');
 });
 
 test('the gap stops growing at 30 seconds', async () => {
@@ -114,7 +114,7 @@ test('it stops while the page is hidden and catches up at once when it is shown 
   setVisibility('visible');
   await settle();
   assert.equal(api.to('GET', HOST).length, 2);
-  await settle(2100);
+  await settle(5100);
   assert.equal(api.to('GET', HOST).length, 3);
 });
 
@@ -132,11 +132,11 @@ test('indicator mode follows the Host while Accept is on and sleeps again when i
   api.set(`GET ${HOST}`, reply(status({ acceptEnabled: true })));
   const { result } = renderHook(() => useRemotePolling('indicator'));
   await settle();
-  await settle(2100);
+  await settle(5100);
   assert.equal(api.to('GET', HOST).length, 2);
 
   api.set(`GET ${HOST}`, reply(status({ acceptEnabled: false })));
-  await settle(2100);
+  await settle(5100);
   const settled = api.to('GET', HOST).length;
   await settle(10_000);
   assert.equal(api.to('GET', HOST).length, settled);
@@ -146,7 +146,7 @@ test('indicator mode follows the Host while Accept is on and sleeps again when i
     await result.current.refresh();
   });
   assert.equal(result.current.snapshot.host?.acceptEnabled, true);
-  await settle(2100);
+  await settle(5100);
   assert.equal(api.to('GET', HOST).length, settled + 2, 'refresh wakes the poll up again');
 });
 

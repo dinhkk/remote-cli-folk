@@ -2,7 +2,7 @@ import { parseHostStatus } from '@/modules/remote/utils/parse-remote-responses';
 import { parseRemotePeers } from '@/modules/remote/utils/parse-remote-peers';
 import { MALFORMED_RESPONSE_CODE, readRemoteResult } from '@/modules/remote/utils/remote-api-result';
 import { api } from '@/shared/api';
-import { REMOTE_PEERS_POLL_INTERVAL_MS } from '@/shared/constants';
+import { REMOTE_STATUS_POLL_INTERVAL_MS } from '@/shared/constants';
 import type { RemoteApiResult, RemoteHostStatus, RemotePeer, RemoteStatusSnapshot } from '@/shared/types';
 
 /**
@@ -72,7 +72,7 @@ const createRemoteStatusPoller = () => {
   const schedule = () => {
     clearTimer();
     if (!shouldKeepPolling() || isPageHidden()) return;
-    const delay = failures === 0 ? REMOTE_PEERS_POLL_INTERVAL_MS : Math.min(REMOTE_PEERS_POLL_INTERVAL_MS * 2 ** failures, MAX_BACKOFF_MS);
+    const delay = failures === 0 ? REMOTE_STATUS_POLL_INTERVAL_MS : Math.min(REMOTE_STATUS_POLL_INTERVAL_MS * 2 ** failures, MAX_BACKOFF_MS);
     timer = setTimeout(() => void poll(), delay);
   };
 

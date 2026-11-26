@@ -13,7 +13,7 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 
 import { api, ApiRequestError, readApiErrorMessage } from '@/shared/api';
-import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
+import { PROVIDER_PERMISSION_PREFERENCE_KEYS, QUEUED_DRAFT_RECONCILE_INTERVAL_MS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
 import type { BackgroundSendChoice, BackgroundSendPrompt, CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand,NewChatScopeRequest } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
@@ -1220,7 +1220,11 @@ export function useChatComposerState({
         });
       }
     };
-    const timer = setInterval(() => void reconcile(), 5_000);
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void reconcile();
+      }
+    }, QUEUED_DRAFT_RECONCILE_INTERVAL_MS);
     // A hidden tab's timers are throttled (to about once a minute after a few
     // minutes), so its card can be far behind; catch up as soon as it is shown.
     const reconcileWhenShown = () => {

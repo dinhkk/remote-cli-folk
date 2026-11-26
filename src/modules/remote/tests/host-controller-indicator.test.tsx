@@ -57,7 +57,7 @@ test('it follows Controllers coming and going without a reload', async () => {
   await settle();
 
   api.set(`GET ${HOST}`, reply(status({ controllers: controllers(true, true) })));
-  await settle(2100);
+  await settle(5100);
 
   assert.equal(screen.getByRole('status').textContent, '2 Controllers connected');
 });

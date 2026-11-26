@@ -64,7 +64,7 @@ test('it loads the relay, the Host status and the paired Hosts and shows each se
 
 test('one poll serves every section: host status and peers are each read once per cycle', async () => {
   await open();
-  await settle(2100);
+  await settle(5100);
 
   assert.equal(api.to('GET', HOST).length, 2);
   assert.equal(api.to('GET', PEERS).length, 2);
@@ -198,7 +198,7 @@ test('after a lockout, starting another pairing is blocked until the lock is ove
   await settle();
   fireEvent.change(screen.getByLabelText('Account password'), { target: { value: 'account-password-1' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-  await settle(2100);
+  await settle(5100);
   fireEvent.change(screen.getByLabelText('Verification code shown on the Controller'), { target: { value: '111111' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
   await settle();
@@ -221,7 +221,7 @@ test('Pair with a Host opens the Controller dialog and a finished pairing refres
   const dialog = screen.getByRole('dialog');
   fireEvent.change(within(dialog).getByLabelText('Pairing code'), { target: { value: 'abcd1234' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Pair' }));
-  await settle(2100);
+  await settle(5100);
 
   assert.ok(api.to('GET', PEERS).length > peersBefore);
   assert.ok(screen.getByText('Paired. The Host now appears in the list and as a tab.'));

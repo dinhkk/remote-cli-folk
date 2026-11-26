@@ -8,6 +8,11 @@ import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState'
 import { readDraftText, resetChatDrafts, writeDraftText } from '@/shared/chatDrafts';
 import type { BackgroundSendChoice, ChatMessage, PermissionMode, Project, ProjectSession, SessionActivityMap } from '@/shared/types';
 
+vi.mock('@/shared/constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/shared/constants')>()),
+  QUEUED_DRAFT_RECONCILE_INTERVAL_MS: 300,
+}));
+
 /**
  * #1587: follow-ups submitted while a turn runs used to replace each other in
  * the session's single queued slot, so only the last one reached the
@@ -336,11 +341,11 @@ test('the card follows the server when another tab adds to the queued message', 
   await submit(view, 'follow-up A');
   server.set('session-1', { text: '', queuedMessage: { content: 'follow-up A\n\nfrom the other tab', attachments: [] } });
 
-  // The card re-reads the server every 5 s while it is shown.
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5_300)); });
+  // The card re-reads the server on a timer while it is shown (shortened here).
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 700)); });
 
   assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfrom the other tab');
-}, 10_000);
+});
 
 test('a follow-up the server does not accept stays in the composer, with an error, and no card', async () => {
   const { view, errors } = render();
@@ -561,13 +566,13 @@ test('Edit after the card caught up with another tab still brings back this tab\
     },
   });
 
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5_300)); });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 700)); });
   assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfrom the other tab');
   await act(async () => { view.result.current.editQueuedDraft(); });
 
   assert.equal(view.result.current.input, 'follow-up A\n\nfrom the other tab');
   assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt']);
-}, 10_000);
+});
 
 test('Edit after another tab added a file to the queued message still brings back this tab\'s files', async () => {
   const fileA = new File(['a'], 'a.txt', { type: 'text/plain' });
@@ -581,13 +586,13 @@ test('Edit after another tab added a file to the queued message still brings bac
     },
   });
 
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5_300)); });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 700)); });
   assert.equal(view.result.current.queuedDraft?.uploadedAttachments?.length, 2, 'the card shows both files');
   await act(async () => { view.result.current.editQueuedDraft(); });
 
   // x.txt was uploaded by the other tab, so this page has no browser file for it.
   assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt']);
-}, 10_000);
+});
 
 test('a tab that is shown again catches up with the queued message at once', async () => {
   const { view } = render();
