@@ -34,6 +34,7 @@ const BLOCKED_PREFIXES = [
   '/api/agent-profiles/claude-agents',
   '/api/agent-profiles/memory-blocks',
   '/api/agent-profiles/bundle',
+  '/api/agent-profiles/pending',
 ] as const;
 
 // TaskMaster details of one project (`/api/projects/:id/taskmaster`) are part of

@@ -1,8 +1,8 @@
 import { AppError } from '@/shared/utils.js';
 import type {
-  AgentBundle, AgentBundleSnapshot, AgentProfileTemplate, AgentProfileTemplateInput, ExportProblem, ImportActor, ImportBasis, ImportFolderResult,
-  ImportFolderRow, ImportItemResult, ImportOptions, ImportPlan, ImportPlanItem, ImportProblem, ImportResult, MemoryBlockBundleEntry,
-  MemoryBlockDefinition, MemoryBlockProjectContent, MemoryBlockWriter, RawAgentBundle,
+  AgentBundle, AgentBundleSnapshot, AgentChangeset, AgentProfileTemplate, AgentProfileTemplateInput, ChangesetReview, ExportProblem, ImportActor,
+  ImportBasis, ImportFolderResult, ImportFolderRow, ImportItemResult, ImportOptions, ImportPlan, ImportPlanItem, ImportProblem, ImportResult,
+  MemoryBlockBundleEntry, MemoryBlockDefinition, MemoryBlockProjectContent, MemoryBlockWriter, ProfilesLiveView, RawAgentBundle,
 } from '@/shared/types.js';
 
 import type { SnapshotStore } from './agent-profiles.backup.js';
@@ -12,6 +12,7 @@ import {
 } from './agent-profiles.bundle.validation.js';
 import { MAX_MEMORY_BLOCKS } from './agent-profiles.blocks.validation.js';
 import type { BlocksService } from './agent-profiles.blocks.service.js';
+import { canonicalJson, evaluateChangeset } from './agent-profiles.changeset.js';
 import type { AgentProfilesService } from './agent-profiles.service.js';
 import { MAX_CONTENTS_PER_BLOCK, blockContentKey, blockFolderOf, type AgentProfileStore } from './agent-profiles.store.js';
 import { parseTemplateInput } from './agent-profiles.validation.js';
@@ -65,12 +66,6 @@ type PlannedItem = Omit<ImportPlanItem, 'folders'> & {
 /** `upload`: a client's bundle (folders only through `projectMap`). `restore`: a snapshot this server wrote (everything overwritable, stored folders). */
 type ImportMode = 'upload' | 'restore';
 
-const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) => (
-  item && typeof item === 'object' && !Array.isArray(item)
-    ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
-    : item
-));
-
 /** A stored template in the shape an import is compared in (no bookkeeping, normalised like an input). */
 function normalizedTemplate(template: AgentProfileTemplate): unknown {
   const { id: _id, rev: _rev, updatedAt: _updatedAt, ...rest } = template;
@@ -106,7 +101,8 @@ const writerFor = (actor: ImportActor, provenance: Exclude<MemoryBlockWriter, nu
  * purpose: the snapshot, the re-plan and the writes run without another request interleaving. A bundle is untrusted input
  * (a person or an AI may have written it): nothing is written without an explicit tick, folders come only from the
  * sidebar project the user maps, and a snapshot is taken before any overwrite.
- * Consumed by: agent-profiles.routes.ts (via agent-profiles.module.ts).
+ * It also reviews and applies the changesets an agent proposes (guardrails in agent-profiles.changeset.ts), see `applyChangeset`.
+ * Consumed by: agent-profiles.routes.ts (via agent-profiles.module.ts), agent-profiles.pending.service.ts, agent-profiles.profiles.mcp.ts.
  */
 export function createBundleService(dependencies: Dependencies) {
   const {
@@ -238,7 +234,7 @@ export function createBundleService(dependencies: Dependencies) {
       if (!existing) return item;
       item.liveTemplate = existing;
       item.basis = existing.rev;
-      item.status = canonical(normalizedTemplate(existing)) === canonical(result.input) ? 'identical' : 'conflict';
+      item.status = canonicalJson(normalizedTemplate(existing)) === canonicalJson(result.input) ? 'identical' : 'conflict';
       item.overwritable = item.status === 'conflict';
       return item;
     });
@@ -564,6 +560,131 @@ export function createBundleService(dependencies: Dependencies) {
     return { filename: `remotecli-agent-bundle-${day}.${format}`, text: serializeBundle(bundle, format), problems };
   }
 
+  // ---------- agent changesets (profiles tools, confirmed in the Host UI) ----------
+
+  /** The store as the changeset rules and the `profiles` tools see it: templates by slug, blocks by name, with folder counts and sizes only. */
+  function viewOf(live: LiveState): ProfilesLiveView {
+    const blocksByName: ProfilesLiveView['blocks'] = new Map();
+    for (const [name, block] of live.blocks) {
+      const texts = [...block.contents.values()];
+      blocksByName.set(name, {
+        definition: block.definition,
+        ambiguous: block.ambiguous,
+        problem: block.problem,
+        folders: texts.length,
+        foldersWithText: texts.filter((entry) => entry.content !== '').length,
+        folderChars: texts.reduce((sum, entry) => sum + entry.content.length, 0),
+        folderRevSum: texts.reduce((sum, entry) => sum + entry.rev, 0),
+      });
+    }
+    return { templates: live.templates, blocks: blocksByName };
+  }
+
+  /** What is stored now, for the `profiles_list` and `profiles_get` tools. Read only. */
+  const catalog = (): ProfilesLiveView => viewOf(readLive());
+
+  function reviewFrom(changeset: AgentChangeset, live: LiveState, managers: readonly string[]) {
+    // Folders never come from an agent, so the plan is made without a project map: it only decides new / identical / conflict.
+    // Deletes run first, so the upserts are planned against the store without the blocks being deleted (the 50-block limit).
+    const deletedBlocks = new Set((changeset.delete ?? []).filter((item) => item.kind === 'block').map((item) => item.key));
+    const afterDeletes: LiveState = { ...live, allBlocks: live.allBlocks.filter((block) => !deletedBlocks.has(block.definition.name)) };
+    const plan = changeset.upsert ? buildPlan(changeset.upsert, afterDeletes, { projectMap: new Map(), mode: 'upload' }) : [];
+    const items = evaluateChangeset({ changeset, live: viewOf(live), managers, plan: plan.map(publicItem) });
+    return { items, review: { items, refused: items.some((item) => item.refusal) } satisfies ChangesetReview };
+  }
+
+  /**
+   * Dry run of an agent changeset: the guardrails and a readable summary per item against the store as it is now. Writes
+   * nothing. `managers` are the agent names allowed to use the `profiles` tools (their templates are off limits).
+   */
+  const reviewChangeset = (changeset: AgentChangeset, managers: readonly string[]): ChangesetReview => reviewFrom(changeset, readLive(), managers).review;
+
+  /** Item key `template:<slug>` / `block:<name>` -> id of the stored record. */
+  function recordIdOf(key: string, live: LiveState): string | null {
+    return key.startsWith('template:') ? live.templates.get(key.slice('template:'.length))?.id ?? null : live.blocks.get(key.slice('block:'.length))?.definition.id ?? null;
+  }
+
+  type ChangesetApplyOptions = {
+    agentName: string;
+    managers: readonly string[];
+    /** Keys the user ticked: an overwrite, or a delete (a tick is the confirmation of a deletion). A create needs no tick. */
+    overwrite?: string[];
+    acceptSensitive?: string[];
+    /** What the review showed per key; a moved target is `STALE`. */
+    basis?: Record<string, ImportBasis>;
+  };
+
+  /**
+   * Applies an agent changeset the Host user confirmed. Everything is checked again from the store as it is now (the guardrails,
+   * the plan, the revisions); nothing from an earlier review is trusted. Deletes run first, after a snapshot that holds
+   * everything they remove (folder text of a project block included), then the upserts (which take their own snapshot when
+   * they overwrite). Each item succeeds or fails alone. Fully synchronous, like an import. The returned `snapshot` is the
+   * first one taken: restoring it undoes the deletes and the overwrites.
+   */
+  function applyChangeset(changeset: AgentChangeset, options: ChangesetApplyOptions): ImportResult {
+    if (!options.agentName.trim()) throw new AppError('An agent actor needs a name', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+    const actor: ImportActor = { kind: 'agent', name: options.agentName };
+    const overwrite = new Set(options.overwrite ?? []);
+    const basis = options.basis ?? {};
+    const liveBefore = readLive();
+    const { items: review } = reviewFrom(changeset, liveBefore, options.managers);
+    const results = new Map<string, ImportItemResult>();
+    for (const item of review) {
+      if (item.refusal) results.set(item.key, { key: item.key, status: 'failed', code: item.refusal.code, reason: item.refusal.message });
+    }
+
+    const deletable = review.filter((item) => {
+      if (item.action !== 'delete' || item.refusal) return false;
+      if (!overwrite.has(item.key)) {
+        results.set(item.key, { key: item.key, status: 'skipped', code: 'DELETE_NOT_TICKED', reason: 'Tick it to confirm the deletion' });
+      } else if (basis[item.key] === undefined) {
+        results.set(item.key, { key: item.key, status: 'failed', code: 'BASIS_REQUIRED', reason: 'Review before deleting: the review tells which version you saw' });
+      } else if (basis[item.key] !== item.basis) {
+        results.set(item.key, { key: item.key, status: 'failed', code: 'STALE', reason: 'Changed since the review. Review again before confirming.' });
+      } else return true;
+      return false;
+    });
+    let snapshot: string | null = null;
+    if (deletable.length > 0) {
+      if (liveBefore.corruptRecords > 0) {
+        throw new AppError(
+          'Some stored templates or blocks are unreadable, so a backup would be incomplete. Nothing was changed; repair or delete those files first.',
+          { code: 'SNAPSHOT_UNAVAILABLE', statusCode: 409 },
+        );
+      }
+      snapshot = snapshots.write(exportFrom(liveBefore, { includeBlockContent: true }).bundle);
+    }
+    for (const item of deletable) {
+      try {
+        const id = recordIdOf(item.key, liveBefore) as string;
+        if (item.kind === 'template') profiles.deleteTemplate(id);
+        else blocks.remove(id);
+        results.set(item.key, { key: item.key, status: 'applied' });
+      } catch (error) {
+        results.set(item.key, { key: item.key, status: 'failed', ...describeFailure(error) });
+      }
+    }
+
+    // Upserts: refused items are left out, so only what passed the guardrails reaches the importer (which checks read-only and folders again).
+    const { upsert } = changeset;
+    let imported: ImportResult | null = null;
+    if (upsert) {
+      const templateCount = upsert.templates.length;
+      const allowed: RawAgentBundle = {
+        ...upsert,
+        templates: upsert.templates.filter((_, index) => !review[index].refusal),
+        memoryBlocks: upsert.memoryBlocks.filter((_, index) => !review[templateCount + index].refusal),
+      };
+      if (allowed.templates.length + allowed.memoryBlocks.length > 0) {
+        imported = apply(allowed, { actor, overwrite: [...overwrite], acceptSensitive: options.acceptSensitive, basis }, 'upload');
+        for (const result of imported.items) results.set(result.key, result);
+      }
+    }
+    const items = review.map((item): ImportItemResult => results.get(item.key) ?? { key: item.key, status: 'failed', code: 'NOT_APPLIED', reason: 'This item was not applied' });
+    const partial = items.some((item) => item.status === 'failed' || (item.status === 'skipped' && item.code !== 'IDENTICAL') || item.partial === true);
+    return { items, partial, snapshot: snapshot ?? imported?.snapshot ?? null };
+  }
+
   // ---------- snapshots ----------
 
   const listSnapshots = (): AgentBundleSnapshot[] => snapshots.list();
@@ -580,8 +701,9 @@ export function createBundleService(dependencies: Dependencies) {
 
   return {
     exportBundle, exportText, planImport, applyImport, previewText, applyText, listSnapshots, restoreSnapshot,
+    catalog, reviewChangeset, applyChangeset,
   };
 }
 
-/** Bundle service type the routes depend on. Consumed by: agent-profiles.routes.ts. */
+/** Bundle service type the routes and the proposal code depend on. Consumed by: agent-profiles.routes.ts, agent-profiles.pending.service.ts, agent-profiles.profiles.mcp.ts. */
 export type BundleService = ReturnType<typeof createBundleService>;

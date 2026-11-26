@@ -233,16 +233,10 @@ export function parseExportRequest(body: unknown): { templateIds?: string[]; blo
   };
 }
 
-/**
- * What the import preview and import routes carry: the bundle `text` (YAML or JSON, parsed by the server) and the user's
- * choices. `projectMap` maps a source folder key to a sidebar project id; `basis` is what the preview saw per ticked key.
- */
-export function parseImportRequest(body: unknown): {
-  text: string; projectMap: Record<string, string>; overwrite: string[]; acceptSensitive: string[]; basis: Record<string, number | 'absent'>;
-} {
-  const source = isRecord(body) ? body : null;
-  if (!source) throw invalidRequest('request body must be an object');
-  if (typeof source.text !== 'string' || !source.text.trim()) throw invalidRequest('text is required (the bundle as YAML or JSON)');
+/** The ticks and the revisions a preview showed, as every apply request carries them. */
+type ParsedChoices = { overwrite: string[]; acceptSensitive: string[]; basis: Record<string, number | 'absent'> };
+
+function parseChoices(source: Record<string, unknown>): ParsedChoices {
   const basis: Record<string, number | 'absent'> = {};
   if (source.basis !== undefined && source.basis !== null) {
     if (!isRecord(source.basis) || Object.keys(source.basis).length > MAX_LIST_ITEMS) throw invalidRequest('basis must be an object');
@@ -251,13 +245,29 @@ export function parseImportRequest(body: unknown): {
       basis[key] = value as number | 'absent';
     }
   }
-  return {
-    text: source.text,
-    projectMap: stringMap(source.projectMap, 'projectMap'),
-    overwrite: keyList(source.overwrite, 'overwrite'),
-    acceptSensitive: keyList(source.acceptSensitive, 'acceptSensitive'),
-    basis,
-  };
+  return { overwrite: keyList(source.overwrite, 'overwrite'), acceptSensitive: keyList(source.acceptSensitive, 'acceptSensitive'), basis };
+}
+
+/**
+ * What the import preview and import routes carry: the bundle `text` (YAML or JSON, parsed by the server) and the user's
+ * choices. `projectMap` maps a source folder key to a sidebar project id; `basis` is what the preview saw per ticked key.
+ */
+export function parseImportRequest(body: unknown): ParsedChoices & { text: string; projectMap: Record<string, string> } {
+  const source = isRecord(body) ? body : null;
+  if (!source) throw invalidRequest('request body must be an object');
+  if (typeof source.text !== 'string' || !source.text.trim()) throw invalidRequest('text is required (the bundle as YAML or JSON)');
+  return { text: source.text, projectMap: stringMap(source.projectMap, 'projectMap'), ...parseChoices(source) };
+}
+
+/**
+ * The confirm route of a pending proposal: the ticks (`overwrite` also carries the keys of ticked deletes), the sensitive
+ * ticks and the `basis` the pending list showed. All optional (an empty body confirms only what needs no tick).
+ * Consumed by: agent-profiles.routes.ts.
+ */
+export function parseConfirmRequest(body: unknown): ParsedChoices {
+  const source = body === undefined || body === null ? {} : body;
+  if (!isRecord(source)) throw invalidRequest('request body must be an object');
+  return parseChoices(source);
 }
 
 /** The restore route's body: the snapshot's file name (checked against the snapshot name pattern by the snapshot store). */

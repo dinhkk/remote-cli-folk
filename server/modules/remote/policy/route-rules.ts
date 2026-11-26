@@ -51,6 +51,7 @@ export const REMOTE_DENY_RULES: readonly RouteRule[] = [
   { pattern: '/api/agent-profiles/claude-agents/**', note: 'lists Claude agents with their prompts and edits the hide list: Host configuration' },
   { pattern: '/api/agent-profiles/memory-blocks/**', note: 'memory blocks are text agents read and write across chats (an agent may have written anything into one): listing and editing them is Host-only, so a Controller can neither read nor plant that content through the API' },
   { pattern: '/api/agent-profiles/bundle/**', note: 'import/export of templates and memory blocks as a text bundle, with the snapshots and restore: bundles carry prompts, block text and folder paths and an import writes them, so the whole family is Host-only. This reduces surface and stops accidents; it is not a boundary against a hostile Controller, which is a full-trust grant' },
+  { pattern: '/api/agent-profiles/pending/**', note: 'proposals an agent staged through the profiles tools, with the confirm and reject actions that apply them: the Host user is the only approver, so the whole family is Host-only. This reduces surface and stops accidents and prompt injection; it is not a boundary against a hostile Controller, which is a full-trust grant' },
   { pattern: '/plugin-ws/**', note: 'plugin WebSocket proxy' },
   { pattern: '/desktop-notifications', note: 'desktop notification socket of the Host' },
   { pattern: '/api/system/**', note: 'self-update of the Host installation' },

@@ -52,11 +52,12 @@ Root = `AGENT_PROFILES_DIR`, else `<os.homedir()>/.claude-code-ui/agent-profiles
 | Path | Content |
 | --- | --- |
 | `templates/<id>.json` | Template records (`rev` for optimistic locking) |
-| `settings.json` | `hiddenClaudeAgents[]`, `rev` |
+| `settings.json` | `hiddenClaudeAgents[]`, `profileManagerAgents[]` (absent in older files = none), `rev` (one revision for both lists: any change bumps it) |
 | `values-by-directory.json` | `{ "<folder key>": { "<param>": "text" } }`; global = key `@global` |
 | `memory-blocks/<id>.json` | Memory block definitions (see [Memory blocks](#memory-blocks)) |
 | `memory-block-contents/<id>/<hash>.json` | Content of a project block in one folder; `<hash>.tomb` keeps the last `rev` of a removed one (see [Memory blocks](#memory-blocks)) |
 | `backups/<UTC stamp>-<4 hex>.json` | Snapshots (JSON bundles, mode 0600, folder 0700) the server writes before an import overwrites something; restored by file name (see [Import / export](#import--export)) |
+| `pending/<id>.json` | Proposals an allowlisted agent staged through the `profiles` tools (folder 0700, files 0600, 24 h, at most 10; see [Profiles tools and staged proposals](#profiles-tools-and-staged-proposals)) |
 | `memory-blocks.legacy/` | Backup copies of definitions saved by an older version, written before they are migrated |
 | `agents/`, `memory/`, `projects/`, `learning-*.json`, `workspace/` | Old layout. Ignored: never read, written or deleted. `memory/` is the old habit store, not the new `memory-blocks/` |
 
@@ -272,6 +273,67 @@ There is no sync: each host imports and recreates its own copy. Import, export, 
 - **Trust statement.** A paired Controller is a full-trust grant of the Host (see `route-rules.ts`). The Remote denial of `/bundle/**`
   reduces surface and stops accidents and prompt injection; it is not a boundary against a hostile Controller.
 
+## Profiles tools and staged proposals
+
+An allowlisted main agent can look at the store and **propose** changes to it from a chat. It never writes the live store: a
+proposal is a file under `pending/` that the Host user confirms in the app. Code: `agent-profiles.profiles.mcp.ts` (the tools),
+`.profiles.tool-names.ts`, `.changeset.ts` (parse, guardrails, readable summary; pure), `.pending.service.ts` (the staged files),
+`BundleService.reviewChangeset/applyChangeset` (the apply path), `claude-profiles-mcp.ts` in the providers module (attach rule).
+
+**Tools** (in-process MCP server `profiles`, built per run like `blocks`; every returned string is escaped inside `<template>`,
+`<block>`, `<item>`, `<error>` tags, nothing goes into a system prompt; an error shows its message only for a `CHANGESET_*` or
+`PENDING_*` code, anything else is one generic line):
+
+| Tool | Does |
+| --- | --- |
+| `profiles_list` | Templates (slug, name, description, family) and blocks (name, mode, scope, size; for a project block how many folders have text, never paths). No prompt text, no block content |
+| `profiles_get(kind, key)` | One template (with instructions) or one block (a global block's text; a project block only as a definition with its folder count) |
+| `profiles_preview(changeset)` | The guardrails and a readable summary per item against the store now. Writes nothing |
+| `profiles_propose(changeset)` | Same checks, then stages `pending/<id>.json` and returns `pendingId` and the summary; the text tells the agent to ask the user to confirm under Settings -> Agent Profiles -> Pending |
+
+All four are pre-approved (`allowedTools`) because none of them changes the store.
+
+**Attach rule.** `resolveProfilesAgentName` (`claude-profiles-mcp.ts`), next to `blocks` in `claude-runtime.provider.ts`. The server and the
+four tool names are added on every run (resumed ones too) only when ALL hold: the provider is Claude; `readRunOrigin(options.origin) === 'local'`
+(absent or unknown reads as remote: never for a Controller, scheduled, queued or `/api/agent` run); the session's main agent is in
+`profileManagerAgents`; that name resolves to the **user-level** generated file `~/.claude/agents/<name>.md` (marker naming the same slug;
+a project file of the same name shadows it in Claude Code and disqualifies it, readable or not); the settings read cleanly. Any error or
+malformed value means no tools, never an exception in the run path. The allowlist is set with `PUT /claude-agents/managers {names, rev}`
+(Host UI) and is checked again at propose time, so removing a name stops a run that is still open.
+
+**Changeset.** `{upsert?: bundle, delete?: [{kind: 'template'|'block', key}]}`: at most 5 items and 20 KB, one key never both upserted and
+deleted (`CHANGESET_CONFLICT`), unknown fields refused (no way to name settings or the allowlist), deletes run before upserts. Codes:
+`CHANGESET_INVALID`, `_EMPTY`, `_TOO_MANY_ITEMS`, `_TOO_LARGE`, `_CONFLICT`, `_REFUSED`, `_NOOP`, `_NOT_ALLOWED`, `_TARGET_NOT_FOUND`; `PENDING_FULL`, `PENDING_NOT_FOUND`.
+
+**Guardrails** (the same function at propose and again at confirm, from the store as it is then; a refused item at propose refuses the whole proposal):
+
+- *Hard refusals*: a template with `mcpServers`, with an `mcp__profiles__*` tool (or `mcp__profiles`), or with no `tools` line (an agent-made agent must state
+  its tools); any `contents[]` entry or `scope.directory` on a block (folder text is created by the Host only, an agent never names a folder: a
+  project block proposal is a definition, the user adds folders in the Memory tab); a block whose name exists with the other scope; a read-only block
+  (overwrite or delete); a block that cannot be backed up (`needsAttention`, unreadable folder file); a template whose slug (= generated agent name)
+  is in `profileManagerAgents`. A slug is the key an item is matched by, so an overwrite can never rename a template (the generated file keeps its name).
+- *Needs the user's tick at confirm* (`acceptSensitive`): `Bash`, `Bash(...)`, `Write`, `Edit`, `NotebookEdit`, other `mcp__*`, non-empty `skills`. An overwrite or a delete
+  also needs its key in `overwrite` (ticking a delete confirms it); a create needs none.
+- *Provenance*: global block text written through a proposal is recorded as `agent:<name>` whatever the proposal claims. An agent changeset never creates, overwrites or
+  removes a folder file, except that deleting a whole project block removes its folder files after the snapshot.
+- *Readable summary per item* (create / overwrite / delete / identical / refused): changed fields with before and after, tools granted, what a delete loses
+  (a global block's text size; a project block's folder count and total size), sensitive reasons.
+
+**Confirm** (`POST /pending/:id/confirm {overwrite[], acceptSensitive[], basis}`): re-validates everything from scratch (the staged summary and plan are never trusted;
+a pending file is plain JSON that anyone with file access could write, so an invalid one is ignored), takes the snapshot first (also for deletes; folder text of a deleted
+project block is in it, so Restore brings it back), then deletes, then upserts, as `actor {kind:'agent', name}`. `basis` is the one `GET /pending` returned, so a
+tick applies to what the user saw: an item that moved is `failed STALE`. Each item succeeds or fails alone; the pending file is removed afterwards (an error before
+anything was applied, such as `SNAPSHOT_UNAVAILABLE`, leaves it). Reject drops it. Expired proposals (24 h) are dropped when read and free their place.
+
+**Why staged confirmation replaced the SDK permission prompt.** An approval through the SDK can be bypassed: `skipPermissions`, "Always allow" (a remembered
+tool) and a project `.claude/settings.json` all pre-approve a tool. The app's own confirmation in the Host UI does not depend on any of them, so the tools need no
+SDK approval and can be pre-approved.
+
+**Trust note.** The real limits are the human confirmation in the Host UI, the hard refusals above, the caps (5 items, 10 pending, 24 h), the snapshot and the Host-only
+origin. A paired Controller is a full-trust grant of the Host (see `route-rules.ts`): the origin marker and the Remote denial of `/pending/**` contain accidents and
+prompt injection that arrives through a Controller chat; they are not a boundary against a hostile Controller, which can write these files itself. An agent with
+`Write`/`Bash` can also create files, and the name-keyed allowlist can be forged by whoever can write `~/.claude/agents`; that gap is accepted.
+
 ## Session scope and run
 
 `POST /api/providers/sessions` body: `{provider:'claude', projectPath, initialMessage?, scope?: {agentName}}`.
@@ -290,6 +352,7 @@ Every run (resume and fork included) in `claude-runtime.provider.ts` `mapCliOpti
 - `sdkOptions.agent = agentName` (only when set)
 - `mcpServers.blocks` = the in-process memory block server, merged into the configured servers (only when `resolveBlocksAgentName` gives a name: the main agent, or `claude-code` for a chat whose folder has content for a project block; set in `queryClaudeSDK` after `mapCliOptionsToSDK`; see [Memory blocks](#memory-blocks))
 - `allowedTools` += `mcp__blocks__block_list`, `mcp__blocks__block_read` (only in the same case); `block_write` stays on the normal approval flow
+- `mcpServers.profiles` and `allowedTools` += the four `mcp__profiles__*` tools: only for a local run of an allowlisted main agent that resolves to its user-level generated file (see [Profiles tools and staged proposals](#profiles-tools-and-staged-proposals))
 - `disallowedTools` += `Task(<name>)` per hidden name (exact case as Claude reports it)
 - **never** `sdkOptions.agents`
 - `settingSources = ['project','user','local']`
@@ -325,8 +388,9 @@ All under `/api/agent-profiles`, Host auth. "Remote" = policy for a paired contr
 | Method path | Use | Remote |
 | --- | --- | --- |
 | GET `/scope-options?projectId=` | Main agents of a sidebar project + `~/.claude/agents`: `{agents:[{name, source: project\|user, isOrchestrator, group?}]}` (`group` = the Group of the generating template, absent otherwise). Hidden names and names `POST /sessions` would refuse (not `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`) excluded. Sorted project first | **allow** |
-| GET `/claude-agents?directory=` | Claude agents (built-in, user, project) with `generated`, `generatedFrom`, `path`; plus `hiddenNames`, `hiddenRev`, `builtinSource` | deny |
+| GET `/claude-agents?directory=` | Claude agents (built-in, user, project) with `generated`, `generatedFrom`, `path`; plus `hiddenNames`, `managerNames`, `hiddenRev` (the one settings revision), `builtinSource` | deny |
 | PUT `/claude-agents/hidden` | `{names, rev}` → `{hiddenClaudeAgents, rev}`; 409 when stale | deny |
+| PUT `/claude-agents/managers` | `{names, rev}` → `{profileManagerAgents, rev}`; names must be valid agent names (at most 50); 409 when stale (the hide list and this list share `rev`) | deny |
 | GET / POST `/templates` | List (`{items, corrupt[]}`) / create (201; 409 `SLUG_TAKEN`) | deny |
 | GET / PUT / DELETE `/templates/:id` | PUT needs `rev` (409 `PROFILE_STALE`) | deny |
 | GET / POST `/memory-blocks` | List of definitions (`{blocks}`, sorted by name; unreadable files skipped; a legacy block that could not be moved carries `needsAttention`) / create (201; 400 when `scope.directory` is sent (a project block has no folder of its own, same for PUT); 409 `BLOCK_NAME_TAKEN`, `BLOCK_LIMIT_REACHED`) | deny |
@@ -340,12 +404,16 @@ All under `/api/agent-profiles`, Host auth. "Remote" = policy for a paired contr
 | POST `/bundle/import` | `{text, overwrite?, acceptSensitive?, projectMap?, basis?}` → **200** `ImportResult` `{items, partial, snapshot}` (never 201: a mixed result must not look like plain success). `basis` (from the preview) is required for every overwrite | deny |
 | GET `/bundle/snapshots` | Snapshots newest first: `[{name, createdAt, templates, blocks, folders, bytes}]` | deny |
 | POST `/bundle/restore` | `{snapshot}` (a file name written by the server, never a path) → `ImportResult`; 404 `SNAPSHOT_NOT_FOUND` for anything that is not a snapshot file name | deny |
+| GET `/pending` | Waiting proposals, oldest first: `[{id, createdAt, expiresAt, agentName, items[], basis}]`; `items` is a fresh review against the store now (`key, kind, label, action, needsTick, basis, sensitive, refusal?, lines, changes`), `basis` maps each key to send back at confirm. No raw changeset | deny |
+| GET `/pending/count` | `{count}` of waiting proposals (the Settings badge) | deny |
+| POST `/pending/:id/confirm` | `{overwrite?, acceptSensitive?, basis?}` → **200** `ImportResult` `{items, partial, snapshot}`; re-validates everything, applies with the agent as actor after a snapshot, removes the proposal. 404 `PENDING_NOT_FOUND`, 409 `SNAPSHOT_UNAVAILABLE` | deny |
+| POST `/pending/:id/reject` | → `{rejected:true}`; 404 `PENDING_NOT_FOUND` | deny |
 | GET `/generate/values?directory=` | Remembered values of a folder (absent = global) | deny |
 | POST `/generate/preview` | Plan only. `{directory?, projectName?, templateIds[1..50], values?}` | deny |
 | POST `/generate` | Write + remember + git exclude. 201 | deny |
 
 **Remote policy** (`route-rules.ts`): explicit deny for `/templates/**`, `/generate/**`,
-`/claude-agents/**`, `/memory-blocks/**`, `/bundle/**`; one allow for `GET /scope-options`. Anything else (including removed `/projects`,
+`/claude-agents/**`, `/memory-blocks/**`, `/bundle/**`, `/pending/**`; one allow for `GET /scope-options`. Anything else (including removed `/projects`,
 `/agents`, `/lint`, `/memory`) is default-denied (`route-unknown`). Client mirror
 `src/shared/transport/target-route-policy.ts` is kept equal by a parity test.
 
@@ -355,7 +423,7 @@ All under `/api/agent-profiles`, Host auth. "Remote" = policy for a paired contr
 `INVALID_SESSION_SCOPE` (400, also for the old `{projectId}` shape), `SCOPE_UNSUPPORTED_PROVIDER`,
 `PROJECT_PATH_REQUIRED`, `INVALID_AGENT_NAME`, `AGENT_NOT_FOUND`, `BLOCK_NAME_TAKEN`, `BLOCK_LIMIT_REACHED`,
 `BLOCK_SCOPE_IMMUTABLE`, `BLOCK_NOT_PROJECT_SCOPE`, `BLOCK_NOT_MIGRATED`, `BLOCK_CONTENT_EXISTS`, `BLOCK_CONTENT_LIMIT_REACHED`,
-`BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_TOO_LARGE`, `BLOCK_STALE`, `BLOCK_EMPTY_APPEND`, and for bundles `BUNDLE_INVALID` (400, `details: {line, column, path}`), `BUNDLE_VERSION_UNSUPPORTED` (400), `SNAPSHOT_UNAVAILABLE` (409), `SNAPSHOT_NOT_FOUND` (404). `BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_STALE` and `BLOCK_EMPTY_APPEND` are agent tool refusals, not HTTP errors (`BLOCK_TOO_LARGE` is both: a tool refusal, and the 400 of a user edit).
+`BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_TOO_LARGE`, `BLOCK_STALE`, `BLOCK_EMPTY_APPEND`, and for bundles `BUNDLE_INVALID` (400, `details: {line, column, path}`), `BUNDLE_VERSION_UNSUPPORTED` (400), `SNAPSHOT_UNAVAILABLE` (409), `SNAPSHOT_NOT_FOUND` (404), and for proposals `CHANGESET_*` (400, `CHANGESET_NOT_ALLOWED` 403), `PENDING_FULL` (409), `PENDING_NOT_FOUND` (404). `BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_STALE` and `BLOCK_EMPTY_APPEND` are agent tool refusals, not HTTP errors (`BLOCK_TOO_LARGE` is both: a tool refusal, and the 400 of a user edit).
 
 `scope-options` takes the **sidebar project id** (`Project.projectId`, the id `GET /api/projects` returns),
 never a path or name. The server resolves the folder. An archived project still resolves. A stale client bundle
@@ -479,4 +547,8 @@ project folder (`SESSION_PROJECT_MISSING` when that row is gone) and ignores cli
 | Folder key (`valuesKeyOf`, `blockFolderOf`) | REST contents routes, `agent-profiles.blocks.service.ts`, the attach rule, `MemoryBlockContents` (existing content files are keyed by it) |
 | When the `blocks` server attaches (`resolveBlocksAgentName`, `hasProjectContent`) | `claude-blocks-mcp.ts`, `claude-runtime.provider.ts`, `agent-profiles.blocks.service.ts`, `claude-blocks-mcp.test.ts`, this doc (Memory blocks, Safety, Gotchas) |
 | `blocks` tool names or result format | `agent-profiles.blocks.tool-names.ts` (`BLOCKS_TOOL_NAMES`, `BLOCKS_READ_TOOL_NAMES`), `agent-profiles.blocks.mcp.ts`, `claude-blocks-mcp.ts` (`BLOCKS_READ_TOOL_NAMES`), `agent-profiles.generator.ts` (`toolsFor`, the `## Memory blocks` paragraph) |
+| `profiles` tool names or result format | `agent-profiles.profiles.tool-names.ts`, `agent-profiles.profiles.mcp.ts`, `claude-profiles-mcp.ts` (pre-approval), `agent-profiles.changeset.ts` (the `mcp__profiles__*` refusal) |
+| When the `profiles` server attaches (`resolveProfilesAgentName`, `isUserGeneratedAgent`) | `claude-profiles-mcp.ts`, `claude-runtime.provider.ts`, `claude-agents.service.ts`, `claude-profiles-mcp.test.ts`, this doc (Profiles tools) |
+| Changeset guardrails or caps | `agent-profiles.changeset.ts`, `BundleService.applyChangeset`, `agent-profiles.pending.service.ts`, their tests, this doc |
+| Pending route family | `route-rules.ts`, `target-route-policy.ts`, parity test, route inventory table |
 | Memory route family | `route-rules.ts`, `target-route-policy.ts`, parity test, route inventory table |

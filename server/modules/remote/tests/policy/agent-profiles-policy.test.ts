@@ -47,6 +47,10 @@ test('every other agent-profiles route is refused for every method', () => {
     '/api/agent-profiles/bundle/import/preview', '/api/agent-profiles/bundle/snapshots', '/api/agent-profiles/bundle/restore',
     '/api/agent-profiles/bundle/restore?snapshot=20260601T120000000Z-abcd.json', '/API/Agent-Profiles/Bundle/Restore', '/api/agent-profiles/bundle%2Frestore',
     '/api/agent-profiles/bundle/%2e%2e/scope-options', '/api/agent-profiles/bundle/export%00',
+    // Proposals an agent staged, and their confirm / reject: the Host user is the only approver.
+    '/api/agent-profiles/pending', '/api/agent-profiles/pending/', '/api/agent-profiles/pending/count', '/api/agent-profiles/pending/p1/confirm',
+    '/api/agent-profiles/pending/p1/reject', '/API/Agent-Profiles/Pending/P1/Confirm', '/api/agent-profiles/pending%2Fp1%2Fconfirm',
+    '/api/agent-profiles/pending/%2e%2e/scope-options', '/api/agent-profiles/pending/p1/confirm%00', '/api/agent-profiles/claude-agents/managers',
     '/api/agent-profiles/lint', '/api/agent-profiles/lint?projectId=p1',
     // The memory/learning routes no longer exist; a Controller must still get nothing from them.
     '/api/agent-profiles/memory', '/api/agent-profiles/memory/learning', '/api/agent-profiles/memory/session/s1',
@@ -88,6 +92,20 @@ test('the bundle family is an explicit deny rule for every method, snapshots and
     }
   }
   assert.equal(REMOTE_DENY_RULES.some((rule) => rule.pattern === '/api/agent-profiles/bundle/**'), true);
+  assert.equal(evaluateRemoteHttpRequest('GET', '/api/agent-profiles/scope-options').allowed, true);
+});
+
+test('the pending family is an explicit deny rule for every method, confirm and reject included, and the scope picker stays reachable', () => {
+  for (const method of METHODS) {
+    for (const path of [
+      '/api/agent-profiles/pending', '/api/agent-profiles/pending/count', '/api/agent-profiles/pending/p1/confirm', '/api/agent-profiles/pending/p1/reject',
+    ]) {
+      assert.deepEqual(evaluateRemoteHttpRequest(method, path), { allowed: false, reason: 'route-denied' }, `${method} ${path}`);
+    }
+  }
+  assert.equal(evaluateRemoteHttpRequest('PUT', '/api/agent-profiles/claude-agents/managers').allowed, false);
+  assert.deepEqual(evaluateRemoteHttpRequest('PUT', '/api/agent-profiles/claude-agents/managers'), { allowed: false, reason: 'route-denied' });
+  assert.equal(REMOTE_DENY_RULES.some((rule) => rule.pattern === '/api/agent-profiles/pending/**'), true);
   assert.equal(evaluateRemoteHttpRequest('GET', '/api/agent-profiles/scope-options').allowed, true);
 });
 

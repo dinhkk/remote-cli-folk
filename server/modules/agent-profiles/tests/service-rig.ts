@@ -5,6 +5,7 @@ import type { ClaudeSdkAgentInfo } from '@/shared/types.js';
 import { createSnapshotStore } from '../agent-profiles.backup.js';
 import { createBundleService } from '../agent-profiles.bundle.service.js';
 import { createBlocksService } from '../agent-profiles.blocks.service.js';
+import { createPendingService } from '../agent-profiles.pending.service.js';
 import { createAgentProfilesService } from '../agent-profiles.service.js';
 import { createAgentProfileStore } from '../agent-profiles.store.js';
 import { storedShapeProblem } from '../agent-profiles.validation.js';
@@ -52,8 +53,12 @@ export function makeServiceRig(options: { sdkAgents?: ClaudeSdkAgentInfo[] } = {
     profiles: service, blocks, store, snapshots, now: () => state.now,
     resolveProjectDirectory: (projectId) => state.projects.get(projectId) ?? null,
   });
+  // Proposals of the `profiles` tools; the allowlist is the one in the rig's settings file, read fresh on every call.
+  const pending = createPendingService({
+    directory: path.join(root, 'agent-profiles', 'pending'), bundle, getManagers: () => claudeAgents.managerNames(), now: () => state.now,
+  });
   return {
-    root, claudeHome, state, store, claudeAgents, service, blocks, snapshots, bundle,
+    root, claudeHome, state, store, claudeAgents, service, blocks, snapshots, bundle, pending,
     cleanup: () => { removeDir(root); removeDir(claudeHome); },
   };
 }

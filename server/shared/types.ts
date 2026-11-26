@@ -2698,13 +2698,15 @@ export type AgentProfileList<T> = { items: T[]; corrupt: AgentProfileCorruptEntr
 
 /**
  * Module settings stored in `settings.json`: the Claude agents the user hid (by
- * name, same for every scope). `rev`/`updatedAt` follow the same stale-write rule as
- * profile records.
+ * name, same for every scope) and the main agents allowed to use the `profiles` MCP tools
+ * (`profileManagerAgents`, set from the Host UI; absent in older files = none). `rev`/`updatedAt` follow the same
+ * stale-write rule as profile records; both lists share the one `rev`, which any change of the settings bumps.
  */
 export type AgentProfileSettings = {
   rev: number;
   updatedAt: string;
   hiddenClaudeAgents: string[];
+  profileManagerAgents: string[];
 };
 
 // ---------------------------
@@ -3214,4 +3216,89 @@ export type AgentMonitorMachineUsage = {
   cpuPercent: number | null;
   memoryUsedBytes: number;
   memoryTotalBytes: number;
+};
+
+// ---------------------------
+//----------------- AGENT CHANGESET AND PENDING PROPOSAL TYPES (profiles MCP server) ------------
+/** One thing an agent asks to delete: a template (key = slug) or a memory block (key = name). */
+export type ChangesetDelete = { kind: 'template' | 'block'; key: string };
+
+/**
+ * What an agent proposes: bundle items to create or overwrite (`upsert`, the same shape as an import bundle, never a folder
+ * text or folder) and items to delete. At most 5 items and 20 KB in total; one key is never both upserted and deleted.
+ * Deletes run before upserts. Parsed (and normalised) by `parseChangeset`; stored as is in a pending proposal.
+ */
+export type AgentChangeset = { upsert?: RawAgentBundle; delete?: ChangesetDelete[] };
+
+/** What a changeset item does to the store: `refused` when it cannot be applied at all (see the item's `refusal`). */
+export type ChangesetAction = 'create' | 'overwrite' | 'delete' | 'identical' | 'refused';
+
+/** One changed field of an overwrite, as text for the person who confirms (long text is cut). `null` = absent. */
+export type ChangesetFieldChange = { field: string; before: string | null; after: string | null };
+
+/**
+ * One item of a changeset as the Host user sees it: what happens, why it is refused, which sensitive powers it grants and
+ * what changes. `needsTick`: an overwrite or delete is applied only when its key is ticked at confirm. `basis` is the
+ * revision of the target now (`absent` for a create): confirm sends it back so the tick applies to what was shown.
+ */
+export type ChangesetReviewItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  action: ChangesetAction;
+  needsTick: boolean;
+  basis: ImportBasis;
+  sensitive: string[];
+  refusal?: { code: string; message: string };
+  /** Readable summary lines (what is created, which fields change, what a delete loses). */
+  lines: string[];
+  changes: ChangesetFieldChange[];
+};
+
+/** Review of a whole changeset against the live store. `refused`: at least one item can never be applied. */
+export type ChangesetReview = { items: ChangesetReviewItem[]; refused: boolean };
+
+/** `<root>/pending/<id>.json`: a changeset an agent proposed and nobody confirmed yet. `summary` is the review taken when it was staged. */
+export type PendingProposal = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  agentName: string;
+  changeset: AgentChangeset;
+  summary: ChangesetReviewItem[];
+};
+
+/** A pending proposal as `GET /pending` returns it: a fresh review against the store now, and the `basis` map to send back at confirm. No raw changeset. */
+export type PendingProposalView = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  agentName: string;
+  items: ChangesetReviewItem[];
+  basis: Record<string, ImportBasis>;
+};
+
+/**
+ * A memory block as the changeset checks and the `profiles` tools describe it: the stored definition plus what the block
+ * holds. `problem` is set when the block cannot be backed up (so never overwritten or deleted by an agent), `ambiguous`
+ * when another block uses the same name. Folder facts are counts and sizes only (paths and folder text never leave the Host).
+ */
+export type ProfilesLiveBlock = {
+  definition: MemoryBlockDefinition;
+  ambiguous: boolean;
+  problem: { code: string; message: string } | null;
+  /** Content files of a project block (0 for a global block). */
+  folders: number;
+  /** Content files whose text is not empty. */
+  foldersWithText: number;
+  /** Total characters of all folder texts. */
+  folderChars: number;
+  /** Sum of the folder content revisions: moves whenever any folder text changes. */
+  folderRevSum: number;
+};
+
+/** The templates (by slug) and blocks (by name, first of a name) the store holds now, as {@link ProfilesLiveBlock}. */
+export type ProfilesLiveView = {
+  templates: Map<string, AgentProfileTemplate>;
+  blocks: Map<string, ProfilesLiveBlock>;
 };

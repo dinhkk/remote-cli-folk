@@ -13,7 +13,7 @@ import type {
 
 import { MAX_AGENT_FILE_BYTES, readGeneratedMarker } from './agent-profiles.generator.js';
 import type { AgentProfileStore } from './agent-profiles.store.js';
-import { parseDirectory, parseExpectedRev, parseHiddenNames } from './agent-profiles.validation.js';
+import { parseDirectory, parseExpectedRev, parseHiddenNames, parseManagerNames } from './agent-profiles.validation.js';
 
 const BUILTIN_CACHE_MS = 5 * 60 * 1000;
 const FALLBACK_CACHE_MS = 60 * 1000;
@@ -50,6 +50,8 @@ type ClaudeAgentListing = {
   hiddenRev: number;
   /** The stored hide list exactly as saved, including names no listed agent has; a client edits this list, never one rebuilt from `items`. */
   hiddenNames: string[];
+  /** Main agents allowed to use the `profiles` tools, exactly as saved; shares `hiddenRev` (one settings revision). */
+  managerNames: string[];
   builtinSource: 'sdk' | 'fallback';
 };
 
@@ -178,7 +180,9 @@ export function createClaudeAgentsService(dependencies: ClaudeAgentsDependencies
         ...(agent.model ? { model: agent.model } : {}),
       }));
     const items = [...builtinEntries, ...files].map((entry) => ({ ...entry, hidden: hidden.has(entry.name) }));
-    return { items, hiddenRev: settings.rev, hiddenNames: settings.hiddenClaudeAgents, builtinSource: builtins.source };
+    return {
+      items, hiddenRev: settings.rev, hiddenNames: settings.hiddenClaudeAgents, managerNames: settings.profileManagerAgents, builtinSource: builtins.source,
+    };
   }
 
   return {
@@ -202,6 +206,31 @@ export function createClaudeAgentsService(dependencies: ClaudeAgentsDependencies
       const names = parseHiddenNames(body);
       const saved = store.updateSettings({ hiddenClaudeAgents: names }, parseExpectedRev(body));
       return { hiddenClaudeAgents: saved.hiddenClaudeAgents, rev: saved.rev };
+    },
+
+    /** Main agents allowed to use the `profiles` tools, exactly as saved. A malformed settings file throws `PROFILE_CORRUPT`. */
+    managerNames(): string[] {
+      return store.readSettings().profileManagerAgents;
+    },
+
+    /** Saves the manager list (`{names, rev}`, `rev` is the settings revision the hide list shares); a stale `rev` is refused with 409. */
+    setManagers(body: unknown): { profileManagerAgents: string[]; rev: number } {
+      const names = parseManagerNames(body);
+      const saved = store.updateSettings({ profileManagerAgents: names }, parseExpectedRev(body));
+      return { profileManagerAgents: saved.profileManagerAgents, rev: saved.rev };
+    },
+
+    /**
+     * Whether a chat started in `directory` with main agent `name` runs the user-level generated agent file
+     * (`~/.claude/agents/<name>.md` with the generator marker naming that same slug). A project file of the same name shadows
+     * the user file in Claude Code, so any project entry with that name (readable or not) disqualifies. Reads files only.
+     * Throws when `directory` is not an absolute path; callers on the run path treat a throw as "no".
+     */
+    async isUserGeneratedAgent(name: string, directory?: string | null): Promise<boolean> {
+      if (!isValidAgentProfileName(name)) return false;
+      const matching = (await readScopeFiles(directory)).filter((entry) => entry.name === name);
+      if (matching.some((entry) => entry.source === 'project')) return false;
+      return matching.some((entry) => entry.source === 'user' && !entry.error && entry.generatedFrom === name);
     },
 
     /**

@@ -3,9 +3,10 @@ import express from 'express';
 import { AppError } from '@/shared/utils.js';
 
 import { parseExpectedBlockRev } from './agent-profiles.blocks.validation.js';
-import { parseExportRequest, parseImportRequest, parseRestoreRequest } from './agent-profiles.bundle.validation.js';
+import { parseConfirmRequest, parseExportRequest, parseImportRequest, parseRestoreRequest } from './agent-profiles.bundle.validation.js';
 import type { BundleService } from './agent-profiles.bundle.service.js';
 import type { BlocksService } from './agent-profiles.blocks.service.js';
+import type { PendingService } from './agent-profiles.pending.service.js';
 import type { AgentProfilesService } from './agent-profiles.service.js';
 import type { ClaudeAgentsService } from './claude-agents.service.js';
 
@@ -56,7 +57,7 @@ export const agentProfilesBundleBodyParser: express.RequestHandler[] = [
  * Mounted behind `authenticateToken`; Remote reaches only `GET /scope-options`.
  */
 export function createAgentProfilesRouter(
-  service: AgentProfilesService, claudeAgents: ClaudeAgentsService, blocks: BlocksService, bundle: BundleService,
+  service: AgentProfilesService, claudeAgents: ClaudeAgentsService, blocks: BlocksService, bundle: BundleService, pending: PendingService,
 ): express.Router {
   const router = express.Router();
   const respond = (operation: (req: express.Request) => unknown | Promise<unknown>, status = 200) =>
@@ -70,6 +71,8 @@ export function createAgentProfilesRouter(
   // The single list of agents: built-in + user + the project folder's `.claude/agents` (`?directory=<absolute>`).
   router.get('/claude-agents', respond((req) => claudeAgents.list(queryValue(req.query.directory))));
   router.put('/claude-agents/hidden', respond((req) => claudeAgents.setHidden(req.body)));
+  // The main agents allowed to use the `profiles` tools (`{names, rev}`; the rev is the one the hide list shares).
+  router.put('/claude-agents/managers', respond((req) => claudeAgents.setManagers(req.body)));
 
   router.get('/templates', respond(() => service.listTemplates()));
   router.post('/templates', respond((req) => service.createTemplate(req.body), 201));
@@ -117,6 +120,13 @@ export function createAgentProfilesRouter(
   // Snapshots the server wrote before an overwrite, newest first; restore names one by file name (never a path).
   router.get('/bundle/snapshots', respond(() => bundle.listSnapshots()));
   router.post('/bundle/restore', respond((req) => bundle.restoreSnapshot(parseRestoreRequest(req.body).snapshot)));
+
+  // Proposals an allowlisted agent staged through the `profiles` tools (Host only, denied for Remote). The list is a fresh review per proposal
+  // with the `basis` to send back; confirm re-checks everything and applies what was ticked (a tick on a delete confirms it), reject drops it.
+  router.get('/pending', respond(() => pending.list()));
+  router.get('/pending/count', respond(() => ({ count: pending.count() })));
+  router.post('/pending/:id/confirm', respond((req) => pending.confirm(param(req.params.id), parseConfirmRequest(req.body))));
+  router.post('/pending/:id/reject', respond((req) => pending.reject(param(req.params.id))));
 
   return router;
 }
