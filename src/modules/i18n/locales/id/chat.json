@@ -141,7 +141,6 @@
     "attachImages": "Lampirkan gambar",
     "send": "Kirim",
     "stop": "Hentikan",
-    "stopUnavailable": "Sesi ini tidak dapat dihentikan di sini",
     "hintText": {
       "ctrlEnter": "Ctrl+Enter untuk mengirim • Shift+Enter untuk baris baru • Tab untuk mengganti mode • / untuk slash command",
       "enter": "Enter untuk mengirim • Shift+Enter untuk baris baru • Tab untuk mengganti mode • / untuk slash command",

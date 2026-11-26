@@ -134,7 +134,6 @@
     "attachImages": "附加图片",
     "send": "发送",
     "stop": "停止",
-    "stopUnavailable": "无法在此停止此会话",
     "hintText": {
       "ctrlEnter": "Ctrl+Enter 发送 • Shift+Enter 换行 • Tab 切换模式 • / 斜杠命令",
       "enter": "Enter 发送 • Shift+Enter 换行 • Tab 切换模式 • / 斜杠命令",

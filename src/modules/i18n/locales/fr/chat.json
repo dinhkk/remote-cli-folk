@@ -132,7 +132,6 @@
     "attachImages": "Joindre des images",
     "send": "Envoyer",
     "stop": "Arrêter",
-    "stopUnavailable": "Cette session ne peut pas être arrêtée ici",
     "hintText": {
       "ctrlEnter": "Ctrl+Entrée pour envoyer • Maj+Entrée pour nouvelle ligne • Tab pour changer de mode • / pour les commandes slash",
       "enter": "Entrée pour envoyer • Maj+Entrée pour nouvelle ligne • Tab pour changer de mode • / pour les commandes slash",

@@ -167,7 +167,6 @@
     "attachImages": "Přiložit obrázky",
     "send": "Odeslat",
     "stop": "Zastavit",
-    "stopUnavailable": "Tuto relaci zde nelze zastavit",
     "hintText": {
       "ctrlEnter": "Ctrl+Enter pro odeslání • Shift+Enter pro nový řádek • Tab pro změnu režimu • / pro příkazy s lomítkem",
       "enter": "Enter pro odeslání • Shift+Enter pro nový řádek • Tab pro změnu režimu • / pro příkazy s lomítkem",

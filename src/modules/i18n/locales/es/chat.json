@@ -158,7 +158,6 @@
     "attachImages": "Adjuntar imágenes",
     "send": "Enviar",
     "stop": "Detener",
-    "stopUnavailable": "Esta sesión no se puede detener aquí",
     "hintText": {
       "ctrlEnter": "Ctrl+Enter para enviar • Shift+Enter para nueva línea • Tab para cambiar de modo • / para comandos",
       "enter": "Enter para enviar • Shift+Enter para nueva línea • Tab para cambiar de modo • / para comandos",
