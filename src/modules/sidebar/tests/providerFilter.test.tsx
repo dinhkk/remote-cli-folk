@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { TFunction } from 'i18next';
 import { expect, test, vi } from 'vitest';
 
@@ -24,6 +24,18 @@ test('UI-01/UI-02/UI-06: provider buttons use the shared catalog and expose pres
     expect(button.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(button);
     expect(change).toHaveBeenLastCalledWith(provider);
+  }
+});
+
+test('provider buttons scroll horizontally instead of wrapping when they exceed the sidebar width', () => {
+  const t = ((key: string, options?: { provider?: string }) => options?.provider ?? key) as TFunction;
+  render(<SidebarProviderFilter value="all" onChange={vi.fn()} t={t} />);
+  const group = screen.getByRole('group');
+  expect(group.className).toContain('overflow-x-auto');
+  expect(group.className).not.toContain('flex-wrap');
+  for (const button of screen.getAllByRole('button')) {
+    expect(button.className).toContain('shrink-0');
+    expect(button.className).toContain('whitespace-nowrap');
   }
 });
 
@@ -62,4 +74,32 @@ test('UI-03: title and message search results both follow the selected provider'
   expect(result?.titleResults).toEqual([]);
   expect(result?.results[0].sessions.map(s => s.sessionId)).toEqual(['b']);
   expect(result?.totalMatches).toBe(1);
+});
+
+test('the scrollbar of the provider row is hidden by default, shows while it is scrolled and hides again after', () => {
+  vi.useFakeTimers();
+  try {
+    const t = ((key: string, options?: { provider?: string }) => options?.provider ?? key) as TFunction;
+    render(<SidebarProviderFilter value="all" onChange={vi.fn()} t={t} />);
+    const group = screen.getByRole('group');
+
+    // `scrollbar-reveal` is the class that keeps the bar transparent until hover or data-scrolling="true".
+    expect(group.className).toContain('scrollbar-reveal');
+    expect(group.className).not.toContain('scrollbar-thin');
+    expect(group.getAttribute('data-scrolling')).toBe('false');
+
+    fireEvent.scroll(group);
+    expect(group.getAttribute('data-scrolling')).toBe('true');
+
+    // A second scroll restarts the wait instead of hiding the bar on the first timer.
+    act(() => { vi.advanceTimersByTime(600); });
+    fireEvent.scroll(group);
+    act(() => { vi.advanceTimersByTime(600); });
+    expect(group.getAttribute('data-scrolling')).toBe('true');
+
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(group.getAttribute('data-scrolling')).toBe('false');
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -18,6 +18,8 @@ type SidebarHeaderProps = {
   projectsCount: number;
   runningSessionsCount: number;
   archivedSessionsCount: number;
+  /** Number of conversations in the current list; shown on the Conversations tab, omitted on other tabs. */
+  conversationsCount?: number;
   isArchivedSessionsLoading: boolean;
   searchFilter: string;
   onSearchFilterChange: (value: string) => void;
@@ -57,6 +59,7 @@ export default function SidebarHeader({
   projectsCount,
   runningSessionsCount,
   archivedSessionsCount,
+  conversationsCount,
   isArchivedSessionsLoading,
   searchFilter,
   onSearchFilterChange,
@@ -153,6 +156,8 @@ export default function SidebarHeader({
               searchMode={searchMode}
               onSearchModeChange={onSearchModeChange}
               runningSessionsCount={runningSessionsCount}
+              projectsCount={projectsCount}
+              conversationsCount={conversationsCount}
               t={t}
             />
             <div className="relative">
@@ -240,6 +245,8 @@ export default function SidebarHeader({
               searchMode={searchMode}
               onSearchModeChange={onSearchModeChange}
               runningSessionsCount={runningSessionsCount}
+              projectsCount={projectsCount}
+              conversationsCount={conversationsCount}
               t={t}
             />
             <div className="relative">

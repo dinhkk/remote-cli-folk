@@ -10,7 +10,6 @@ import SessionOptions from '@/modules/sidebar/SessionOptions';
 
 type SidebarRecentConversationsProps = {
   conversations: RecentConversationListItem[];
-  total: number;
   hasMore: boolean;
   isLoading: boolean;
   isLoadingMore: boolean;
@@ -51,7 +50,6 @@ function RecentConversationSkeleton() {
 /** Rendered by SidebarContent in the recents search mode to list recently active sessions across all projects. */
 export default function SidebarRecentConversations({
   conversations,
-  total,
   hasMore,
   isLoading,
   isLoadingMore,
@@ -98,13 +96,6 @@ export default function SidebarRecentConversations({
 
   return (
     <div className="px-1" data-testid="recent-conversations-list">
-      <div className="flex items-center justify-between px-2 pb-1.5 pt-0.5">
-        <span className="text-[11px] font-medium text-muted-foreground">
-          {t('recent.title', 'Recent conversations')}
-        </span>
-        <span className="text-[10px] tabular-nums text-muted-foreground/70">{total}</span>
-      </div>
-
       <div className="space-y-0.5">
         {conversations.map((conversation) => {
           const isSelected = String(selectedSession?.id ?? '') === conversation.sessionId;
