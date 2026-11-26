@@ -3,6 +3,12 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.2.0](https://github.com/tunghuynh/remote-cli/compare/v1.2.0-beta...v1.2.0) (2026-11-26)
+
+### Bug Fixes
+
+* **security:** harden TOTP re-enroll, process-tree kill and hidden agent rules ([0732a59](https://github.com/tunghuynh/remote-cli/commit/0732a594c852e511746b8e85d06d18f618826324))
+
 ## [1.2.0-beta](https://github.com/tunghuynh/remote-cli/compare/v1.1.0...v1.2.0-beta) (2026-11-25)
 
 ### New Features
