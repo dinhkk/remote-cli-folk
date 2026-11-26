@@ -56,6 +56,7 @@ Root = `AGENT_PROFILES_DIR`, else `<os.homedir()>/.claude-code-ui/agent-profiles
 | `values-by-directory.json` | `{ "<folder key>": { "<param>": "text" } }`; global = key `@global` |
 | `memory-blocks/<id>.json` | Memory block definitions (see [Memory blocks](#memory-blocks)) |
 | `memory-block-contents/<id>/<hash>.json` | Content of a project block in one folder; `<hash>.tomb` keeps the last `rev` of a removed one (see [Memory blocks](#memory-blocks)) |
+| `backups/<UTC stamp>-<4 hex>.json` | Snapshots (JSON bundles, mode 0600, folder 0700) the server writes before an import overwrites something; restored by file name (see [Import / export](#import--export)) |
 | `memory-blocks.legacy/` | Backup copies of definitions saved by an older version, written before they are migrated |
 | `agents/`, `memory/`, `projects/`, `learning-*.json`, `workspace/` | Old layout. Ignored: never read, written or deleted. `memory/` is the old habit store, not the new `memory-blocks/` |
 
@@ -235,6 +236,42 @@ folder's file only and cannot reach another folder's content.
   chats). Content stays escaped and out of the system prompt; a prompt-injected chat can still write a line that
   later runs read.
 
+## Import / export
+
+Templates and memory blocks move between independent hosts as one text **bundle** (YAML by default, JSON accepted). The
+file format, field tables, examples and a paste-ready prompt for an AI are in [agent-bundle-format.md](../agent-bundle-format.md).
+There is no sync: each host imports and recreates its own copy. Import, export, snapshots and restore are Host-only.
+
+- **Code.** `agent-profiles.bundle.service.ts` (export, plan, apply, restore), `.bundle.validation.ts` (per-item checks, request
+  bodies), `.bundle.format.ts` (`parseBundleText`, `serializeBundle`), `.backup.ts` (snapshot files). Every rule (slug and name
+  checks, 50 blocks, 200 files per block, `maxChars`, revisions, scope immutability) stays in the template and block
+  services; the bundle service decides what an import would do and calls them. It is fully synchronous: snapshot, re-plan and
+  writes run without another request interleaving.
+- **Text.** Parsed with the `yaml` package (core schema, anchors and aliases refused, duplicate keys an error, nesting <= 8,
+  at most 500 folder entries per bundle). Errors carry line, column and path. The request body of the bundle routes is
+  capped at 5 MB by a parser mounted before the global 50 MB one (`agentProfilesBundleBodyParser`).
+- **A bundle is untrusted input** (a person or an AI may have written it). Import is a dry-run preview per item (`new`,
+  `identical`, `conflict`, `invalid`, `skipped`); duplicates are skipped unless ticked; a sensitive template (`mcpServers`, no
+  `tools`, `Bash`/`Write`/`Edit`/`NotebookEdit`, `mcp__*`, `skills`) needs its own tick.
+- **Folders.** The `directory` of a folder entry is only a mapping key (`blockContentKey`). The target folder is always the sidebar
+  project the user maps (`projectMap: {[sourceKey]: projectId}`, resolved on the server); an unmapped entry is skipped and the
+  block's definition still imports. Nothing in a bundle can name a place to write.
+- **Never destructive on text.** A bundle without text keeps stored text; a project definition update never touches folder files;
+  a folder entry overwrites only its own folder and only when its key is ticked; import never removes a file.
+- **Stale guard.** The preview returns a `basis` per item and folder (template `rev`, block definition `rev`, folder content `rev`,
+  or `absent`); apply compares it with the live value and fails that item with `STALE` when it moved. An overwrite without a
+  `basis` is refused.
+- **Snapshots.** Before an apply that will overwrite something (and only then) the server writes every template, block and folder
+  text to `backups/` and refuses to continue when it cannot (`SNAPSHOT_UNAVAILABLE`), also when a stored record is unreadable. A
+  block not yet moved to per-folder text, or with an unreadable folder file, cannot be backed up, so it is never overwritten by an
+  import. Pruned when both older than 14 days and beyond the newest 50.
+- **Restore** names a snapshot by file name (checked against the snapshot name pattern, no path) and applies it with every key
+  overwritable, to the folder each text was stored for; items created since are kept; a scope clash or unmigrated block is skipped
+  with its code. It takes its own snapshot first.
+- **Provenance.** `lastWriter` travels in the bundle: `agent:<name>` text stays marked as agent text, anything else becomes `user`.
+- **Trust statement.** A paired Controller is a full-trust grant of the Host (see `route-rules.ts`). The Remote denial of `/bundle/**`
+  reduces surface and stops accidents and prompt injection; it is not a boundary against a hostile Controller.
+
 ## Session scope and run
 
 `POST /api/providers/sessions` body: `{provider:'claude', projectPath, initialMessage?, scope?: {agentName}}`.
@@ -298,12 +335,17 @@ All under `/api/agent-profiles`, Host auth. "Remote" = policy for a paired contr
 | POST `/memory-blocks/:id/contents` | `{directory}` (any absolute folder, normalized server-side) → creates an empty content file, 201 `{content}`. 409 `BLOCK_CONTENT_EXISTS`, `BLOCK_CONTENT_LIMIT_REACHED` | deny |
 | PUT `/memory-blocks/:id/contents` | `{directory, content, expectedRev}`; `expectedRev` = the **content** `rev` loaded (409 `PROFILE_STALE`); 400 `BLOCK_TOO_LARGE` over `maxChars`; 404 when the folder has no file | deny |
 | DELETE `/memory-blocks/:id/contents?directory=&expectedRev=` | Empties the text, keeps the file, bumps `rev` → `{content}`. With `&remove=true` deletes the file (tomb keeps the `rev`) → `{ok:true}`. `expectedRev` (optional, the content `rev` loaded; the Memory tab always sends it): stale → 409 `PROFILE_STALE` and nothing changes, malformed → 400; without it the current `rev` is used (blind write). 404 when the folder has no file | deny |
+| POST `/bundle/export` | `{templateIds?, blockIds?, includeBlockContent?, format?: 'yaml'\|'json'}` → `{filename, text, problems[]}` (YAML by default; block text and folder text only with `includeBlockContent`) | deny |
+| POST `/bundle/import/preview` | `{text, projectMap?}` (`text` = the bundle as YAML or JSON, parsed on the server) → `ImportPlan` `{items, hasFolderText}`; writes nothing. Each item and folder row carries `basis` | deny |
+| POST `/bundle/import` | `{text, overwrite?, acceptSensitive?, projectMap?, basis?}` → **200** `ImportResult` `{items, partial, snapshot}` (never 201: a mixed result must not look like plain success). `basis` (from the preview) is required for every overwrite | deny |
+| GET `/bundle/snapshots` | Snapshots newest first: `[{name, createdAt, templates, blocks, folders, bytes}]` | deny |
+| POST `/bundle/restore` | `{snapshot}` (a file name written by the server, never a path) → `ImportResult`; 404 `SNAPSHOT_NOT_FOUND` for anything that is not a snapshot file name | deny |
 | GET `/generate/values?directory=` | Remembered values of a folder (absent = global) | deny |
 | POST `/generate/preview` | Plan only. `{directory?, projectName?, templateIds[1..50], values?}` | deny |
 | POST `/generate` | Write + remember + git exclude. 201 | deny |
 
 **Remote policy** (`route-rules.ts`): explicit deny for `/templates/**`, `/generate/**`,
-`/claude-agents/**`, `/memory-blocks/**`; one allow for `GET /scope-options`. Anything else (including removed `/projects`,
+`/claude-agents/**`, `/memory-blocks/**`, `/bundle/**`; one allow for `GET /scope-options`. Anything else (including removed `/projects`,
 `/agents`, `/lint`, `/memory`) is default-denied (`route-unknown`). Client mirror
 `src/shared/transport/target-route-policy.ts` is kept equal by a parity test.
 
@@ -313,7 +355,7 @@ All under `/api/agent-profiles`, Host auth. "Remote" = policy for a paired contr
 `INVALID_SESSION_SCOPE` (400, also for the old `{projectId}` shape), `SCOPE_UNSUPPORTED_PROVIDER`,
 `PROJECT_PATH_REQUIRED`, `INVALID_AGENT_NAME`, `AGENT_NOT_FOUND`, `BLOCK_NAME_TAKEN`, `BLOCK_LIMIT_REACHED`,
 `BLOCK_SCOPE_IMMUTABLE`, `BLOCK_NOT_PROJECT_SCOPE`, `BLOCK_NOT_MIGRATED`, `BLOCK_CONTENT_EXISTS`, `BLOCK_CONTENT_LIMIT_REACHED`,
-`BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_TOO_LARGE`, `BLOCK_STALE`, `BLOCK_EMPTY_APPEND`. `BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_STALE` and `BLOCK_EMPTY_APPEND` are agent tool refusals, not HTTP errors (`BLOCK_TOO_LARGE` is both: a tool refusal, and the 400 of a user edit).
+`BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_TOO_LARGE`, `BLOCK_STALE`, `BLOCK_EMPTY_APPEND`, and for bundles `BUNDLE_INVALID` (400, `details: {line, column, path}`), `BUNDLE_VERSION_UNSUPPORTED` (400), `SNAPSHOT_UNAVAILABLE` (409), `SNAPSHOT_NOT_FOUND` (404). `BLOCK_NOT_FOUND`, `BLOCK_READ_ONLY`, `BLOCK_STALE` and `BLOCK_EMPTY_APPEND` are agent tool refusals, not HTTP errors (`BLOCK_TOO_LARGE` is both: a tool refusal, and the 400 of a user edit).
 
 `scope-options` takes the **sidebar project id** (`Project.projectId`, the id `GET /api/projects` returns),
 never a path or name. The server resolves the folder. An archived project still resolves. A stale client bundle
