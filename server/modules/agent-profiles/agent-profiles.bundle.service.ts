@@ -128,6 +128,7 @@ export function createBundleService(dependencies: Dependencies) {
       allBlocks: [],
       corruptRecords: listedTemplates.corrupt.length + store.list('memory-blocks').corrupt.length,
     };
+    // An unreadable folder text file is left out of a snapshot too, so it counts like an unreadable record.
     for (const definition of definitions) {
       const live: LiveBlock = {
         definition, ambiguous: (counts.get(definition.name) ?? 0) > 1, problem: null, contents: new Map(), corruptFiles: 0,
@@ -147,6 +148,7 @@ export function createBundleService(dependencies: Dependencies) {
           }
         }
       }
+      if (live.corruptFiles > 0) state.corruptRecords += 1;
       state.allBlocks.push(live);
       if (!state.blocks.has(definition.name)) state.blocks.set(definition.name, live);
     }
@@ -260,7 +262,8 @@ export function createBundleService(dependencies: Dependencies) {
     for (const folder of entry.folders) if (!folder.problem) keyCounts.set(folder.sourceKey, (keyCounts.get(folder.sourceKey) ?? 0) + 1);
     const seenTargets = new Set<string>();
     let files = live ? live.contents.size + live.corruptFiles : 0;
-    const maxChars = live?.definition.maxChars ?? entry.input.maxChars;
+    // An overwrite of the definition applies the bundle's limit before the text is written, so a text must fit both.
+    const maxChars = live ? Math.min(live.definition.maxChars, entry.input.maxChars) : entry.input.maxChars;
     return entry.folders.map((folder): PlannedFolder => {
       const none = { sourceDirectory: folder.directory, sourceKey: folder.sourceKey, basis: 'absent' as ImportBasis, overwritable: false };
       if (folder.problem) {

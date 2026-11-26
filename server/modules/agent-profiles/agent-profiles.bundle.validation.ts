@@ -182,7 +182,7 @@ export function templateSensitivity(input: AgentProfileTemplateInput): string[] 
   if (input.mcpServers && input.mcpServers.length > 0) reasons.push('mcpServers');
   if (!input.tools || input.tools.length === 0) reasons.push('no-tools');
   for (const tool of input.tools ?? []) {
-    if (/^(Bash|Write|Edit|NotebookEdit)(\(|$)/.test(tool) || tool.startsWith('mcp__')) reasons.push(`tool:${tool}`);
+    if (/^(Bash|Write|Edit|NotebookEdit)\s*(\(|$)/i.test(tool.trim()) || tool.trim().toLowerCase().startsWith('mcp__')) reasons.push(`tool:${tool}`);
   }
   if (input.skills && input.skills.length > 0) reasons.push('skills');
   return [...new Set(reasons)];

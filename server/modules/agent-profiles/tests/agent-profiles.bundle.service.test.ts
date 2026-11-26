@@ -613,6 +613,37 @@ describe('agent bundle import: project blocks and folder text', () => {
     assert.equal(result.snapshot, null, 'nothing overwritable, no snapshot needed');
   });
 
+  it('checks folder text against the smaller of the stored and the bundle limit, so a limit change cannot leave a half-applied block', () => {
+    const rig = newRig();
+    addProject(rig, 'p1', '/target/one');
+    seedProjectBlock(rig, 'notes', { '/target/one': 'short' });
+    const bundle = bundleOf([], [projectBlock('notes', { maxChars: 100, contents: [{ directory: '/source/a', content: 'x'.repeat(150) }] })]);
+    const projectMap = { [valuesKeyOf('/source/a')]: 'p1' };
+    const plan = rig.bundle.planImport(bundle, { projectMap });
+    assert.equal(itemOf(plan, 'block:notes').folders?.[0].status, 'invalid');
+    assert.equal(itemOf(plan, 'block:notes').folders?.[0].code, 'BLOCK_TOO_LARGE');
+  });
+
+  it('refuses an overwrite when a folder text file of any block is unreadable (the snapshot would be incomplete)', () => {
+    const rig = newRig();
+    rig.service.createTemplate(templateBody({ slug: 'alpha', tools, name: 'Old' }));
+    const corrupt = seedProjectBlock(rig, 'with-corrupt', { '/f/one': 'text' });
+    fs.writeFileSync(path.join(rig.root, 'agent-profiles', 'memory-block-contents', corrupt.id, 'ffffffffffffffff.json'), '{ broken');
+    const bundle = bundleOf([template('alpha', { name: 'New' })]);
+    const plan = rig.bundle.planImport(bundle, {});
+    const error = failureOf(() => rig.bundle.applyImport(bundle, { overwrite: ['template:alpha'], basis: basisOf(plan) }));
+    assert.equal(error.code, 'SNAPSHOT_UNAVAILABLE');
+    assert.equal(rig.service.listTemplates().items[0].name, 'Old');
+  });
+
+  it('flags tools that run commands or write whatever their letter case or spacing', () => {
+    const rig = newRig();
+    const plan = rig.bundle.planImport(bundleOf([
+      template('lower', { tools: ['bash'] }), template('upper', { tools: ['WRITE'] }), template('spaced', { tools: ['Bash (rm -rf:*)'] }), template('mcp-upper', { tools: ['MCP__x__y'] }),
+    ]), {});
+    for (const slug of ['lower', 'upper', 'spaced', 'mcp-upper']) assert.equal(itemOf(plan, `template:${slug}`).sensitive.length, 1, slug);
+  });
+
   it('applies 500 folder entries within a bounded time', () => {
     const rig = newRig();
     const blocks: MemoryBlockBundleEntry[] = [];
