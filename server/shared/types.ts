@@ -2690,6 +2690,114 @@ export type AgentProfileSettings = {
 };
 
 // ---------------------------
+// ---------------------------
+//----------------- AGENT BUNDLE TYPES (import / export of templates and memory blocks) ------------
+/**
+ * One memory block inside a bundle. `scope` never carries a folder. A global block carries `content`; a project block
+ * carries `contents` (one entry per folder it has text for). Both are present only when the export included block text.
+ * `directory` of a `contents` entry is the folder the text belonged to on the source host: it is only a mapping key on
+ * import (the target folder is always the sidebar project the user maps it to). `lastWriter` is provenance and is never
+ * trusted as a user claim: text an agent wrote stays labelled as agent text.
+ */
+export type MemoryBlockBundleEntry = {
+  name: string;
+  description: string;
+  mode: MemoryBlockMode;
+  scope: MemoryBlockScope;
+  maxChars: number;
+  content?: string;
+  contents?: { directory: string; content: string; lastWriter?: MemoryBlockWriter }[];
+  lastWriter?: MemoryBlockWriter;
+};
+
+/**
+ * The portable bundle: templates and memory blocks as editable text (YAML or JSON). Hand-written and AI-written bundles
+ * are accepted as input and treated as untrusted. No ids, revisions or timestamps travel in a bundle.
+ */
+export type AgentBundle = {
+  format: 'remotecli.agent-bundle';
+  version: 1;
+  exportedAt: string;
+  templates: AgentProfileTemplateInput[];
+  memoryBlocks: MemoryBlockBundleEntry[];
+};
+
+/**
+ * A bundle after its envelope was checked (format, version, array shapes, nesting depth) but before any item was
+ * validated: what a person or an AI wrote. Items are validated one by one by the import plan, so one bad item never
+ * rejects the others. An {@link AgentBundle} is assignable to it.
+ */
+export type RawAgentBundle = {
+  format: AgentBundle['format'];
+  version: AgentBundle['version'];
+  exportedAt: string;
+  templates: unknown[];
+  memoryBlocks: unknown[];
+};
+
+/** Who triggers an import: the Host user (default) or an agent proposing changes; an agent cannot write `read-only` blocks and is recorded as the writer. */
+export type ImportActor = { kind: 'user' } | { kind: 'agent'; name: string };
+
+/** Revision a preview saw of an import target (template `rev`, block definition `rev`, folder content `rev`), or `absent`. Apply compares it with the live value. */
+export type ImportBasis = number | 'absent';
+
+/** One problem found in a bundle; `level: 'warning'` never blocks the item. `line`/`column` are set when the position in the source text is known. */
+export type ImportProblem = { level: 'error' | 'warning'; code: string; message: string; path?: string; line?: number; column?: number };
+
+/** How an item or folder entry compares with the store: `new`, `identical`, `conflict` (exists and differs), `invalid` (cannot be imported), `skipped` (no target folder). */
+export type ImportStatus = 'new' | 'identical' | 'conflict' | 'invalid' | 'skipped';
+
+/** One folder-text entry of a project block in a plan. `sourceKey` (= the store's folder key of `sourceDirectory`) keys `projectMap`. */
+export type ImportFolderRow = {
+  /** `block:<name>#<sourceKey>`: the key to tick in `overwrite` and to index `basis`. */
+  key: string;
+  sourceDirectory: string;
+  sourceKey: string;
+  status: ImportStatus;
+  code?: string;
+  reason?: string;
+  /** False for a conflict that can never be overwritten (the block cannot be backed up). */
+  overwritable: boolean;
+  basis: ImportBasis;
+};
+
+/** One template or block of a bundle in an import preview. `key` is `template:<slug>` / `block:<name>`. `overwritable` is false for a conflict that can never be overwritten (other scope kind, ambiguous name, not backed-up block). */
+export type ImportPlanItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  status: ImportStatus;
+  code?: string;
+  overwritable: boolean;
+  problems: ImportProblem[];
+  sensitive: string[];
+  basis: ImportBasis;
+  folders?: ImportFolderRow[];
+};
+
+/** Result of a dry run: nothing is written. */
+export type ImportPlan = { items: ImportPlanItem[]; hasFolderText: boolean };
+
+/** Outcome of one folder entry when applying. */
+export type ImportFolderResult = { key: string; status: 'applied' | 'skipped' | 'failed'; code?: string; reason?: string };
+
+/** Outcome of one item when applying; `skipped` with code `IDENTICAL` means nothing to do. `partial`: the item applied but a folder entry did not. */
+export type ImportItemResult = {
+  key: string;
+  status: 'applied' | 'skipped' | 'failed';
+  code?: string;
+  reason?: string;
+  partial?: true;
+  folders?: ImportFolderResult[];
+};
+
+/** Result of applying an import or restore. `partial`: at least one item (or folder entry) was not applied (identical items do not count). `snapshot`: file name of the backup taken before overwriting, or null. */
+export type ImportResult = { items: ImportItemResult[]; partial: boolean; snapshot: string | null };
+
+/** One server-written snapshot (backup) listed for restore. */
+export type AgentBundleSnapshot = { name: string; createdAt: string; templates: number; blocks: number; folders: number; bytes: number };
+
+// ---------------------------
 //----------------- CLAUDE-PROVIDED AGENT TYPES ------------
 /**
  * Where a Claude agent comes from: `builtin` (shipped inside Claude Code, only

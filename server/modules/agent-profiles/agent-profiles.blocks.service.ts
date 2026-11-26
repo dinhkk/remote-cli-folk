@@ -1,6 +1,6 @@
 import { AppError } from '@/shared/utils.js';
 import type {
-  MemoryBlock, MemoryBlockDefinition, MemoryBlockProjectContent,
+  MemoryBlock, MemoryBlockDefinition, MemoryBlockProjectContent, MemoryBlockWriter,
 } from '@/shared/types.js';
 
 import {
@@ -238,13 +238,14 @@ export function createBlocksService(dependencies: { store: AgentProfileStore }) 
     /** Every readable block definition of every scope (the owner's management list); no per-folder content. */
     list: (): { blocks: MemoryBlockDefinition[] } => ({ blocks: definitions().map(publicDefinition) }),
 
-    create(body: unknown): { block: MemoryBlockDefinition } {
+    /** `writer` labels the text of a global block created with content (default: the user; the bundle importer passes the provenance it keeps). */
+    create(body: unknown, writer: Exclude<MemoryBlockWriter, null> = 'user'): { block: MemoryBlockDefinition } {
       const input = parseBlockInput(body);
       if (definitions().length >= MAX_MEMORY_BLOCKS) {
         throw conflict(`At most ${MAX_MEMORY_BLOCKS} memory blocks can exist; delete one first`, 'BLOCK_LIMIT_REACHED');
       }
       refuseTakenName(input.name);
-      const block = store.insert<MemoryBlockDefinition>(KIND, { ...input, lastWriter: input.scope.kind === 'global' && input.content ? 'user' : null });
+      const block = store.insert<MemoryBlockDefinition>(KIND, { ...input, lastWriter: input.scope.kind === 'global' && input.content ? writer : null });
       migrationPending = true; // a new name may clash with a block that is waiting to be moved
       return { block: publicDefinition(block) };
     },
@@ -254,8 +255,9 @@ export function createBlocksService(dependencies: { store: AgentProfileStore }) 
      * The user may edit read-only blocks. The scope kind cannot change (409), a project definition ignores `content` (its
      * text lives per folder). Only a rename is checked for a taken name: a block that already shares its name with another
      * (stored before names became unique across scopes) stays editable, it just cannot be renamed into a clash.
+     * `writer` labels a changed global text (default: the user).
      */
-    update(id: string, body: unknown): { block: MemoryBlockDefinition } {
+    update(id: string, body: unknown, writer: Exclude<MemoryBlockWriter, null> = 'user'): { block: MemoryBlockDefinition } {
       const input = parseBlockInput(body, { requireContent: true });
       const expectedRev = parseExpectedBlockRev(body);
       const existing = requireDefinition(id);
@@ -266,7 +268,7 @@ export function createBlocksService(dependencies: { store: AgentProfileStore }) 
       const block = store.update<MemoryBlockDefinition>(KIND, id, expectedRev, (current) => (
         current.scope.kind === 'project'
           ? { ...input, scope: current.scope, content: current.content, lastWriter: current.lastWriter }
-          : { ...input, lastWriter: input.content !== current.content ? 'user' : current.lastWriter }
+          : { ...input, lastWriter: input.content !== current.content ? writer : current.lastWriter }
       ));
       migrationPending = true; // a rename may end (or start) a name clash
       return { block: publicDefinition(block) };
@@ -294,6 +296,26 @@ export function createBlocksService(dependencies: { store: AgentProfileStore }) 
       requireProjectDefinition(id);
       const folder = folderOfRequest(directory);
       return { content: store.createContent(id, folder.key, { directory: folder.directory, content: '', lastWriter: null }) };
+    },
+
+    /**
+     * Import of one folder's text in a single write: without `expectedRev` the file is created with its text (`rev` 1, or the
+     * removed file's last rev + 1; 409 `BLOCK_CONTENT_EXISTS` when it exists, `BLOCK_CONTENT_LIMIT_REACHED` at the cap); with
+     * `expectedRev` the existing file is rewritten (409 `PROFILE_STALE` when its rev moved on). `directory` is a folder the
+     * caller already trusts (a sidebar project's folder, or one this server wrote into a snapshot), never a request value.
+     * `writer` is the provenance label of the text.
+     * Consumed by: agent-profiles.bundle.service.ts.
+     */
+    importFolderText(
+      id: string, directory: string, content: string, options: { writer: Exclude<MemoryBlockWriter, null>; expectedRev?: number },
+    ): { content: MemoryBlockProjectContent } {
+      const definition = requireProjectDefinition(id);
+      const folder = blockFolderOf(directory);
+      refuseTooLarge(definition, content.length);
+      if (options.expectedRev === undefined) {
+        return { content: store.createContent(id, folder.key, { directory: folder.directory, content, lastWriter: options.writer }) };
+      }
+      return { content: store.updateContent(id, folder.key, options.expectedRev, () => ({ content, lastWriter: options.writer })) };
     },
 
     /** User edit of a folder's text; `expectedRev` is the content `rev` the editor loaded. */

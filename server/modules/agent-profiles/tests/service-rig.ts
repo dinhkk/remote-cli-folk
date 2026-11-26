@@ -2,6 +2,8 @@ import path from 'node:path';
 
 import type { ClaudeSdkAgentInfo } from '@/shared/types.js';
 
+import { createSnapshotStore } from '../agent-profiles.backup.js';
+import { createBundleService } from '../agent-profiles.bundle.service.js';
 import { createBlocksService } from '../agent-profiles.blocks.service.js';
 import { createAgentProfilesService } from '../agent-profiles.service.js';
 import { createAgentProfileStore } from '../agent-profiles.store.js';
@@ -21,6 +23,8 @@ export function makeServiceRig(options: { sdkAgents?: ClaudeSdkAgentInfo[] } = {
   const state = {
     sdkCalls: 0, sdkFails: false, sdkHangs: false, sdkAgents: options.sdkAgents ?? [], clock: 0,
     projects: new Map<string, string>(),
+    /** Time the bundle snapshots are stamped with; tests move it to age a snapshot. */
+    now: new Date('2026-06-01T12:00:00.000Z'),
   };
   const store = createAgentProfileStore({ rootDir: path.join(root, 'agent-profiles'), checkShape: storedShapeProblem });
   const claudeAgents = createClaudeAgentsService({
@@ -43,8 +47,13 @@ export function makeServiceRig(options: { sdkAgents?: ClaudeSdkAgentInfo[] } = {
     resolveProjectDirectory: (projectId) => state.projects.get(projectId) ?? null,
   });
   const blocks = createBlocksService({ store });
+  const snapshots = createSnapshotStore({ directory: path.join(root, 'agent-profiles', 'backups'), now: () => state.now });
+  const bundle = createBundleService({
+    profiles: service, blocks, store, snapshots, now: () => state.now,
+    resolveProjectDirectory: (projectId) => state.projects.get(projectId) ?? null,
+  });
   return {
-    root, claudeHome, state, store, claudeAgents, service, blocks,
+    root, claudeHome, state, store, claudeAgents, service, blocks, snapshots, bundle,
     cleanup: () => { removeDir(root); removeDir(claudeHome); },
   };
 }
