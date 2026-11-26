@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export const SIDEBAR_WIDTH_STORAGE_KEY = 'sidebar-width';
-export const SIDEBAR_WIDTH_DEFAULT = 288; // the previous fixed md:w-72
+// Wide enough for the four section tabs (counts included) to sit in the strip without the "…" overflow menu.
+export const SIDEBAR_WIDTH_DEFAULT = 320;
 export const SIDEBAR_WIDTH_MIN = 220;
 export const SIDEBAR_WIDTH_MAX = 640;
 export const SIDEBAR_WIDTH_KEYBOARD_STEP = 16;

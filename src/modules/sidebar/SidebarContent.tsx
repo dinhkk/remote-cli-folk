@@ -209,6 +209,7 @@ export default function SidebarContent({
         projectsCount={projects.length}
         runningSessionsCount={runningSessionsCount}
         archivedSessionsCount={archivedSessionsCount}
+        conversationsCount={searchMode === 'conversations' ? visibleConversationTotal : undefined}
         isArchivedSessionsLoading={isArchivedSessionsLoading}
         searchFilter={searchFilter}
         onSearchFilterChange={onSearchFilterChange}
@@ -223,10 +224,9 @@ export default function SidebarContent({
         t={t}
       />
 
-      {searchMode === 'conversations' && <>
+      {searchMode === 'conversations' && (
         <SidebarProviderFilter value={providerFilter} onChange={onProviderFilterChange} t={t} />
-        <p className="px-3 pb-2 text-xs text-muted-foreground">{t('providerFilter.count', { count: visibleConversationTotal })}</p>
-      </>}
+      )}
       <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
         {showConversationSearch ? (
           isSearching && !conversationResults ? (
@@ -396,7 +396,6 @@ export default function SidebarContent({
         ) : searchMode === 'conversations' ? (
           <SidebarRecentConversations
             conversations={recentConversations}
-            total={recentConversationsTotal}
             hasMore={recentConversationsHasMore}
             isLoading={isRecentConversationsLoading}
             isLoadingMore={isLoadingMoreRecentConversations}

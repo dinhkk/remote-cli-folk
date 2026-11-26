@@ -149,7 +149,6 @@
     "projectsScanned_other": "{{count}} projects scanned"
   },
   "recent": {
-    "title": "Recent conversations",
     "emptyTitle": "No conversations yet",
     "emptyDescription": "Your most recently updated conversations will appear here.",
     "loadFailed": "Could not load recent conversations",
@@ -184,7 +183,6 @@
   "providerFilter": {
     "label": "Filter conversations by provider",
     "all": "All",
-    "provider": "{{provider}}",
-    "count": "Conversations: {{count}}"
+    "provider": "{{provider}}"
   }
 }

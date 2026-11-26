@@ -6,7 +6,7 @@ import { KillFlowProvider } from '@/modules/agent-monitor/graph/KillFlowContext'
 import { KillMessage } from '@/modules/agent-monitor/graph/KillMessage';
 import { MonitorGraphCard } from '@/modules/agent-monitor/graph/MonitorGraphCard';
 import { sessionNodeId } from '@/modules/agent-monitor/graph/layoutMonitorTree';
-import { useElementWidth, widthTier } from '@/modules/agent-monitor/hooks/useElementWidth';
+import { isStackedWidth, useElementWidth, widthTier } from '@/modules/agent-monitor/hooks/useElementWidth';
 import { useServerNow } from '@/modules/agent-monitor/hooks/useServerNow';
 import { MonitorOverview } from '@/modules/agent-monitor/overview/MonitorOverview';
 import { MonitorColumns } from '@/modules/agent-monitor/running/MonitorColumns';
@@ -138,7 +138,7 @@ export function RunningMonitorPane({ leading, renderActivity }: RunningMonitorPa
                         />
                       )
                       : <p className="text-sm text-muted-foreground" data-testid="running-session-gone">{t('pane.sessionGone')}</p>)
-                    : <MonitorOverview snapshot={snapshot} now={now} animate={animate} tier={tier} onSelectNode={onSelectNode} />}
+                    : <MonitorOverview snapshot={snapshot} now={now} animate={animate} tier={tier} stacked={isStackedWidth(paneWidth)} onSelectNode={onSelectNode} />}
 
                   {activity && renderActivity && openActivityChat && !narrow && (
                     <section className="shrink-0" aria-label={t('agentActivity.title')} data-testid="running-activity">

@@ -20,6 +20,10 @@ type SidebarModeTabsProps = {
   searchMode: SidebarSearchMode;
   onSearchModeChange: (mode: SidebarSearchMode) => void;
   runningSessionsCount: number;
+  /** Shown next to the Projects label; leave undefined to show the label alone. */
+  projectsCount?: number;
+  /** Shown next to the Conversations label; leave undefined to show the label alone. */
+  conversationsCount?: number;
   t: TFunction;
 };
 
@@ -35,6 +39,8 @@ export default function SidebarModeTabs({
   searchMode,
   onSearchModeChange,
   runningSessionsCount,
+  projectsCount,
+  conversationsCount,
   t,
 }: SidebarModeTabsProps) {
   const tabs: ModeTab[] = [
@@ -49,6 +55,11 @@ export default function SidebarModeTabs({
   const hiddenTabs = tabs.filter((_, index) => !visibleIndexes.includes(index));
   const runningBadgeText = runningSessionsCount > 99 ? '99+' : String(runningSessionsCount);
   const moreLabel = t('search.modeMore', 'More');
+
+  // Only the labelled tabs carry a count; the icon-only ones keep their own badge or none.
+  const tabCount = (mode: SidebarSearchMode) => (
+    mode === 'projects' ? projectsCount : mode === 'conversations' ? conversationsCount : undefined
+  );
 
   const renderTab = (tab: ModeTab, canGrow: boolean) => {
     const isActive = tab.mode === searchMode;
@@ -83,6 +94,9 @@ export default function SidebarModeTabs({
           <Icon className="h-3 w-3" />
         )}
         {tab.showLabel && <span className="truncate">{tab.label}</span>}
+        {tabCount(tab.mode) !== undefined && (
+          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/70">{tabCount(tab.mode)}</span>
+        )}
       </button>
     );
 

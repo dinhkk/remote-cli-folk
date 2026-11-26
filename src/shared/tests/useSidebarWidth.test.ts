@@ -25,10 +25,10 @@ test('a stored width is restored, and a broken one falls back to the default', (
   assert.equal(parseSidebarWidth('wide, please'), SIDEBAR_WIDTH_DEFAULT);
   assert.equal(parseSidebarWidth(undefined), SIDEBAR_WIDTH_DEFAULT);
   // A numeric prefix is not a width: '320px' is as broken as 'wide, please'.
-  assert.equal(parseSidebarWidth('320px'), SIDEBAR_WIDTH_DEFAULT);
+  assert.equal(parseSidebarWidth('400px'), SIDEBAR_WIDTH_DEFAULT);
   assert.equal(parseSidebarWidth(''), SIDEBAR_WIDTH_DEFAULT);
 });
 
-test('the default width matches the previous fixed sidebar', () => {
-  assert.equal(SIDEBAR_WIDTH_DEFAULT, 288); // md:w-72
+test('the default width leaves room for every section tab', () => {
+  assert.equal(SIDEBAR_WIDTH_DEFAULT, 320);
 });

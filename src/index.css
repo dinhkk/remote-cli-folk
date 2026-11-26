@@ -341,6 +341,41 @@
     border-radius: 3px;
   }
   
+  /*
+   * A scrollbar that stays out of sight until the pointer is over the element or
+   * it has just been scrolled (the element carries data-scrolling="true" then).
+   * The bar keeps its space, only its colour changes, so revealing it does not
+   * move the content around.
+   */
+  .scrollbar-reveal {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-reveal:hover,
+  .scrollbar-reveal[data-scrolling='true'] {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
+  }
+
+  .scrollbar-reveal::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-reveal::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-reveal::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+  }
+
+  .scrollbar-reveal:hover::-webkit-scrollbar-thumb,
+  .scrollbar-reveal[data-scrolling='true']::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: hsl(var(--muted-foreground) / 0.8);
   }
