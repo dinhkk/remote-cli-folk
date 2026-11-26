@@ -249,8 +249,21 @@ export const TAB_TOKEN_REQUEST_MIN_INTERVAL_MS = 60_000;
 
 //----------------- REMOTE TABS ------------
 
-/** How often the Remote tab bar refreshes pairing state while at least one pairing exists (contracts.md section 2: poll every 2 s, no SSE). */
+/** How often a pairing dialog follows its join while it is open: the person is waiting on the other device, so this stays short. */
 export const REMOTE_PEERS_POLL_INTERVAL_MS = 2_000;
+
+/**
+ * How often the shared Remote poll (tab bar, settings, Local badge) re-reads peers and Host status.
+ * Every one of these requests crosses the relay, so the steady state is kept slow; a person who acts
+ * gets a fresh read at once through `refresh`, and a tab that is shown again catches up immediately.
+ */
+export const REMOTE_STATUS_POLL_INTERVAL_MS = 5_000;
+
+/** How often the running-sessions list is re-read while the page is visible; live runs also arrive over the websocket. */
+export const RUNNING_SESSIONS_POLL_INTERVAL_MS = 10_000;
+
+/** How often a visible composer re-reads the server's copy of its queued follow-up. */
+export const QUEUED_DRAFT_RECONCILE_INTERVAL_MS = 10_000;
 
 /** How long a link-error message stays on a Remote tab before it hides itself. */
 export const TARGET_LINK_ERROR_AUTOHIDE_MS = 8_000;

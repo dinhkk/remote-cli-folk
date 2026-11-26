@@ -12,6 +12,7 @@ import {
 } from '@/shared/hooks/useSessionProtection';
 import type { BackgroundTaskSummary, GetSessionActivity, IsSessionProcessing, MarkSessionBackground, MarkSessionIdle, MarkSessionProcessing, SessionActivity, SessionActivityMap, SyncProcessingSessions } from '@/shared/types';
 import { api } from '@/shared/api';
+import { RUNNING_SESSIONS_POLL_INTERVAL_MS } from '@/shared/constants';
 
 type RunningSessionApiItem = {
   sessionId?: unknown;
@@ -169,12 +170,26 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
     void refreshRunningSessions();
   }, [refreshRunningSessions]);
 
+  // Every read crosses the relay for a remote tab, so a hidden page does not ask,
+  // and a page that is shown again catches up at once instead of waiting for the next tick.
   useEffect(() => {
     const interval = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
       void refreshRunningSessions();
-    }, 5000);
+    }, RUNNING_SESSIONS_POLL_INTERVAL_MS);
+    const refreshWhenShown = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshRunningSessions();
+      }
+    };
+    document.addEventListener('visibilitychange', refreshWhenShown);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenShown);
+    };
   }, [refreshRunningSessions]);
 
   const actions = useMemo<SessionProtectionActions>(
