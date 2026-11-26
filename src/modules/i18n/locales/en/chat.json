@@ -289,7 +289,7 @@
       "count": "{{count}} tasks",
       "prompt": {
         "title": "This session still has background work running",
-        "description": "A new message starts a new turn, which stops that work; anything it has not reported yet is lost. Queue the message to send it when the work finishes.",
+        "description": "Send anyway stops the previous Claude process and its background work before starting a new turn. Unreported results are lost. Queue waits for the work to finish.",
         "cancel": "Cancel",
         "queue": "Queue",
         "sendAnyway": "Send anyway"

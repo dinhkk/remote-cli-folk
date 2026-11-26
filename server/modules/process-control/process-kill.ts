@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 
-import { groupKeyOf, treePids, toSample, type ProcessReading, type ProcessSample, type RawProcess } from './agent-monitor.process-usage.js';
+import { groupKeyOf, treePids, toSample, type ProcessReading, type ProcessSample, type RawProcess } from './process-usage.js';
 
 /**
  * Process-kill core: picks the exact processes to kill from a FRESH read of the process table, checks they are safe to kill,

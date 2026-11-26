@@ -164,7 +164,7 @@ Host's project folder paths, session labels and process names (the per-session p
 and a Controller can end a Claude session or its child processes on the Host. A kill pressed on the Host itself does not go
 through the bridge and is **not audited**.
 
-## Kill (`agent-monitor.kill.ts`, `agent-monitor.process-kill.ts`)
+## Kill (`agent-monitor.kill.ts`, `process-control/process-kill.ts`)
 
 What a box does when its kill button is confirmed:
 
@@ -423,3 +423,22 @@ more (all removed, with the Settings tab before them).
 | `MEDIUM_FROM` / `WIDE_FROM` in `useElementWidth` | `MonitorColumns`, `MonitorOverview` (KPI `compact`), `monitorTierLayout.test.tsx` |
 | `AgentMonitorSessionUsage` / `sampler.treeUsage` | both `types.ts` files, `withProcesses` in the service, the session chips and `SelectionDetail` |
 | Any text on the monitor screens | keep it to titles, numbers, state labels and real-problem notices (see Client); `agentMonitorTranslations.test.ts` fails on a missing key and on the removed notes coming back |
+
+
+## Earlier processes of the same Claude session
+
+A registry session id is not a process identity. When multiple live roots share that id,
+Running keeps the newest root associated with the chat and adds an **Earlier Claude process**
+entry for each older root. Each entry uses its own process tree for child groups and resource
+usage; shared transcript agents are not duplicated on earlier entries. Existing visibility
+and list size caps still apply. Header summaries continue to count chats rather than processes.
+
+Earlier entries use an opaque token derived from the pid and registry start time. The kill
+route resolves that token from the current snapshot and verifies the exact root against a
+fresh registry read. It never falls back to the newest root for a missing or stale token.
+Other roots, including newer processes of the same session, remain protected. Killing an
+earlier root does not complete the current chat run.
+
+Process reading, grouping and guarded kill commands are shared through the
+`server/modules/process-control/index.ts` API. The provider's replacement lifecycle uses
+these primitives without importing or initializing the monitor module.

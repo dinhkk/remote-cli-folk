@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { RawProcess } from '../agent-monitor.process-usage.js';
+import type { RawProcess } from '@/modules/process-control/index.js';
+
 import { createResourceSampler, type SamplerTarget } from '../agent-monitor.sampler.js';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

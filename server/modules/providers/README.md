@@ -382,3 +382,13 @@ alongside the implementation.
 - Assuming one provider's MCP config file format works for the others.
 
 
+
+
+### Replacing held Claude work
+
+`claude-process-lifecycle.ts` captures the SDK child through `spawnClaudeCodeProcess`.
+A replacement turn awaits bounded cleanup of that child and its captured descendants.
+Outstanding task state is retained until exit is verified; stale events from a stopping
+query cannot clear that state or overwrite the replacement. Failed cleanup rejects the
+new turn and preserves the old session for retry. Queue and individual task stop use
+their existing paths. See the process-control module and websocket architecture docs.
