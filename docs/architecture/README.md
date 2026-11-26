@@ -140,7 +140,8 @@ Terms that mean something specific here and are easy to guess wrong.
 ## Cross-cutting invariants
 
 - **One running entry per session.** Runtime background tasks take priority over CLI
-  liveness records, preserving `background: true` and `tasks`. See
+  liveness records. Background-only work keeps the composer usable; an external turn
+  with `canInterrupt: false` cannot expose an enabled Stop action. See
   [Run lifecycle and busy state](02-realtime-stream.md#run-lifecycle-and-busy-state).
 
 
