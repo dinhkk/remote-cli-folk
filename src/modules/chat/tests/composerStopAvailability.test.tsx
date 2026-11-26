@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+
 import { createRef } from 'react';
 import type { ComponentProps } from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import { test, vi } from 'vitest';
+
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import '@/modules/i18n';
 
