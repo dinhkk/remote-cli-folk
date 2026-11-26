@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -314,4 +316,56 @@ test('a turn whose tool emits no task events still holds on the static rule', as
 
     assert.equal(script.released(), false, 'Monitor reports no task, so the launch rule decides');
   });
+});
+
+
+test('replacement keeps tasks tracked until the stubborn owned process exits', { skip: process.platform !== 'linux' }, async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), 'claude-replacement-'));
+  const first = createScriptedQuery();
+  const second = createScriptedQuery();
+  const sent: NormalizedMessage[] = [];
+  const sessions = new ClaudeSessionsProvider({ getLiveRunStartTime: () => null });
+  const writer = { send: (message: NormalizedMessage) => sent.push(message), userId: null };
+  const context: Omit<ProviderRuntimeContext, 'createQuery'> = {
+    resolveProviderSessionId: () => null, resolveResumeModel: async () => undefined,
+    getProviderModels: async () => CLAUDE_PREDEFINED_MODELS as never,
+    normalizeMessage: (raw, sid) => sessions.normalizeMessage(raw, sid), isProviderInstalled: async () => true,
+  };
+  let child: ChildProcess | null = null;
+  let newStarted = false;
+  const firstRun = queryClaudeSDK('start task', { sessionId: SESSION_ID, cwd }, writer as never, {
+    ...context, createQuery: (input) => {
+      const args = ['-e', 'setInterval(() => {}, 1000)'];
+      child = input.options.spawnClaudeCodeProcess
+        ? input.options.spawnClaudeCodeProcess({ command: process.execPath, args, cwd, env: {}, signal: new AbortController().signal })
+        : spawn(process.execPath, args, { cwd, stdio: 'pipe' });
+      return first.createQuery(input);
+    },
+  });
+  let secondRun: Promise<unknown> | null = null;
+  try {
+    await first.script.started;
+    first.script.emit(init());
+    first.script.emit(taskStarted('held-task', 'held-tool', 'local_bash'));
+    first.script.emit(result());
+    await waitFor(() => sent.some((message) => message.kind === 'complete'));
+    secondRun = queryClaudeSDK('send anyway', { sessionId: SESSION_ID, cwd }, writer as never, {
+      ...context, createQuery: (input) => { newStarted = true; return second.createQuery(input); },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(newStarted, false, 'replacement cannot start while the old process is alive');
+    assert.equal(listClaudeSDKBackgroundWork()[0]?.tasks[0]?.taskId, 'held-task');
+    first.script.emit(taskNotification('held-task', 'held-tool', 'stopped'));
+    first.script.end();
+    await firstRun;
+    assert.equal(listClaudeSDKBackgroundWork()[0]?.tasks[0]?.taskId, 'held-task', 'SDK wind-down cannot clear tasks before process exit');
+    await second.script.started;
+    assert.ok(child && ((child as ChildProcess).exitCode !== null || (child as ChildProcess).signalCode !== null));
+    assert.deepEqual(listClaudeSDKBackgroundWork(), []);
+  } finally {
+    first.script.end(); second.script.emit(init()); second.script.emit(result()); second.script.end();
+    if (child) (child as ChildProcess).kill('SIGKILL');
+    await firstRun; if (secondRun) await secondRun;
+    await rm(cwd, { recursive: true, force: true });
+  }
 });

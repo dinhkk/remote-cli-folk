@@ -1,8 +1,8 @@
 import type { AgentMonitorKillRequest, AgentMonitorKillResponse } from '@/shared/types.js';
+import { groupKeyOf } from '@/modules/process-control/index.js';
+import type { KillContext, KillOutcome } from '@/modules/process-control/index.js';
 
 import type { AgentActivityAggregator } from './agent-monitor.aggregator.js';
-import { groupKeyOf } from './agent-monitor.process-usage.js';
-import type { KillContext, KillOutcome } from './agent-monitor.process-kill.js';
 
 /** The SDK is given this long to stop one agent; after it the answer is "no handle" and the client offers the session kill. */
 export const STOP_TASK_TIMEOUT_MS = 3_000;
@@ -12,7 +12,7 @@ const UNMARK_AFTER_MS = 10_000;
 const MAX_ID_LENGTH = 256;
 
 /** What the store knows about a session id the client sent. `terminal` sessions are CLI sessions the app did not start. */
-export type KillSessionInfo = { provider: string; providerSessionId: string | null; terminal: boolean };
+export type KillSessionInfo = { provider: string; providerSessionId: string | null; terminal: boolean; root?: { pid: number; startedAt: number } };
 
 /** One Claude CLI process of the registry; only `pid`, `startedAt` and the session id it belongs to matter here. */
 type LiveRoot = { providerSessionId: string; pid: number; startedAt: number };
@@ -97,8 +97,8 @@ export function createAgentMonitorKiller(deps: KillerDeps) {
     } catch {
       return null;
     }
-    const mine = live.filter((entry) => entry.providerSessionId === info.providerSessionId).sort((a, b) => b.startedAt - a.startedAt);
-    const root = mine[0];
+    const mine = live.filter((entry) => entry.providerSessionId === info.providerSessionId).sort((a, b) => b.startedAt - a.startedAt || b.pid - a.pid);
+    const root = info.root ? mine.find((entry) => entry.pid === info.root?.pid && entry.startedAt === info.root.startedAt) : mine[0];
     if (!root) return null;
     const otherRoots = live.filter((entry) => entry !== root).map((entry) => entry.pid).sort((a, b) => a - b);
     return { root, context: { registryStartedAt: root.startedAt, otherRoots } };

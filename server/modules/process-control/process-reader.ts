@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 
-import { parsePosixPs, parseWindowsProcessJson, type ProcessReading } from './agent-monitor.process-usage.js';
+import { parsePosixPs, parseWindowsProcessJson, type ProcessReading } from './process-usage.js';
 
 /** Reads every process once. Rejects on failure or when `signal` aborts (the child is killed). */
 export type ProcessReader = (signal: AbortSignal) => Promise<ProcessReading>;

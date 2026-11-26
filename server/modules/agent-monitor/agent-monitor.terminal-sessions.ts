@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { AgentMonitorSession } from '@/shared/types.js';
 
 import { folderNameOf, projectKeyOf } from './agent-monitor.projects.js';
@@ -84,6 +86,7 @@ export function createTerminalSessionReader({
   let sessions: AgentMonitorSession[] = [];
   // Claude process id of each listed session, as of the last refresh (same lifetime as `sessions`).
   let pids = new Map<string, number>();
+  let earlierRoots = new Map<string, { providerSessionId: string; pid: number; startedAt: number }>();
 
   /** The registry, shared between viewers: one read serves every caller within the TTL. A failed read counts as empty. */
   function readRegistry(): Promise<RegistryEntry[]> {
@@ -167,7 +170,25 @@ export function createTerminalSessionReader({
         .filter((item) => item.state !== 'idle' || at - sinceStatus(item.entry) <= IDLE_SESSION_VISIBLE_MS)
         .sort((a, b) => Number(b.state !== 'idle') - Number(a.state !== 'idle') || sinceStatus(b.entry) - sinceStatus(a.entry))
         .slice(0, maxSessions);
-      const built = await Promise.all(items.map((item) => buildSession(item, at)));
+      const newest = new Map<string, RegistryEntry>();
+      for (const { entry } of items) {
+        const prior = newest.get(entry.providerSessionId);
+        if (!prior || entry.startedAt > prior.startedAt || (entry.startedAt === prior.startedAt && (entry.pid ?? 0) > (prior.pid ?? 0))) newest.set(entry.providerSessionId, entry);
+      }
+      const nextEarlier = new Map<string, { providerSessionId: string; pid: number; startedAt: number }>();
+      const built = await Promise.all(items.map(async (item) => {
+        const session = await buildSession(item, at);
+        if (item.entry.pid !== undefined && item.entry !== newest.get(item.entry.providerSessionId)) {
+          const key = createHash('sha256').update(`${item.entry.pid}:${item.entry.startedAt}`).digest('hex').slice(0, 16);
+          session.id += `:process:${key}`;
+          session.label += ' (earlier process)';
+          session.agents = [];
+          session.orchestrator.name = 'Earlier Claude process';
+          nextEarlier.set(session.id, { providerSessionId: item.entry.providerSessionId, pid: item.entry.pid, startedAt: item.entry.startedAt });
+        }
+        return session;
+      }));
+      earlierRoots = nextEarlier;
       sessions = built;
       pids = new Map(items.flatMap((item, index) => (item.entry.pid ? [[built[index].id, item.entry.pid] as const] : [])));
     } catch {
@@ -193,9 +214,12 @@ export function createTerminalSessionReader({
     // Nobody is watching: drop the result so the next viewer never sees an old picture.
     sessions = [];
     pids = new Map();
+    earlierRoots = new Map();
   }
 
   return {
+    /** Resolves an earlier process token from the current snapshot; the killer rechecks it against the fresh registry. */
+    earlierRootOf(sessionId: string) { return earlierRoots.get(sessionId) ?? null; },
     /** Called by every poll of the open screen: keeps the transcript reading going for another lease. */
     touch(): void {
       if (disposed) return;

@@ -4,12 +4,11 @@ import path from 'node:path';
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { listLiveClaudeCliProcesses, providerRuntimeService, providerTokenUsageService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
+import { createProcessKiller, runKillCommand, createProcessReader } from '@/modules/process-control/index.js';
 
 import { createAgentActivityAggregator, type MonitorSessionMeta } from './agent-monitor.aggregator.js';
 import { createAgentMonitorKiller, type KillSessionInfo } from './agent-monitor.kill.js';
 import { folderNameOf } from './agent-monitor.projects.js';
-import { createProcessKiller, runKillCommand } from './agent-monitor.process-kill.js';
-import { createProcessReader } from './agent-monitor.process-reader.js';
 import { createAgentMonitorRouter } from './agent-monitor.routes.js';
 import { createResourceSampler, type SamplerTarget } from './agent-monitor.sampler.js';
 import { createAgentMonitorService } from './agent-monitor.service.js';
@@ -71,12 +70,15 @@ async function listTargets(): Promise<SamplerTarget[]> {
   const targets: SamplerTarget[] = [{ key: 'server', kind: 'server', label: 'Server', pid: process.pid, includeDescendants: false }];
   const external: SamplerTarget[] = [];
 
-  const live = (await listLiveClaudeCliProcesses()).sort((a, b) => b.startedAt - a.startedAt);
+  const live = (await listLiveClaudeCliProcesses()).sort((a, b) => b.startedAt - a.startedAt || b.pid - a.pid);
+  const seenSessions = new Set<string>();
   for (const entry of live) {
     const appSession = sessionsDb.getSessionByProviderSessionId(entry.providerSessionId);
     if (appSession) {
+      const key = seenSessions.has(appSession.session_id) ? `session:${appSession.session_id}:process:${entry.pid}` : `session:${appSession.session_id}`;
+      seenSessions.add(appSession.session_id);
       targets.push({
-        key: `session:${appSession.session_id}`,
+        key,
         kind: 'session',
         label: readSessionMeta(appSession.session_id)?.label ?? appSession.session_id.slice(0, 8),
         pid: entry.pid,
@@ -129,6 +131,9 @@ const TERMINAL_PREFIX = 'terminal:';
 /** What the kill route needs to know about a session id the client sent; null when the app has never heard of it. */
 function describeSessionForKill(sessionId: string): KillSessionInfo | null {
   if (sessionId.startsWith(TERMINAL_PREFIX)) {
+    const earlier = terminal.earlierRootOf(sessionId);
+    if (earlier) return { provider: 'claude', providerSessionId: earlier.providerSessionId, terminal: true, root: earlier };
+    if (sessionId.includes(':process:')) return null;
     return { provider: 'claude', providerSessionId: sessionId.slice(TERMINAL_PREFIX.length), terminal: true };
   }
   const row = sessionsDb.getSessionById(sessionId);

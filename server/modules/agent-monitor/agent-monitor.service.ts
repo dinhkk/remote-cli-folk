@@ -84,7 +84,7 @@ export function createAgentMonitorService({ aggregator, terminal, sampler, cores
       };
       const sessions = [
         ...drawn,
-        ...terminal.current().filter((session) => !isDuplicate(session.openSessionId, session.state === 'idle', drawnById)),
+        ...terminal.current().filter((session) => terminal.earlierRootOf(session.id) !== null || !isDuplicate(session.openSessionId, session.state === 'idle', drawnById)),
       ].sort(byBusiness).slice(0, MAX_SESSIONS_TOTAL).map(withProcesses);
 
       const points = Math.ceil(SPARKLINE_WINDOW_MS / intervalMs);

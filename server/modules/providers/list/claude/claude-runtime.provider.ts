@@ -17,9 +17,11 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 
+
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
+import { createClaudeProcessLifecycle } from '@/modules/providers/list/claude/claude-process-lifecycle.js';
 import {
   appendFilesInputTag,
   buildClaudeUserContent,
@@ -90,6 +92,8 @@ type TokenBudget = {
 };
 
 const activeSessions = new Map<string, ActiveSession>();
+const processLifecycles = new WeakMap<ClaudeQuery, ReturnType<typeof createClaudeProcessLifecycle>>();
+const stoppingInstances = new WeakSet<ClaudeQuery>();
 // Outstanding background tasks per live session, keyed like activeSessions. An
 // entry lives exactly as long as the map entry it shadows: cleared when the
 // session is removed, and reset when a newer run takes the key over.
@@ -422,7 +426,7 @@ export function mapCliOptionsToSDK(options: AnyRecord = {}) {
  * @param {Object} writer - WebSocket writer for reconnect support
  * @param {Function} releaseInput - Closes the held stdin stream so the CLI can exit
  */
-function addSession(
+async function addSession(
   sessionId: string,
   queryInstance: ClaudeQuery,
   writer: ClaudeRuntimeWriter | null = null,
@@ -440,16 +444,8 @@ function addSession(
     existing && existing.status === 'active' && existing.instance && existing.instance !== queryInstance
   );
   if (superseding && existing) {
+    await releaseHeldSession(sessionId);
     supersededInstances.add(existing.instance);
-    Promise.resolve()
-      .then(() => existing.instance.interrupt())
-      .catch((error) => {
-        console.error(`Error interrupting superseded run for session ${sessionId}:`, error?.message || error);
-      });
-    existing.releaseInput?.();
-    // Whatever the superseded process had outstanding dies with it and will
-    // never report, so the new run starts from an empty task set.
-    backgroundWork.clear(sessionId);
   }
   const carried = superseding ? null : existing;
   activeSessions.set(sessionId, {
@@ -466,38 +462,27 @@ function addSession(
 }
 
 /**
- * Lets go of the process an earlier run left holding a session open, so the
- * next turn can take the session over.
- *
- * Closing stdin is not enough on its own: the CLI's wind-down waits for the
- * background agents the process still has going — for up to the ceiling it
- * was started with (BG_WAIT_CEILING_MS) — so an abandoned process with an
- * agent outstanding would run next to the process that replaced it for as
- * long as the agent does, both appending to the same session file. Stop the
- * tasks first, while stdin is still open: the SDK drops control requests
- * written after stdin has ended, which is also why the interrupt a later
- * supersede sends to this process cannot do the job.
- *
- * The stops are not awaited — each request is written to the CLI before this
- * returns, and a reply is only missing when the process has already gone.
- * @param {string} sessionId - Session identifier
+ * End the owned process tree before allowing a replacement query. Keep the entry
+ * and outstanding tasks until cleanup confirms exit; failures remain retryable.
  */
-function releaseHeldSession(sessionId: string) {
+async function releaseHeldSession(sessionId: string) {
   const held = getSession(sessionId);
-  if (!held) {
-    return;
-  }
-  for (const task of backgroundWork.outstanding(sessionId)) {
-    // A stop that cannot be delivered changes nothing about what happens
-    // next: the process is on its way out either way. Guard the synchronous
-    // call too, so a failing stop can never skip the release below.
-    try {
-      Promise.resolve(held.instance?.stopTask?.(task.taskId)).catch(() => {});
-    } catch {
-      // Same as a rejected stop.
+  if (!held) return;
+  stoppingInstances.add(held.instance);
+  const cooperate = () => {
+    for (const task of backgroundWork.outstanding(sessionId)) {
+      try { Promise.resolve(held.instance.stopTask?.(task.taskId)).catch(() => {}); } catch { /* Continue cleanup. */ }
     }
-  }
-  held.releaseInput?.();
+    try { Promise.resolve(held.instance.interrupt()).catch(() => {}); } catch { /* Continue cleanup. */ }
+    held.releaseInput?.();
+  };
+  // A failed cleanup leaves both the entry and stopping marker intact for retry.
+  const lifecycle = processLifecycles.get(held.instance);
+  if (lifecycle) await lifecycle.stop(cooperate);
+  else cooperate();
+  supersededInstances.add(held.instance);
+  if (getSession(sessionId)?.instance === held.instance) removeSession(sessionId);
+  stoppingInstances.delete(held.instance);
 }
 
 /**
@@ -1097,9 +1082,6 @@ async function queryClaudeSDK(
 
   // A new turn supersedes any earlier one still holding this session's process
   // open, so held runs cannot stack up across a conversation.
-  if (sessionKey()) {
-    releaseHeldSession(sessionKey()!);
-  }
 
   // Arms (or re-arms) the idle countdown that eventually closes stdin.
   const scheduleRelease = () => {
@@ -1120,6 +1102,7 @@ async function queryClaudeSDK(
   let queryInstance: ClaudeQuery | null = null;
 
   try {
+    if (sessionKey()) await releaseHeldSession(sessionKey()!);
     const resolvedModel = await context.resolveResumeModel(sessionId, options.model);
     let effortModels: ProviderModelsDefinition = CLAUDE_PREDEFINED_MODELS;
     try {
@@ -1270,6 +1253,9 @@ async function queryClaudeSDK(
     // The SDK's own `query`, unless the caller supplies one (tests script the
     // stream to drive the hold logic below without a CLI process).
     const createQuery = context.createQuery ?? query;
+    const lifecycle = createClaudeProcessLifecycle();
+    sdkOptions.spawnClaudeCodeProcess = (spawnOptions: Parameters<typeof lifecycle.spawn>[0]) =>
+      lifecycle.spawn(spawnOptions, sdkOptions.stderr);
     let heldPrompt = createHeldPromptStream(promptMessages);
     releasePromptStream = heldPrompt.release;
     try {
@@ -1292,20 +1278,22 @@ async function queryClaudeSDK(
       });
     }
 
+    processLifecycles.set(queryInstance, lifecycle);
     // Track the query instance for abort capability
     if (sessionKey()) {
-      addSession(sessionKey()!, queryInstance, ws, releasePromptStream);
+      await addSession(sessionKey()!, queryInstance, ws, releasePromptStream);
     }
 
     // Process streaming messages
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
     for await (const rawMessage of queryInstance) {
+      if (stoppingInstances.has(queryInstance) || supersededInstances.has(queryInstance)) continue;
       const message = rawMessage as AnyRecord;
       // Capture session ID from first message
       if (message.session_id && !capturedSessionId) {
 
         capturedSessionId = message.session_id;
-        addSession(sessionKey()!, queryInstance, ws, releasePromptStream);
+        await addSession(sessionKey()!, queryInstance, ws, releasePromptStream);
 
         // Set session ID on writer
         if (ws.setSessionId && typeof ws.setSessionId === 'function') {
@@ -1468,13 +1456,13 @@ async function queryClaudeSDK(
     // Clean up session on completion — only while this run still owns the map
     // entry. A superseding run may have replaced it, and deleting here would
     // strand that run.
-    if (sessionKey() && getSession(sessionKey()!)?.instance === queryInstance) {
+    if (sessionKey() && getSession(sessionKey()!)?.instance === queryInstance && !stoppingInstances.has(queryInstance)) {
       removeSession(sessionKey()!);
     }
 
     // A superseded run winds down silently: the map entry, the abort flag,
     // and all client-facing events belong to the run that replaced it.
-    const superseded = supersededInstances.has(queryInstance);
+    const superseded = supersededInstances.has(queryInstance) || stoppingInstances.has(queryInstance);
 
     // Send the terminal completion event — skipped for aborted runs, whose
     // terminal `complete` (aborted: true) was already sent by abort-session, and
@@ -1500,11 +1488,11 @@ async function queryClaudeSDK(
 
     // Clean up session on error — only while this run still owns the map entry
     // (a superseding run may have replaced it).
-    if (sessionKey() && getSession(sessionKey()!)?.instance === queryInstance) {
+    if (sessionKey() && getSession(sessionKey()!)?.instance === queryInstance && !stoppingInstances.has(queryInstance)) {
       removeSession(sessionKey()!);
     }
 
-    if (queryInstance && supersededInstances.has(queryInstance)) {
+    if (queryInstance && (supersededInstances.has(queryInstance) || stoppingInstances.has(queryInstance))) {
       // Interrupted because a newer run took over this session id; that run
       // owns the abort flag and all further client-facing events.
       return;

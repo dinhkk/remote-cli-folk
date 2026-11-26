@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { groupKeyOf, parsePosixPs, parseWindowsProcessJson, toSample, type ProcessReading, type RawProcess } from '../agent-monitor.process-usage.js';
-import {
+import { groupKeyOf, parsePosixPs, parseWindowsProcessJson, toSample, type ProcessReading, type RawProcess,
   createProcessKiller,
   killInvocations,
   MAX_KILL_PIDS,
@@ -10,8 +9,7 @@ import {
   selectGroupPids,
   START_TIME_EPSILON_MS,
   verifyClaudeRoot,
-  type KillRun,
-} from '../agent-monitor.process-kill.js';
+  type KillRun } from '@/modules/process-control/index.js';
 
 const T0 = 1_700_000_000_000;
 const proc = (pid: number, ppid: number, name: string, startedAt: number | null = T0): RawProcess => ({ pid, ppid, name, cpuSeconds: 0, rssBytes: 1, startedAt });
