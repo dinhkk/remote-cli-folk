@@ -323,6 +323,7 @@ describe('agent bundle import: apply', () => {
     const noBasis = rig.bundle.applyImport(bundle, { overwrite: ['template:alpha'] });
     assert.equal(resultOf(noBasis, 'template:alpha').status, 'failed');
     assert.equal(resultOf(noBasis, 'template:alpha').code, 'BASIS_REQUIRED');
+    assert.equal(noBasis.snapshot, null, 'a refused overwrite takes no snapshot');
     rig.service.updateTemplate(created.id, templateBody({ slug: 'alpha', tools, name: 'Edited meanwhile', rev: created.rev }));
     const stale = rig.bundle.applyImport(bundle, { overwrite: ['template:alpha'], basis: basisOf(plan) });
     assert.equal(resultOf(stale, 'template:alpha').code, 'STALE');

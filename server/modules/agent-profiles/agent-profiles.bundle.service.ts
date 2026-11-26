@@ -383,12 +383,14 @@ export function createBundleService(dependencies: Dependencies) {
 
   const allKeysOf = (items: PlannedItem[]): Set<string> => new Set(items.flatMap((item) => [item.key, ...(item.folders ?? []).map((folder) => folder.key)]));
 
-  /** Whether anything in the plan would be overwritten (so a snapshot must exist first). */
-  function overwrites(items: PlannedItem[], overwrite: Set<string>): boolean {
-    return items.some((item) => (
-      (item.status === 'conflict' && item.overwritable && overwrite.has(item.key))
-      || (item.folders ?? []).some((folder) => folder.status === 'conflict' && folder.overwritable && overwrite.has(folder.key))
-    ));
+  /**
+   * Whether anything in the plan would really be overwritten (so a snapshot must exist first): a ticked, overwritable
+   * conflict whose preview revision still matches (an upload) or any conflict (a restore). A refused tick takes no snapshot.
+   */
+  function overwrites(items: PlannedItem[], overwrite: Set<string>, basis: Record<string, ImportBasis>, mode: ImportMode): boolean {
+    const goes = (row: { key: string; status: string; overwritable: boolean; basis: ImportBasis }): boolean =>
+      row.status === 'conflict' && row.overwritable && overwrite.has(row.key) && (mode === 'restore' || basis[row.key] === row.basis);
+    return items.some((item) => goes(item) || (item.folders ?? []).some(goes));
   }
 
   type ApplyContext = {
@@ -507,7 +509,7 @@ export function createBundleService(dependencies: Dependencies) {
     const overwrite = mode === 'restore' ? allKeysOf(before) : new Set(options.overwrite ?? []);
     // Stage 2: snapshot first (it reads every block), then the plan the writes use, then the writes: no await in between.
     let snapshot: string | null = null;
-    if (overwrites(before, overwrite)) {
+    if (overwrites(before, overwrite, options.basis ?? {}, mode)) {
       if (readLive().corruptRecords > 0) {
         throw new AppError(
           'Some stored templates or blocks are unreadable, so a backup would be incomplete. Nothing was changed; repair or delete those files first.',
