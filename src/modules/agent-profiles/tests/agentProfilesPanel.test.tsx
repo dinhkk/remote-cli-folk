@@ -18,7 +18,7 @@ import {
 import type { ClaudeAgentEntry, GenerateTargetProject } from '@/shared/types';
 
 /**
- * The whole screen against a fake server: exactly three tabs (Agents, Templates, Memory), the shared template load and the corrupt-file notice, the Agents tab
+ * The whole screen against a fake server: exactly four tabs (Agents, Templates, Memory, Pending), the shared template load and the corrupt-file notice, the Agents tab
  * (the list of the chosen target read from `?directory=`, generated/handmade marks, hide/show with the stored `rev`,
  * fallback warning) and the Generate entry.
  */
@@ -84,10 +84,10 @@ const rowOf = (name: string) => screen.getByText(name).closest('li') as HTMLElem
 const listCalls = (api: ReturnType<typeof setup>) => api.calls.filter((call) => call.method === 'GET' && call.path.startsWith('/api/agent-profiles/claude-agents')).map((call) => call.path);
 
 describe('panel', () => {
-  it('offers exactly three tabs: Agents first, then Templates and Memory', async () => {
+  it('offers exactly four tabs: Agents first, then Templates, Memory and Pending', async () => {
     const api = setup();
 
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Agents', 'Templates', 'Memory']);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Agents', 'Templates', 'Memory', 'Pending']);
     expect(screen.getByRole('tab', { name: 'Agents' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.queryByRole('tab', { name: 'Projects' })).toBeNull();
     expect(screen.queryByRole('tab', { name: /Claude/ })).toBeNull();

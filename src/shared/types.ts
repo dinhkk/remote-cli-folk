@@ -2190,6 +2190,8 @@ export type ClaudeAgentListing = {
   items: ClaudeAgentEntry[];
   hiddenNames: string[];
   hiddenRev: number;
+  /** Main agents allowed to use the `profiles` tools, as stored; shares `hiddenRev` (one settings revision), so send that rev with a change. */
+  managerNames: string[];
   builtinSource: 'sdk' | 'fallback';
 };
 
@@ -2325,6 +2327,50 @@ export type ExportBundleResult = { filename: string; text: string; problems: Exp
 
 /** One server-written snapshot (backup) listed for restore. */
 export type AgentBundleSnapshot = { name: string; createdAt: string; templates: number; blocks: number; folders: number; bytes: number };
+
+//----------------- PENDING PROPOSALS (changes an agent staged for the Host user to confirm) ------------
+
+/** What a proposed item does to the store: `refused` when it can never be applied (see the item's `refusal`), `identical` when nothing would change. */
+export type ChangesetAction = 'create' | 'overwrite' | 'delete' | 'identical' | 'refused';
+
+/** One changed field of an overwrite as text (long text is cut by the server); `null` = absent. Shown as before and after. */
+export type ChangesetFieldChange = { field: string; before: string | null; after: string | null };
+
+/**
+ * One proposed item as the review shows it: what happens, why it is refused, which sensitive powers it grants and what
+ * changes. `needsTick`: an overwrite or delete applies only when its key is ticked at confirm. `basis` is the revision of the
+ * target now (`absent` for a create); confirm sends it back so a tick applies to what was shown.
+ */
+export type ChangesetReviewItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  action: ChangesetAction;
+  needsTick: boolean;
+  basis: ImportBasis;
+  sensitive: string[];
+  refusal?: { code: string; message: string };
+  /** Readable summary lines built by the server (what is created, which fields change, what a delete loses). */
+  lines: string[];
+  changes: ChangesetFieldChange[];
+};
+
+/** A waiting proposal as `GET /pending` returns it: a fresh review against the store now and the `basis` map to send back at confirm. Never the raw changeset. */
+export type PendingProposalView = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  agentName: string;
+  items: ChangesetReviewItem[];
+  basis: Record<string, ImportBasis>;
+};
+
+/** The choices sent to confirm a pending proposal: `overwrite` also carries the keys of ticked deletes. */
+export type PendingConfirmRequest = {
+  overwrite: string[];
+  acceptSensitive: string[];
+  basis: Record<string, ImportBasis>;
+};
 
 //----------------- MAIN AGENT OF A CHAT (new-chat picker, session badge) ------------
 

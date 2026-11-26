@@ -7,8 +7,11 @@ import { GenerateAgentsForm } from '@/modules/agent-profiles/agents/GenerateAgen
 import { GLOBAL_TARGET_ID, resolveGenerateTarget } from '@/modules/agent-profiles/agents/generate-target';
 import { ProfileErrorNotice } from '@/modules/agent-profiles/common/ProfileErrorNotice';
 import { useProfileAction } from '@/modules/agent-profiles/hooks/useProfileAction';
+import { ApiRequestError } from '@/shared/api';
 import { Button } from '@/shared/ui';
 import type { AgentProfileTemplate, ClaudeAgentEntry, GenerateTargetProject } from '@/shared/types';
+
+const NO_NAMES: string[] = [];
 
 type AgentsTabProps = {
   /** The sidebar projects the agent files can be generated for. */
@@ -24,6 +27,10 @@ type AgentsTabProps = {
   builtinSource: 'sdk' | 'fallback' | null;
   /** Edits the stored hide list (receives it raw, returns the new one) and saves it; rejects on a stale revision. */
   onChangeHidden: (mutate: (names: string[]) => string[]) => Promise<void>;
+  /** The names allowed to use the `profiles` tools as stored; with `onChangeManagers`, file agent rows get a "Profile manager" switch. */
+  managerNames?: string[];
+  /** Edits the stored manager list (receives it raw, returns the new one) and saves it; rejects on a stale revision. */
+  onChangeManagers?: (mutate: (names: string[]) => string[]) => Promise<void>;
   /** Reads the agent list again (after Generate, or when a hide change was refused as stale). */
   onReload: () => void;
 };
@@ -31,11 +38,11 @@ type AgentsTabProps = {
 /**
  * The Agents tab: the agent files of the chosen target grouped by source (built into Claude Code, personal
  * `~/.claude/agents`, the project's `.claude/agents`), each marked generated (with its template) or handmade and with a
- * hide/show switch, plus hide-all/show-all and a hidden-only filter. The target is a sidebar project or the global scope;
+ * hide/show switch and, for file agents, a "Profile manager" switch, plus hide-all/show-all and a hidden-only filter. The target is a sidebar project or the global scope;
  * "Generate agents" opens the Generate form for it. Hiding applies to new sessions of every project.
  * Rendered by the agent-profiles panel.
  */
-export function AgentsTab({ projects, targetId, onTargetChange, templates, entries, status, loadError, builtinSource, onChangeHidden, onReload }: AgentsTabProps) {
+export function AgentsTab({ projects, targetId, onTargetChange, templates, entries, status, loadError, builtinSource, onChangeHidden, managerNames = NO_NAMES, onChangeManagers, onReload }: AgentsTabProps) {
   const { t } = useTranslation('agentProfiles');
   const { error, busy, run } = useProfileAction();
   // Show only the hidden agents.
@@ -55,6 +62,18 @@ export function AgentsTab({ projects, targetId, onTargetChange, templates, entri
   const hide = async (name: string, visible: boolean) => {
     // Only this one name is added or removed; names the listing does not show stay on the stored list.
     await run(() => onChangeHidden((stored) => (visible ? stored.filter((entry) => entry !== name) : [...new Set([...stored, name])])));
+  };
+  const setManager = (name: string, allowed: boolean) => {
+    if (!onChangeManagers) return;
+    void run(async () => {
+      try {
+        await onChangeManagers((stored) => (allowed ? [...new Set([...stored, name])] : stored.filter((entry) => entry !== name)));
+      } catch (failure) {
+        // A stale revision means the settings moved elsewhere: show what the server holds now (the notice stays up).
+        if (failure instanceof ApiRequestError && failure.code === 'PROFILE_STALE') onReload();
+        throw failure;
+      }
+    });
   };
   const hideAll = () => void run(() => onChangeHidden((stored) => [...new Set([...stored, ...readable.map((entry) => entry.name)])]));
   const showAll = () => void run(() => onChangeHidden((stored) => stored.filter((name) => !listedNames.includes(name))));
@@ -132,6 +151,9 @@ export function AgentsTab({ projects, targetId, onTargetChange, templates, entri
                     entry={entry}
                     busy={busy}
                     onSetVisible={(visible) => void hide(entry.name, visible)}
+                    manager={onChangeManagers && entry.source !== 'builtin'
+                      ? { checked: managerNames.includes(entry.name), onChange: (allowed) => setManager(entry.name, allowed) }
+                      : undefined}
                   />
                 ))}
               </ul>

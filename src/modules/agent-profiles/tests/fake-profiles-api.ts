@@ -7,6 +7,8 @@ import type {
   ImportFolderRow,
   ImportPlanItem,
   ImportResult,
+  ChangesetReviewItem,
+  PendingProposalView,
   MemoryBlock,
   MemoryBlockInput,
   MemoryBlockProjectContent,
@@ -242,6 +244,7 @@ export const listing = (items: ClaudeAgentEntry[], overrides: Record<string, unk
   items,
   hiddenNames: items.filter((item) => item.hidden).map((item) => item.name),
   hiddenRev: 1,
+  managerNames: [],
   builtinSource: 'sdk',
   ...overrides,
 });
@@ -271,3 +274,31 @@ export const makeFolderRow = (overrides: Partial<ImportFolderRow> & { key: strin
 
 /** An apply or restore answer; every key applied by default. */
 export const makeImportResult = (overrides: Partial<ImportResult> = {}): ImportResult => ({ items: [], partial: false, snapshot: null, ...overrides });
+
+// ---------- pending proposal fixtures ----------
+
+/** A reviewed item of a pending proposal: a create of `template:<slug>` / `block:<name>` with nothing sensitive, unless overridden. */
+export const makeReviewItem = (overrides: Partial<ChangesetReviewItem> & { key: string }): ChangesetReviewItem => ({
+  kind: overrides.key.startsWith('block:') ? 'block' : 'template',
+  label: overrides.key.split(':')[1] ?? overrides.key,
+  action: 'create',
+  needsTick: false,
+  basis: 'absent',
+  sensitive: [],
+  lines: [],
+  changes: [],
+  ...overrides,
+});
+
+/** A pending proposal as `GET /pending` returns it: created a minute ago, expiring in 23 hours, `basis` taken from the items. */
+export const makePendingProposal = (overrides: Partial<PendingProposalView> & { id: string }): PendingProposalView => {
+  const items = overrides.items ?? [];
+  return {
+    createdAt: new Date(Date.now() - 60_000).toISOString(),
+    expiresAt: new Date(Date.now() + 23 * 3_600_000).toISOString(),
+    agentName: 'alpha-manager',
+    items,
+    basis: Object.fromEntries(items.map((item) => [item.key, item.basis])),
+    ...overrides,
+  };
+};

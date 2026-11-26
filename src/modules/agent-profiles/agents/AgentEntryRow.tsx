@@ -11,14 +11,16 @@ type AgentEntryRowProps = {
   busy: boolean;
   /** Shows or hides the agent for new sessions of every project. */
   onSetVisible: (visible: boolean) => void;
+  /** The "Profile manager" switch of a file agent; absent = the row offers none. */
+  manager?: { checked: boolean; onChange: (allowed: boolean) => void };
 };
 
 /**
  * One agent of the Agents list: name, model, whether its file was generated from a template or written by hand,
- * the visible/hidden switch and a read-only details view (tools, file, prompt). An entry whose file could not be parsed
+ * the visible/hidden switch, the optional "Profile manager" switch and a read-only details view (tools, file, prompt). An entry whose file could not be parsed
  * shows the file and the reason instead. Used by the Agents tab of the agent-profiles module.
  */
-export function AgentEntryRow({ entry, busy, onSetVisible }: AgentEntryRowProps) {
+export function AgentEntryRow({ entry, busy, onSetVisible, manager }: AgentEntryRowProps) {
   const { t } = useTranslation('agentProfiles');
   // Whether the read-only details are open; local because only this row cares.
   const [open, setOpen] = useState(false);
@@ -48,6 +50,13 @@ export function AgentEntryRow({ entry, busy, onSetVisible }: AgentEntryRowProps)
         <ProfileSwitch checked={!entry.hidden} onChange={onSetVisible} disabled={busy} ariaLabel={t('agents.visibleFor', { name: entry.name })} />
       </div>
       <p className="text-xs text-muted-foreground">{entry.description}</p>
+      {manager && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <ProfileSwitch checked={manager.checked} onChange={manager.onChange} disabled={busy} ariaLabel={t('agents.manager.switch', { name: entry.name })} />
+          <span className="font-medium">{t('agents.manager.label')}</span>
+          <span className="min-w-0 flex-1 text-muted-foreground">{t('agents.manager.hint')}</span>
+        </div>
+      )}
       {open && (
         <div className="space-y-1 rounded-md bg-muted/30 p-2 text-xs">
           {entry.path && <p className="break-all font-mono">{entry.path}</p>}

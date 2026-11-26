@@ -5,7 +5,8 @@
   "tabs": {
     "agents": "Agents",
     "templates": "Templates",
-    "memory": "Memory"
+    "memory": "Memory",
+    "pending": "Pending"
   },
   "state": {
     "loading": "Loading…",
@@ -252,7 +253,12 @@
     "tools": "Tools: {{tools}}",
     "noPrompt": "Claude Code does not let apps read the prompt or tools of its built-in agents.",
     "prompt": "Prompt of {{name}}",
-    "fileError": "{{name}}: this agent file could not be read ({{error}}). Fix the file's front matter; the other agents are not affected."
+    "fileError": "{{name}}: this agent file could not be read ({{error}}). Fix the file's front matter; the other agents are not affected.",
+    "manager": {
+      "switch": "Profile manager for {{name}}",
+      "label": "Profile manager",
+      "hint": "Lets this agent propose changes to templates and memory blocks, which you confirm under Settings, Agent Profiles, Pending. Works only for the user-level generated agent (a file in ~/.claude/agents made from a template) and only in chats on this machine, never in a Remote tab."
+    }
   },
   "corrupt": {
     "title_one": "{{count}} stored template file could not be read and was skipped:",
@@ -428,5 +434,46 @@
       "position": "Line {{line}}, column {{column}}",
       "path": "At {{path}}"
     }
+  },
+  "pending": {
+    "intro": "Changes that manager agents proposed. Nothing is applied until you confirm it here; a proposal expires on its own after 24 hours.",
+    "refresh": "Refresh",
+    "empty": "No proposals are waiting.",
+    "proposalLabel": "Proposal of {{agent}}",
+    "justNow": "Proposed less than a minute ago",
+    "age": "Proposed {{time}} ago",
+    "expires": "Expires in {{time}}",
+    "expired": "Expired",
+    "time": {
+      "hours_one": "{{count}} h",
+      "hours_other": "{{count}} h",
+      "minutes_one": "{{count}} min",
+      "minutes_other": "{{count}} min"
+    },
+    "action": {
+      "create": "Create",
+      "overwrite": "Overwrite",
+      "delete": "Delete",
+      "identical": "No change",
+      "refused": "Refused"
+    },
+    "before": "Before",
+    "after": "After",
+    "absent": "(empty)",
+    "showFull": "Show full text of {{field}}",
+    "showLess": "Show less of {{field}}",
+    "showFullShort": "Show full text",
+    "showLessShort": "Show less",
+    "deleteTick": "Delete {{name}}",
+    "deleteShort": "Delete",
+    "untickedHint": "Nothing is ticked by default. Items you leave unticked (overwrites, deletes, sensitive items) are skipped.",
+    "confirm": "Confirm",
+    "reject": "Reject",
+    "confirmFor": "Confirm proposal of {{agent}}",
+    "rejectFor": "Reject proposal of {{agent}}",
+    "outcomeTitle": "Confirmed: proposal of {{agent}}",
+    "dismiss": "Dismiss",
+    "badgeTitle_one": "{{count}} proposal waiting for your confirmation",
+    "badgeTitle_other": "{{count}} proposals waiting for your confirmation"
   }
 }

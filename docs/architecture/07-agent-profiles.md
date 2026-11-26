@@ -240,7 +240,7 @@ folder's file only and cannot reach another folder's content.
 ## Import / export
 
 Templates and memory blocks move between independent hosts as one text **bundle** (YAML by default, JSON accepted). The
-file format, field tables, examples and a paste-ready prompt for an AI are in [agent-bundle-format.md](../agent-bundle-format.md).
+file format, field tables, examples and a paste-ready prompt for an AI are in [agent-bundle-format.md](../agent-bundle-format.md). An example agent that proposes templates and blocks from a chat (`remotecli-manager`, with skills and a setup README) is under [docs/examples/remotecli-manager](../examples/remotecli-manager/README.md); it is never seeded into the store.
 There is no sync: each host imports and recreates its own copy. Import, export, snapshots and restore are Host-only.
 
 - **Code.** `agent-profiles.bundle.service.ts` (export, plan, apply, restore), `.bundle.validation.ts` (per-item checks, request
@@ -432,7 +432,7 @@ instead of guessing a folder, and the client must reload.
 
 ## Client UI
 
-**Settings → Agent Profiles** (3 tabs, `AgentProfilesPanel.tsx`; Memory is Host only, so a Remote target never mounts it):
+**Settings → Agent Profiles** (4 tabs, `AgentProfilesPanel.tsx`; the panel is Host only, so a Remote target never mounts it and never reads the pending count):
 
 - **Agents**: target select (each sidebar project, or Global `~/.claude/agents`). List grouped
   *Built into Claude Code / Personal / Project: name*, with badges Generated / Handmade / Hidden, a
@@ -440,8 +440,14 @@ instead of guessing a folder, and the client must reload.
   **Generate agents** opens the form: tick templates → values pre-filled from `/generate/values` → plan table
   (status per template, path) → Apply → result (created / regenerated / skipped, git-exclude note).
   Preview is disabled while remembered values load or failed; Apply needs a plan from a Preview.
+  Every agent file (not the built-ins) also has a **Profile manager** switch: it adds or removes the name in
+  `profileManagerAgents` through `PUT /claude-agents/managers {names, rev}` (`rev` is the settings revision the hide list shares, so after
+  either save the listing is read again and both lists refresh). The hint says it works only for the user-level generated agent and only in
+  Host chats; a 409 reloads the list.
 - **Templates**: list, editor (fields, params builder, `{{key}}` check, tools / MCP / skills / model pickers,
   `memory` select, `usesBlocks` switch, preview), delete with confirm. Corrupt files named in a notice.
+- **Pending** (`pending/PendingTab.tsx`, `PendingProposalCard.tsx`, `usePendingProposals.ts`): what manager agents proposed and nobody confirmed. Read when the tab opens, on **Refresh** and every 15 s while the tab is mounted and the page is visible (silent, never while hidden); an expired proposal is gone from the next read. Each card shows the agent, age and expiry and one block per item built from the server's review, never raw JSON: action badge (Create / Overwrite / Delete / No change / Refused with its reason), the readable lines (a delete states the text size and folder count lost), before and after of each changed field with *Show full text* for long text, and a Sensitive badge naming the reasons. Nothing is ticked by default: overwrites and deletes need their tick and each sensitive item its own (*Select all sensitive* as in Import); a refused item has none. **Confirm** posts `overwrite[]` (deletes included), `acceptSensitive[]` and `basis` copied from `GET /pending`, so a moved item comes back `STALE`; the per-item results, the partial warning and the snapshot name stay under the list until dismissed. **Reject** drops the proposal. Both refresh the counts.
+- **Pending count badge**: `usePendingCount` reads `GET /pending/count` once and then about every 60 s while the page is visible (and at once on becoming visible and after a confirm or reject), keeping the last number on a failed read and showing no toast. It feeds the number on the Pending tab and `PendingSettingsBadge` on the sidebar's Settings buttons (header on desktop and phone, collapsed rail). In a Remote target it never calls the route and renders nothing.
 - **Header buttons Export / Import / Restore** (`src/modules/agent-profiles/bundle/`): Export picks templates and blocks, block text off by default, YAML or JSON download. Import takes a file or pasted text, previews (statuses, problems with line and column, per-conflict and per-sensitive ticks with *Select all sensitive*), maps each source folder to a sidebar project only when the bundle carries folder text, then applies and shows per-item results, a partial warning and the snapshot name. Restore lists snapshots newest first and asks before restoring. See [Import / export](#import--export).
 - **Memory**: the blocks of every scope (name, mode, scope; a global block also size, last writer, time of change), the form
   (name, description, mode, global or project, content for a global block, max characters; the scope is fixed once saved) and delete with confirm.
