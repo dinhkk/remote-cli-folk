@@ -15,7 +15,7 @@ export function BundleDialogFrame({ title, onClose, children }: BundleDialogFram
   const { t } = useTranslation('agentProfiles');
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto p-5" aria-describedby={undefined}>
+      <DialogContent wrapperClassName="z-[10000]" className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto p-5" aria-describedby={undefined}>
         <DialogTitle className="not-sr-only text-base font-semibold text-foreground">{title}</DialogTitle>
         <div className="mt-3 space-y-4">{children}</div>
         <div className="mt-5 flex justify-end">

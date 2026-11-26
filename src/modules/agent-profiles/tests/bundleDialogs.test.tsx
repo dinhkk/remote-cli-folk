@@ -90,6 +90,13 @@ describe('ExportBundleDialog', () => {
     return api;
   };
 
+  it('stacks above the Settings overlay (z-index 9999) it is opened from', async () => {
+    renderExport();
+    await screen.findByRole('checkbox', { name: 'notes' });
+    const wrapper = screen.getByRole('dialog').parentElement as HTMLElement;
+    expect(wrapper.className).toContain('z-[10000]');
+  });
+
   it('defaults to block text off and YAML, warns about private content, and lists templates and blocks', async () => {
     renderExport();
     await screen.findByRole('checkbox', { name: 'notes' });
