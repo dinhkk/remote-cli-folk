@@ -117,7 +117,28 @@ test('saveDraft stores the text and queued message under the given scope', () =>
   assert.deepEqual(saved, [[5, 'session-1', {
     text: 'half a thought',
     queuedMessage: { content: 'later' },
-  }]]);
+  }, 'remote']]);
+});
+
+test('saveDraft and appendQueuedMessage pass the request origin on, and default to remote', () => {
+  const saved: unknown[][] = [];
+  const appended: unknown[][] = [];
+  const service = createUserService(createDependencies({
+    drafts: {
+      ...noDrafts,
+      saveDraft: (...args) => saved.push(args),
+      appendQueuedMessage: (...args) => { appended.push(args); return { queuedMessage: args[2], appended: false }; },
+    },
+  }));
+
+  // A body that claims an origin is ignored: only the argument counts.
+  service.saveDraft(5, 's', { text: '', queuedMessage: { content: 'x' }, origin: 'local' }, 'local');
+  service.saveDraft(5, 's', { text: '', queuedMessage: { content: 'x' }, origin: 'local' });
+  service.appendQueuedMessage(5, 's', { content: 'x', origin: 'local' }, 'local');
+  service.appendQueuedMessage(5, 's', { content: 'x', origin: 'local' });
+
+  assert.deepEqual(saved.map((call) => call[3]), ['local', 'remote']);
+  assert.deepEqual(appended.map((call) => call[3]), ['local', 'remote']);
 });
 
 test('saveDraft without a queued message writes only the text and leaves the queued one alone', () => {
@@ -147,7 +168,7 @@ test('saveDraft with an explicit null queued message still clears it', () => {
 
   service.saveDraft(5, 'session-1', { scope: 'session-1', text: 'typing', queuedMessage: null });
 
-  assert.deepEqual(saved, [[5, 'session-1', { text: 'typing', queuedMessage: null }]]);
+  assert.deepEqual(saved, [[5, 'session-1', { text: 'typing', queuedMessage: null }, 'remote']]);
 });
 
 test('appendQueuedMessage hands the repository the message and returns what is now queued', () => {
@@ -173,7 +194,7 @@ test('appendQueuedMessage hands the repository the message and returns what is n
     content: 'B',
     options: { model: 'opus' },
     attachments: [{ name: 'b.txt' }],
-  }]]);
+  }, 'remote']]);
   assert.deepEqual(result, {
     success: true,
     queuedMessage: { content: 'A\n\nB', attachments: [] },

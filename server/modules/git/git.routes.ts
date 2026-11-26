@@ -1188,7 +1188,9 @@ Generate the commit message:`;
       await queryClaudeSDK(prompt, {
         cwd: projectPath,
         permissionMode: 'bypassPermissions',
-        model: 'sonnet'
+        model: 'sonnet',
+        // A one-shot generation (commit message) that no connection owns: unclassified, so remote.
+        origin: 'remote',
       }, writer);
     } else if (provider === 'cursor') {
       await spawnCursor(prompt, {

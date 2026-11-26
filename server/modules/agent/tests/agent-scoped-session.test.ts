@@ -128,6 +128,15 @@ test('continuing a scoped session through the Agent API passes its stored agent 
   });
 });
 
+test('Agent API runs are remote, whatever the request body claims', async () => {
+  await withIsolatedDatabase(async () => {
+    const runtime = createRecordingRuntime();
+    await postAgent(createDependencies(runtime.queryClaude), { projectPath: PROJECT_PATH, message: 'Fresh', origin: 'local', options: { origin: 'local' } });
+    assert.equal(runtime.optionsSeen.length, 1);
+    assert.equal(runtime.optionsSeen[0].origin, 'remote');
+  });
+});
+
 test('an unscoped session and a brand-new API run carry no agentProfile key at all', async () => {
   await withIsolatedDatabase(async () => {
     sessionsDb.createAppSession('app-plain', 'claude', PROJECT_PATH, 'Plain');

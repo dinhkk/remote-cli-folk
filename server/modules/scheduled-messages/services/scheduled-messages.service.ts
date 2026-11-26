@@ -1,6 +1,7 @@
 import { scheduledMessagesDb, sessionsDb } from '@/modules/database/index.js';
 import type { ScheduledMessageRow } from '@/modules/database/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
+import type { RunOrigin } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 /** How far ahead a message may be scheduled. Beyond this it is almost certainly a mistake. */
@@ -94,6 +95,8 @@ export const scheduledMessagesService = {
     content: string;
     options?: unknown;
     scheduledFor: string;
+    /** From the request's authentication (never from `options`); stored with the row and used when it fires. Omitted runs as remote. */
+    origin?: RunOrigin;
   }): ScheduledMessage {
     const content = input.content.trim();
     if (!content) {
@@ -136,6 +139,7 @@ export const scheduledMessagesService = {
       content,
       options: input.options ?? {},
       scheduledFor,
+      origin: input.origin,
     }));
     announceScheduledMessagesChanged(scheduled.sessionId);
     return scheduled;

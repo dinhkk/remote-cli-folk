@@ -19,9 +19,10 @@ import type {
   LLMProvider,
   ProviderPermissionDecision,
   ProviderRuntimeWriter,
+  RunOrigin,
   SessionAgentSnapshot,
 } from '@/shared/types.js';
-import { parseIncomingJsonObject } from '@/shared/utils.js';
+import { originFromAuthKind, parseIncomingJsonObject, readRunOrigin } from '@/shared/utils.js';
 
 /**
  * Trust boundary for client-supplied image attachments: chat.send options come
@@ -153,6 +154,7 @@ function readRequiredSessionId(data: AnyRecord): string | null {
 async function handleChatSend(
   ws: WebSocket,
   userId: string | number | null,
+  origin: RunOrigin,
   data: AnyRecord,
   dependencies: ChatWebSocketDependencies
 ): Promise<void> {
@@ -161,7 +163,7 @@ async function handleChatSend(
     return;
   }
 
-  await dispatchRun(ws, userId, resolved.sessionId, resolved.session, data, dependencies);
+  await dispatchRun(ws, userId, origin, resolved.sessionId, resolved.session, data, dependencies);
 }
 
 type ResolvedSendTarget = {
@@ -214,12 +216,14 @@ const SCOPED_SESSION_RESERVED_OPTIONS = ['systemPrompt', 'agents', 'agent', 'cwd
 /**
  * Copy of the client's `chat.send` options with the agent-profile keys under server
  * control removed. `agentProfile` is dropped for every session (only the server may
- * set it, from the session row); a session with a main agent also loses `systemPrompt`,
+ * set it, from the session row), and so is `origin` (only the server may set it, from the connection); a session with a main agent also loses `systemPrompt`,
  * `agents`, `agent` and `cwd`. A plain chat keeps everything else exactly as the client sent it.
  */
 function sanitizeClientRunOptions(options: AnyRecord, hasMainAgent: boolean): AnyRecord {
   const sanitized = { ...options };
   delete sanitized.agentProfile;
+  // The run origin is derived on the Host from how the request was authenticated, never from the client.
+  delete sanitized.origin;
   if (hasMainAgent) {
     for (const key of SCOPED_SESSION_RESERVED_OPTIONS) {
       delete sanitized[key];
@@ -237,6 +241,8 @@ function sanitizeClientRunOptions(options: AnyRecord, hasMainAgent: boolean): An
 async function dispatchRun(
   ws: WebSocket | null,
   userId: string | number | null,
+  /** Origin of the connection or row that starts THIS turn; set on the run options after every client-supplied value. */
+  origin: RunOrigin,
   sessionId: string,
   session: NonNullable<ReturnType<typeof sessionsDb.getSessionById>>,
   data: AnyRecord,
@@ -337,6 +343,8 @@ async function dispatchRun(
     projectPath: session.project_path ?? clientOptions.projectPath,
     // Set after the client spread: the agent record comes from the session row, never from the client.
     ...(agentSnapshot ? { agentProfile: agentSnapshot } : {}),
+    // Last, so neither the client options nor the extra runtime options can override it.
+    origin,
   };
 
   let failure: string | null = null;
@@ -374,6 +382,7 @@ async function dispatchRun(
 async function handleChatEditSend(
   ws: WebSocket,
   userId: string | number | null,
+  origin: RunOrigin,
   data: AnyRecord,
   dependencies: ChatWebSocketDependencies
 ): Promise<void> {
@@ -423,6 +432,7 @@ async function handleChatEditSend(
   await dispatchRun(
     ws,
     userId,
+    origin,
     sessionId,
     session,
     data,
@@ -703,6 +713,10 @@ export async function runDetachedChatTurn(
     content: string;
     options?: AnyRecord;
     /**
+     * Origin stored with the scheduled or queued row (null or absent = remote). Never read from `options`.
+     */
+    origin?: RunOrigin | null;
+    /**
      * Aborts a run already in progress instead of refusing to start. A
      * scheduled message sets this: the user picked the time knowing it might
      * land mid-run, so the timer outranks whatever is running.
@@ -741,6 +755,7 @@ export async function runDetachedChatTurn(
   return dispatchRun(
     null,
     input.userId,
+    readRunOrigin(input.origin),
     input.sessionId,
     session,
     { sessionId: input.sessionId, content: input.content, options: input.options ?? {} },
@@ -757,6 +772,8 @@ export function handleChatConnection(
   connectedClients.add(ws);
 
   const userId = readRequestUserId(request);
+  // Fixed for the life of the connection from how the upgrade authenticated; a client message cannot change it.
+  const origin = originFromAuthKind(request.user?.authKind);
 
   ws.on('message', async (rawMessage) => {
     try {
@@ -774,10 +791,10 @@ export function handleChatConnection(
 
       switch (messageType) {
         case 'chat.edit-send':
-          await handleChatEditSend(ws, userId, data, dependencies);
+          await handleChatEditSend(ws, userId, origin, data, dependencies);
           return;
         case 'chat.send':
-          await handleChatSend(ws, userId, data, dependencies);
+          await handleChatSend(ws, userId, origin, data, dependencies);
           return;
         case 'chat.abort':
           await handleChatAbort(ws, data, dependencies);

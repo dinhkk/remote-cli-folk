@@ -995,6 +995,24 @@ export type QueuedChatMessage = {
 };
 
 // ---------------------------
+//----------------- RUN ORIGIN ------------
+/**
+ * Where the request that started a provider run came from, carried on the run
+ * options as `origin`.
+ *
+ * `local` is set only by the Host's own authenticated non-bridge path (a browser
+ * session or the platform auth of the Host itself). `remote` is a connection the
+ * Host bridged from a Remote Controller (loopback token), and also every path
+ * that cannot prove otherwise: a missing or unknown value is read as `remote`
+ * (fail closed). The value never comes from a client message, header, query or
+ * `options`; it is derived on the Host from how the request was authenticated.
+ * It is containment against accidents and prompt injection that arrives through a
+ * Controller chat, not a boundary against a hostile paired Controller (a paired
+ * Controller is a full-trust grant). Read it with `readRunOrigin`.
+ */
+export type RunOrigin = 'local' | 'remote';
+
+// ---------------------------
 //----------------- PROJECT PERSISTENCE TYPES ------------
 /**
  * Canonical project row shape returned by the projects repository.

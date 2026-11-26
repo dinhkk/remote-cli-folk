@@ -113,6 +113,9 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
     status TEXT NOT NULL DEFAULT 'pending',
     -- Why a failed one failed, shown next to it in the composer.
     failure_reason TEXT,
+    -- Run origin (local | remote) of the request that created the row, set by the route
+    -- from how the request was authenticated. NULL (rows from before this column) runs as remote.
+    origin TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -232,6 +235,8 @@ CREATE TABLE IF NOT EXISTS session_drafts (
     draft_scope TEXT NOT NULL,
     draft_text TEXT NOT NULL DEFAULT '',
     queued_message TEXT,
+    -- Run origin (local | remote) of the request that queued the message; NULL runs as remote.
+    queued_origin TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, draft_scope),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

@@ -1,8 +1,15 @@
 import express from 'express';
 
+import { originFromAuthKind } from '@/shared/utils.js';
+
 import type { createUserService } from './user.service.js';
 
-type AuthenticatedRequest = express.Request & { user?: { id?: number | string } };
+type AuthenticatedRequest = express.Request & { user?: { id?: number | string }; authKind?: string };
+
+/** Run origin of the request, from how it was authenticated (a bridged Controller is remote); never from the body. */
+function readRequestOrigin(request: express.Request) {
+  return originFromAuthKind((request as AuthenticatedRequest).authKind);
+}
 
 function readUserId(request: express.Request): number {
   const rawUserId = (request as AuthenticatedRequest).user?.id;
@@ -75,7 +82,7 @@ export function createUserRouter(service: ReturnType<typeof createUserService>):
   router.put('/drafts', (req, res, next) => {
     try {
       const body = req.body as { scope?: unknown };
-      res.json(service.saveDraft(readUserId(req), body?.scope, req.body));
+      res.json(service.saveDraft(readUserId(req), body?.scope, req.body, readRequestOrigin(req)));
     } catch (error) {
       next(error);
     }
@@ -96,7 +103,7 @@ export function createUserRouter(service: ReturnType<typeof createUserService>):
   router.post('/drafts/queued-message', (req, res, next) => {
     try {
       const body = req.body as { scope?: unknown; queuedMessage?: unknown };
-      res.json(service.appendQueuedMessage(readUserId(req), body?.scope, body?.queuedMessage));
+      res.json(service.appendQueuedMessage(readUserId(req), body?.scope, body?.queuedMessage, readRequestOrigin(req)));
     } catch (error) {
       next(error);
     }

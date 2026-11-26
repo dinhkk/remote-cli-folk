@@ -450,6 +450,15 @@ const addSessionModelColumn = (db: Database): void => {
  * Existing rows stay NULL so clients can continue falling back to their
  * per-provider preference until the user selects an effort or sends a turn.
  */
+const addRunOriginColumns = (db: Database): void => {
+  addColumnToTableIfNotExists(
+    db, 'scheduled_messages', getTableInfo(db, 'scheduled_messages').map((column) => column.name), 'origin', 'TEXT',
+  );
+  addColumnToTableIfNotExists(
+    db, 'session_drafts', getTableInfo(db, 'session_drafts').map((column) => column.name), 'queued_origin', 'TEXT',
+  );
+};
+
 const addSessionEffortColumn = (db: Database): void => {
   const sessionsTableInfo = getTableInfo(db, 'sessions');
   const columnNames = sessionsTableInfo.map((column) => column.name);
@@ -563,6 +572,7 @@ export const runMigrations = (db: Database) => {
     addRemotePairingAliasColumn(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
+    addRunOriginColumns(db);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');
