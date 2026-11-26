@@ -70,3 +70,11 @@
   stroke-dasharray: 6 8;
   animation: monitor-edge-dash 0.9s linear infinite;
 }
+
+/*
+ * The zoom / fit / reset panel is hidden: it was too big for the pane. Pinch and Ctrl/Cmd + wheel still zoom, and a drag pans.
+ * It is only hidden, not removed (MonitorGraph still renders it), so deleting this rule brings it back.
+ */
+.monitor-flow .react-flow__controls {
+  display: none;
+}
