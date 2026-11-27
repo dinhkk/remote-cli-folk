@@ -49,8 +49,8 @@ test('pending list, count, confirm and reject over HTTP', async () => {
     assert.deepEqual((await call('GET', '/pending')).body, []);
     assert.deepEqual((await call('GET', '/pending/count')).body, { count: 0 });
     const first = rig.pending.propose('manager', proposal('alpha')).proposal;
-    // The list is ordered by creation time in milliseconds: keep the two proposals apart.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    // The rig clock is fixed and the list is ordered by creation time: move it on so the two proposals differ.
+    rig.state.now = new Date(rig.state.now.getTime() + 1000);
     const second = rig.pending.propose('manager', proposal('beta')).proposal;
     const listed = await call('GET', '/pending');
     assert.equal(listed.status, 200);
