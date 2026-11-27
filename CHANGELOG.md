@@ -3,6 +3,57 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.3.0](https://github.com/tunghuynh/remote-cli/compare/v1.2.0...v1.3.0) (2026-11-27)
+
+### New Features
+
+* **agent-monitor:** one strip of cards over the graph, hide the flow controls ([d42a5d6](https://github.com/tunghuynh/remote-cli/commit/d42a5d69ce4aca719f22fc7e693f7c9025f677f7))
+* **agent-profiles:** bundle core for exporting and importing templates and memory blocks ([ddc5b29](https://github.com/tunghuynh/remote-cli/commit/ddc5b29e9f7a0950d59e6f7f09db469599ff4719))
+* **agent-profiles:** bundle routes with a 5 MB body cap and Host-only policy ([b5e94a0](https://github.com/tunghuynh/remote-cli/commit/b5e94a08b5e2d123732b372410d1f720ae9efb66))
+* **agent-profiles:** export, import and restore dialogs for agent bundles ([f703f25](https://github.com/tunghuynh/remote-cli/commit/f703f25aa8813772cafdd818ff8b9e903690ae07))
+* **agent-profiles:** offer the profile manager template and skills once on first start ([24d98a7](https://github.com/tunghuynh/remote-cli/commit/24d98a710017677b1d5b33034ed1eea3a69e7bde))
+* **agent-profiles:** pending proposals tab, settings badge and profile manager switch ([5993242](https://github.com/tunghuynh/remote-cli/commit/599324294e5f640f1304027543a91d22787a3ed4))
+* **agent-profiles:** per-project content for project memory blocks ([b3dcb78](https://github.com/tunghuynh/remote-cli/commit/b3dcb785a83a2f167f7c918424e74a3c9edf9668))
+* **agent-profiles:** profiles tools and staged proposals for a manager agent ([0b9a14b](https://github.com/tunghuynh/remote-cli/commit/0b9a14bcf968ffc2b8292a5bd54309ba2219db68))
+* **agent-profiles:** teach the profile manager how templates, memory and proposals work ([68f6d7f](https://github.com/tunghuynh/remote-cli/commit/68f6d7f5af3154d8516f4a685ffd40e226f87bf7))
+* **providers:** mark every Claude run as local or remote, failing closed ([a6f6649](https://github.com/tunghuynh/remote-cli/commit/a6f6649094766496aa8e00fe04daf6e05aafea7a))
+* **sidebar:** counts on the section tabs, scrolling provider filter, wider default ([6e892e0](https://github.com/tunghuynh/remote-cli/commit/6e892e0ec3d6cf4bd50e81838d7535ecbf22d732))
+* **sidebar:** open on the Conversations tab ([4976465](https://github.com/tunghuynh/remote-cli/commit/4976465658f2177e16dd2154d20d25562844590b))
+
+### Bug Fixes
+
+* **agent-monitor:** give the narrow overview graph more height ([69141e2](https://github.com/tunghuynh/remote-cli/commit/69141e259cf6556e2c948d24a92fd2e641b08d01))
+* **agent-profiles:** close three gaps in the bundle import checks ([1963902](https://github.com/tunghuynh/remote-cli/commit/19639028cfffb9d21d14bff45fddd79490fda5fd))
+* **agent-profiles:** close tool-list and unattended-run gaps found in review ([91ce135](https://github.com/tunghuynh/remote-cli/commit/91ce13572afbbb3faa628a5c1ee955f5dd0c2eab))
+* **agent-profiles:** enforce the bundle body cap on every body type and fix dialog races ([393b6f3](https://github.com/tunghuynh/remote-cli/commit/393b6f398c5bf896b935361754802633170b88e5))
+* **agent-profiles:** seed the profile manager at server start, not on import ([515df50](https://github.com/tunghuynh/remote-cli/commit/515df5032d7e4cabbb407d379fc641462025ee58))
+* **agent-profiles:** show the bundle dialogs above the Settings overlay ([5b7f3eb](https://github.com/tunghuynh/remote-cli/commit/5b7f3ebc4b477c88fbdd8554872291283d4513e3))
+* **agent-profiles:** take no snapshot for an overwrite that is refused ([8a3dee2](https://github.com/tunghuynh/remote-cli/commit/8a3dee23dac2d0fa65704466cfe2cef2b44a73df))
+* **chat:** limit background session fix to server reporting ([e755461](https://github.com/tunghuynh/remote-cli/commit/e755461ce81b85ac227457c0a226addf45166c24))
+* **chat:** preserve background tasks and disable unavailable stop actions ([173aac3](https://github.com/tunghuynh/remote-cli/commit/173aac3d3b68e1444b8a2c912e091e082ced20fb))
+* **chat:** restore background session stop availability ([45a4b4c](https://github.com/tunghuynh/remote-cli/commit/45a4b4c18847bab5a7eb039f6993838752f9c84c))
+* **claude:** await superseded process cleanup and expose earlier roots ([f27f0e2](https://github.com/tunghuynh/remote-cli/commit/f27f0e29f1ed217795b898cdfd2f1af52b8fb5f7))
+* **providers:** a message queued in the Host browser keeps the profiles tools ([9358ff8](https://github.com/tunghuynh/remote-cli/commit/9358ff8f844c1d840c7e85ebba2e75e62aa36bef))
+
+### Performance
+
+* **remote:** slow the shared polls and tie them to page visibility ([72f9dd5](https://github.com/tunghuynh/remote-cli/commit/72f9dd5132dd762ca7d4e8a99b47e5f0b3f80307))
+
+### Refactoring
+
+* **agent-profiles:** bundle snapshots on any file system and fewer store reads ([1c328db](https://github.com/tunghuynh/remote-cli/commit/1c328dbdfda6a8727046dae112de7612f5c2ca72))
+
+### Documentation
+
+* **agent-profiles:** add a remotecli-manager example with skills ([4987b88](https://github.com/tunghuynh/remote-cli/commit/4987b88cfbd835f2f8e65ae73c9363aa43846da4))
+* **agent-profiles:** document the agent bundle format and the import/export flow ([c02aa47](https://github.com/tunghuynh/remote-cli/commit/c02aa4732a5325fa92c9717abe4d02c33b7f0f40))
+* **chat:** number the session invariant and remove blank lines ([3932406](https://github.com/tunghuynh/remote-cli/commit/39324069f4052a251b74e511538647a811149b66))
+
+### Tests
+
+* **agent-profiles:** order pending proposals with the rig clock, not real time ([5a7b8a4](https://github.com/tunghuynh/remote-cli/commit/5a7b8a4c4338d52750e62716b09620842b459f18))
+* **chat:** separate composer test import groups ([c8a0ff0](https://github.com/tunghuynh/remote-cli/commit/c8a0ff02a81f2fe31eaca38ce062d55fbf3ad943))
+
 ## [1.2.0](https://github.com/tunghuynh/remote-cli/compare/v1.2.0-beta...v1.2.0) (2026-11-26)
 
 ### Bug Fixes
