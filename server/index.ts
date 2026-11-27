@@ -49,7 +49,7 @@ import {
     startEnabledPluginServers,
     stopAllPlugins,
 } from './modules/plugins/index.js';
-import { agentProfilesBundleBodyParser, agentProfilesRoutes } from './modules/agent-profiles/index.js';
+import { agentProfilesBundleBodyParser, agentProfilesRoutes, seedProfileManager } from './modules/agent-profiles/index.js';
 import { agentMonitorRoutes, stopAgentMonitor } from './modules/agent-monitor/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
@@ -461,6 +461,9 @@ async function startServer() {
             // Sends anything that came due while the server was not running,
             // then keeps polling.
             initializeScheduledMessageDispatcher(providerRuntimeService);
+
+            // Offered once per store; never throws.
+            seedProfileManager();
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {

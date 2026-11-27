@@ -55,8 +55,14 @@ const pendingService = createPendingService({
   getManagers: () => claudeAgents.managerNames(),
 });
 
-// Offered once per store (marker file): the `remotecli-manager` template and its three skills in `~/.claude/skills`. Never throws.
-seedProfileManagerOnce({ rootDir, skillsDirectory: path.join(claudeHomeDirectory, 'skills'), profiles: agentProfilesService });
+/**
+ * Offers the profile manager once per store (marker file): the `remotecli-manager` template and its skills in `~/.claude/skills`.
+ * Called by the server at start-up, never at import, so tests and tools that load this module write nothing. Never throws.
+ * Consumed by: server/index.ts.
+ */
+export function seedProfileManager(): void {
+  seedProfileManagerOnce({ rootDir, skillsDirectory: path.join(claudeHomeDirectory, 'skills'), profiles: agentProfilesService });
+}
 
 /** Agent profile router assembled with the file store and the Claude SDK adapter. */
 export const agentProfilesRoutes = createAgentProfilesRouter(agentProfilesService, claudeAgents, blocksService, bundleService, pendingService);
