@@ -70,6 +70,10 @@ export function createAgentProfilesRouter(
 
   // The single list of agents: built-in + user + the project folder's `.claude/agents` (`?directory=<absolute>`).
   router.get('/claude-agents', respond((req) => claudeAgents.list(queryValue(req.query.directory))));
+  // Deletes one generated agent file (`?scope=user|project&name=<slug>&directory=<absolute, project only>`); handmade files are refused (409).
+  router.delete('/claude-agents/file', respond((req) => claudeAgents.deleteGenerated(
+    queryValue(req.query.scope), queryValue(req.query.name), queryValue(req.query.directory),
+  )));
   router.put('/claude-agents/hidden', respond((req) => claudeAgents.setHidden(req.body)));
   // The main agents allowed to use the `profiles` tools (`{names, rev}`; the rev is the one the hide list shares).
   router.put('/claude-agents/managers', respond((req) => claudeAgents.setManagers(req.body)));
