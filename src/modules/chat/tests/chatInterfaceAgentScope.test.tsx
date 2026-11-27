@@ -17,7 +17,7 @@ const harness = vi.hoisted(() => ({
   provider: 'claude',
   sessionId: null as string | null,
   composerArgs: [] as Array<{ newChatScope?: unknown; onShowSettings?: unknown }>,
-  composerProps: [] as Array<{ agentScope?: unknown }>,
+  composerProps: [] as Array<{ agentScope?: unknown; sessionAgentName?: string | null }>,
   requests: [] as string[],
   sessionScope: null as unknown,
   agents: [] as unknown[],
@@ -59,7 +59,7 @@ vi.mock('@/modules/chat/hooks/useChatComposerState', () => ({
 vi.mock('@/modules/chat/hooks/useSessionStore', () => ({ useSessionStore: () => ({}) }));
 vi.mock('@/modules/chat/transcript/ChatMessagesPane', () => ({ default: () => null }));
 vi.mock('@/modules/chat/composer/ChatComposer', () => ({
-  default: (props: { agentScope?: unknown }) => {
+  default: (props: { agentScope?: unknown; sessionAgentName?: string | null }) => {
     harness.composerProps.push(props);
     return null;
   },
@@ -107,6 +107,7 @@ const lastScopeRequest = () => harness.composerArgs.at(-1)?.newChatScope;
 type AgentScopeProp = { status: string; agentName: string | null; agents: unknown[]; setAgentName: (name: string | null) => void } | null;
 /** What ChatInterface hands the composer for the main-agent menu on its last render. */
 const lastAgentScope = () => harness.composerProps.at(-1)?.agentScope as AgentScopeProp | undefined;
+const lastSessionAgentName = () => harness.composerProps.at(-1)?.sessionAgentName ?? null;
 
 test('a new Claude chat hands the composer the main-agent menu state for the open project and its scope (Auto by default)', async () => {
   render(<ChatInterface isActive selectedProject={project('/work/alpha')} selectedSession={null} ws={null} sendMessage={() => {}} />);
@@ -116,7 +117,7 @@ test('a new Claude chat hands the composer the main-agent menu state for the ope
   assert.equal(lastAgentScope()?.agents.length, 2);
   assert.deepEqual(harness.requests, ['/api/agent-profiles/scope-options?projectId=p1'], 'the agents of the open project, by its database id');
   await waitFor(() => assert.deepEqual(lastScopeRequest(), { scope: { agentName: null } }));
-  assert.equal(screen.queryByTitle(/Chosen when this chat was opened/), null, 'no badge on a new chat');
+  assert.equal(lastSessionAgentName(), null, 'no locked agent on a new chat');
 });
 
 test('picking the orchestrator puts its name into the scope the composer sends', async () => {
@@ -137,17 +138,17 @@ test('a project without agents hands the composer an empty menu and no setup hin
   assert.equal(screen.queryByRole('button'), null);
 });
 
-test('an open session shows the read-only main-agent badge and gives the composer no menu', async () => {
+test('an open session hands the composer its main agent to show locked, and no menu', async () => {
   harness.sessionId = 's1';
   harness.sessionScope = { agentName: 'orchestrator' };
   render(<ChatInterface isActive selectedProject={project('/work/alpha')} selectedSession={session} ws={null} sendMessage={() => {}} />);
 
-  await screen.findByText('Main agent: orchestrator');
+  await waitFor(() => assert.equal(lastSessionAgentName(), 'orchestrator'));
   assert.equal(lastAgentScope(), null);
-  assert.deepEqual(harness.requests, ['/api/providers/sessions/s1'], 'the badge reads the session only');
+  assert.deepEqual(harness.requests, ['/api/providers/sessions/s1'], 'the locked agent reads the session only');
 });
 
-test('a chat of another provider gets neither the menu nor a scope request, and an old plain session shows no badge', async () => {
+test('a chat of another provider gets neither the menu nor a scope request, and an old plain session shows no locked agent', async () => {
   harness.provider = 'codex';
   const first = render(<ChatInterface isActive selectedProject={project('/work/alpha')} selectedSession={null} ws={null} sendMessage={() => {}} />);
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -161,5 +162,5 @@ test('a chat of another provider gets neither the menu nor a scope request, and 
   harness.sessionScope = null;
   render(<ChatInterface isActive selectedProject={project('/work/alpha')} selectedSession={session} ws={null} sendMessage={() => {}} />);
   await waitFor(() => assert.ok(harness.requests.includes('/api/providers/sessions/s1')));
-  assert.equal(screen.queryByTitle(/Chosen when this chat was opened/), null);
+  assert.equal(lastSessionAgentName(), null);
 });

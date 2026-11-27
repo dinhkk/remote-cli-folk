@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import '@/modules/i18n';
-import { SessionScopeBadge } from '@/modules/agent-profiles';
+import { useSessionAgentScope } from '@/modules/agent-profiles';
 import { installFakeProfilesApi, reply } from '@/modules/agent-profiles/tests/fake-profiles-api';
 
 /** An open session names the main agent it was started with, read-only; a chat without one shows nothing. */
@@ -11,11 +11,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** Renders the looked-up agent name as text, or nothing, the way the composer's locked agent button consumes the hook. */
+function SessionScopeBadge({ sessionId, enabled }: { sessionId: string | null; enabled: boolean }) {
+  const name = useSessionAgentScope(sessionId, enabled);
+  return name ? <span>{`Main agent: ${name}`}</span> : null;
+}
+
 const details = (agentScope: unknown) => reply({ success: true, data: { sessionId: 's1', agentScope } });
 
 const install = (agentScope: unknown) => installFakeProfilesApi({ 'GET /api/providers/sessions/:id': details(agentScope) });
 
-describe('session scope badge', () => {
+describe('session agent scope', () => {
   it('names the main agent of the session, with nothing to click or change', async () => {
     install({ agentName: 'orchestrator' });
     render(<SessionScopeBadge sessionId="s1" enabled />);
@@ -46,7 +52,7 @@ describe('session scope badge', () => {
     }
   });
 
-  it('shows nothing when the lookup fails: the badge never breaks the chat', async () => {
+  it('shows nothing when the lookup fails: the lookup never breaks the chat', async () => {
     installFakeProfilesApi({ 'GET /api/providers/sessions/:id': { status: 500, body: { success: false, error: { code: 'X', message: 'down' } } } });
     const { container } = render(<SessionScopeBadge sessionId="s1" enabled />);
 

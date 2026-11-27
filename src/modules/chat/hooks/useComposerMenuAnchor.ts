@@ -7,12 +7,14 @@ const VIEWPORT_MARGIN = 8;
 const MENU_GAP = 8;
 
 /**
- * Positions a composer popover above its trigger and right-aligned to it.
+ * Positions a composer popover above its trigger, aligned to the trigger's edge
+ * on the side with more room: left-aligned for a trigger in the left half of the
+ * viewport, right-aligned otherwise.
  *
- * Anchoring with `right`/`bottom` rather than `left`/`top` lets the menu grow
- * upward and leftward without measuring itself first, so it never paints in the
- * wrong spot for a frame. The same anchor works on phones because `maxWidth`
- * shrinks the menu instead of letting it run off the left edge.
+ * Anchoring with `left`/`right` and `bottom` rather than `top` lets the menu grow
+ * upward (and sideways) without measuring itself first, so it never paints in the
+ * wrong spot for a frame. `maxWidth` shrinks the menu instead of letting it run
+ * off the screen on phones.
  */
 export function useComposerMenuAnchor(
   isOpen: boolean,
@@ -29,12 +31,15 @@ export function useComposerMenuAnchor(
       return;
     }
 
+    const alignStart = rect.left + rect.width / 2 < window.innerWidth / 2;
+    const left = Math.max(VIEWPORT_MARGIN, rect.left);
     const right = Math.max(VIEWPORT_MARGIN, window.innerWidth - rect.right);
+    const room = window.innerWidth - (alignStart ? left : right);
     setAnchor({
-      right,
+      ...(alignStart ? { left } : { right }),
       bottom: window.innerHeight - rect.top + MENU_GAP,
       maxHeight: Math.max(160, rect.top - MENU_GAP - VIEWPORT_MARGIN),
-      maxWidth: Math.max(200, Math.min(preferredWidth, window.innerWidth - right - VIEWPORT_MARGIN)),
+      maxWidth: Math.max(200, Math.min(preferredWidth, room - VIEWPORT_MARGIN)),
     });
   }, [preferredWidth]);
 

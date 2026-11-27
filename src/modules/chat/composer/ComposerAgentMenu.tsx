@@ -46,7 +46,7 @@ function groupAgents(agents: AgentScopeOption[], systemLabel: string): AgentGrou
  * `Auto` (Claude Code picks an agent per task, the default) or one agent the open project (and `~/.claude/agents`)
  * offers, which then works the whole chat itself. Agents are listed under group headings (see `groupAgents`); a single
  * group needs no heading. A project without agent files shows nothing: there is nothing to choose.
- * Rendered by chat's ChatComposer for a chat that has no session yet; an open session shows SessionScopeBadge instead.
+ * Rendered by chat's ChatComposer for a chat that has no session yet; an open session shows ComposerAgentLocked instead.
  */
 export default function ComposerAgentMenu({ state }: ComposerAgentMenuProps) {
   const { t } = useTranslation('agentProfiles');
@@ -133,5 +133,28 @@ export default function ComposerAgentMenu({ state }: ComposerAgentMenuProps) {
         document.body,
       )}
     </>
+  );
+}
+
+/**
+ * The picker's counterpart for a chat that already has a session: the same button in the same place, disabled, because
+ * the main agent is fixed with the session and changing it means opening a new chat.
+ * Rendered by chat's ChatComposer for an open session whose main agent is known.
+ */
+export function ComposerAgentLocked({ agentName }: { agentName: string }) {
+  const { t } = useTranslation('agentProfiles');
+  const ariaLabel = t('scope.label');
+
+  return (
+    <button
+      type="button"
+      disabled
+      className="flex h-7 max-w-28 shrink-0 items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 text-[11px] font-medium text-foreground opacity-60 sm:max-w-44"
+      aria-label={`${ariaLabel}: ${agentName}`}
+      title={t('scope.badgeTitle')}
+    >
+      <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="truncate">{agentName}</span>
+    </button>
   );
 }

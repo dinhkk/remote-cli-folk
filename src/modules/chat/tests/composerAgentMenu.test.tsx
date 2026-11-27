@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import '@/modules/i18n';
 import type { NewChatScopeState } from '@/modules/agent-profiles';
-import ComposerAgentMenu from '@/modules/chat/composer/ComposerAgentMenu';
+import ComposerAgentMenu, { ComposerAgentLocked } from '@/modules/chat/composer/ComposerAgentMenu';
 
 /**
  * The composer's main-agent dropdown (next to `/`, in the style of the model menu): `Auto` plus the agents the project
@@ -144,6 +144,37 @@ describe('composer main-agent menu', () => {
     });
   });
 
+  describe('placement on a narrow screen', () => {
+    const placeTrigger = (left: number, width: number) => {
+      Object.defineProperty(window, 'innerWidth', { value: 400, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+      return vi.spyOn(HTMLButtonElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        left, right: left + width, width, top: 700, bottom: 728, height: 28, x: left, y: 700, toJSON: () => ({}),
+      });
+    };
+
+    it('opens to the right of a trigger in the left half, so the menu never runs off the left edge', () => {
+      const spy = placeTrigger(24, 80);
+      render(<ComposerAgentMenu state={stateOf()} />);
+      open();
+      const style = screen.getByRole('menu', { name: 'Main agent' }).style;
+      expect(style.left).toBe('24px');
+      expect(style.right).toBe('');
+      expect(Number.parseInt(style.maxWidth, 10)).toBeLessThanOrEqual(400 - 24 - 8);
+      spy.mockRestore();
+    });
+
+    it('opens to the left of a trigger in the right half', () => {
+      const spy = placeTrigger(300, 80);
+      render(<ComposerAgentMenu state={stateOf()} />);
+      open();
+      const style = screen.getByRole('menu', { name: 'Main agent' }).style;
+      expect(style.right).toBe('20px');
+      expect(style.left).toBe('');
+      spy.mockRestore();
+    });
+  });
+
   it('closes on Escape', () => {
     render(<ComposerAgentMenu state={stateOf()} />);
     open();
@@ -157,5 +188,17 @@ describe('composer main-agent menu', () => {
       expect(button()).toBeNull();
       view.unmount();
     }
+  });
+});
+
+describe('ComposerAgentLocked', () => {
+  it('shows the session agent on a disabled button that opens nothing', () => {
+    render(<ComposerAgentLocked agentName="orchestrator" />);
+
+    const locked = button() as HTMLButtonElement;
+    expect(locked.textContent).toBe('orchestrator');
+    expect(locked.disabled).toBe(true);
+    fireEvent.click(locked);
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 });
