@@ -54,7 +54,6 @@ function LogoBlock({ t }: { t: TFunction }) {
 
 /** Rendered by SidebarContent at the top of the panel for the search box, search-mode tabs, and the refresh, settings and new-project actions. */
 export default function SidebarHeader({
-  isPWA,
   isMobile,
   isLoading,
   projectsCount,
@@ -87,7 +86,7 @@ export default function SidebarHeader({
     <div className="flex-shrink-0">
       {/* Desktop header */}
       <div
-        className="hidden px-3 pb-2 pt-3 md:block"
+        className="hidden px-3 pb-2 pt-2 md:block"
         style={{}}
       >
         <div className="flex items-center justify-between gap-2">
@@ -199,8 +198,7 @@ export default function SidebarHeader({
 
       {/* Mobile header */}
       <div
-        className="p-3 pb-2 md:hidden"
-        style={isPWA && isMobile ? { paddingTop: '16px' } : {}}
+        className="px-3 pb-2 pt-2 md:hidden"
       >
         <div className="flex items-center justify-between">
           {IS_PLATFORM ? (

@@ -30,7 +30,7 @@ export function SidebarProviderFilter({ value, onChange, t }: {
     if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
   }, []);
 
-  return <div role="group" aria-label={t('providerFilter.label')} data-scrolling={isScrolling} onScroll={handleScroll} className="scrollbar-reveal flex min-w-0 shrink-0 transform-gpu gap-1 overflow-x-auto px-2 py-2">
+  return <div role="group" aria-label={t('providerFilter.label')} data-scrolling={isScrolling} onScroll={handleScroll} className="scrollbar-reveal flex min-w-0 shrink-0 transform-gpu gap-1 overflow-x-auto mx-3 py-2">
     {choices.map(provider => <button key={provider} type="button" aria-label={provider === 'all' ? t('providerFilter.all') : t('providerFilter.provider', { provider: PROVIDER_LABELS[provider] })} aria-pressed={value === provider}
       onClick={() => onChange(provider)}
       className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-xs focus-visible:outline focus-visible:outline-2 ${value === provider ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent/50'}`}>
