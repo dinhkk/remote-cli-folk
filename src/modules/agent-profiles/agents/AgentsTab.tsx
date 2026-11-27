@@ -7,7 +7,7 @@ import { GenerateAgentsForm } from '@/modules/agent-profiles/agents/GenerateAgen
 import { GLOBAL_TARGET_ID, resolveGenerateTarget } from '@/modules/agent-profiles/agents/generate-target';
 import { ProfileErrorNotice } from '@/modules/agent-profiles/common/ProfileErrorNotice';
 import { useProfileAction } from '@/modules/agent-profiles/hooks/useProfileAction';
-import { ApiRequestError } from '@/shared/api';
+import { api, ApiRequestError, readApiJson } from '@/shared/api';
 import { Button } from '@/shared/ui';
 import type { AgentProfileTemplate, ClaudeAgentEntry, GenerateTargetProject } from '@/shared/types';
 
@@ -74,6 +74,14 @@ export function AgentsTab({ projects, targetId, onTargetChange, templates, entri
         throw failure;
       }
     });
+  };
+  // Only a generated file agent can be deleted; the server re-checks the marker and refuses anything else.
+  const removeGenerated = async (entry: ClaudeAgentEntry) => {
+    if (!entry.generatedFrom || entry.source === 'builtin') return;
+    if (!window.confirm(t('agents.deleteConfirm', { name: entry.name }))) return;
+    const scope = entry.source === 'project' ? 'project' : 'user';
+    const done = await run(async () => readApiJson(await api.agentProfiles.deleteGeneratedClaudeAgent(scope, entry.generatedFrom as string, scope === 'project' ? target.directory : null)));
+    if (done !== undefined) onReload();
   };
   const hideAll = () => void run(() => onChangeHidden((stored) => [...new Set([...stored, ...readable.map((entry) => entry.name)])]));
   const showAll = () => void run(() => onChangeHidden((stored) => stored.filter((name) => !listedNames.includes(name))));
@@ -151,6 +159,7 @@ export function AgentsTab({ projects, targetId, onTargetChange, templates, entri
                     entry={entry}
                     busy={busy}
                     onSetVisible={(visible) => void hide(entry.name, visible)}
+                    onDelete={entry.generatedFrom && entry.source !== 'builtin' ? () => void removeGenerated(entry) : undefined}
                     manager={onChangeManagers && entry.source !== 'builtin'
                       ? { checked: managerNames.includes(entry.name), onChange: (allowed) => setManager(entry.name, allowed) }
                       : undefined}

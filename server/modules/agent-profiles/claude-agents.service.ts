@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { parseFrontMatter } from '@/shared/frontmatter.js';
-import { isValidAgentProfileName } from '@/shared/utils.js';
+import { AppError, isValidAgentProfileName } from '@/shared/utils.js';
 import type {
   AgentProfileTemplate,
   ClaudeAgentEntry,
@@ -218,6 +218,45 @@ export function createClaudeAgentsService(dependencies: ClaudeAgentsDependencies
       const names = parseManagerNames(body);
       const saved = store.updateSettings({ profileManagerAgents: names }, parseExpectedRev(body));
       return { profileManagerAgents: saved.profileManagerAgents, rev: saved.rev };
+    },
+
+    /**
+     * Deletes one generated agent file: `<claude home>/agents/<name>.md` (scope `user`) or
+     * `<directory>/.claude/agents/<name>.md` (scope `project`). The path is built here from the name, never taken from the client,
+     * and only a file that still carries the generator marker naming `name` is removed: a handmade file (or one the user
+     * took over by removing the marker) answers 409 and stays. A missing file is 404.
+     */
+    async deleteGenerated(scope: unknown, name: unknown, directory?: unknown): Promise<{ deleted: true }> {
+      if (scope !== 'user' && scope !== 'project') {
+        throw new AppError('scope must be "user" or "project"', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+      }
+      if (typeof name !== 'string' || !isValidAgentProfileName(name)) {
+        throw new AppError('name is not a valid agent name', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+      }
+      const projectDirectory = scope === 'project' ? parseDirectory(directory) : null;
+      if (scope === 'project' && !projectDirectory) {
+        throw new AppError('directory is required for a project agent', { code: 'INVALID_PROFILE_INPUT', statusCode: 400 });
+      }
+      const agentsDirectory = projectDirectory
+        ? path.join(projectDirectory, '.claude', 'agents')
+        : path.join(claudeHomeDirectory, 'agents');
+      const file = path.join(agentsDirectory, `${name}.md`);
+      let text: string;
+      try {
+        const stats = await fs.stat(file);
+        if (!stats.isFile() || stats.size > MAX_AGENT_FILE_BYTES) throw new Error('not a readable agent file');
+        text = await fs.readFile(file, 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          throw new AppError('Agent file not found', { code: 'PROFILE_NOT_FOUND', statusCode: 404 });
+        }
+        throw new AppError('The agent file cannot be read, so it was not deleted', { code: 'AGENT_NOT_GENERATED', statusCode: 409 });
+      }
+      if (readGeneratedMarker(text, name) === null) {
+        throw new AppError('Only agent files generated from a template can be deleted here', { code: 'AGENT_NOT_GENERATED', statusCode: 409 });
+      }
+      await fs.rm(file, { force: true });
+      return { deleted: true };
     },
 
     /**

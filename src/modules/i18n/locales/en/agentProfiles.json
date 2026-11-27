@@ -248,6 +248,7 @@
     "generated": "Generated",
     "generatedFrom": "Generated from {{template}}",
     "handmade": "Handmade",
+    "deleteConfirm": "Delete the generated agent file \"{{name}}\"? The template is not changed; you can generate it again.",
     "hiddenBadge": "Hidden",
     "visibleFor": "Visible: {{name}}",
     "tools": "Tools: {{tools}}",

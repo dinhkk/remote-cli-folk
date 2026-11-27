@@ -295,3 +295,32 @@ test('a project file of the same name shadows the user file and disqualifies it,
     });
   } finally { removeDir(project); }
 });
+
+// ---------- deleting a generated agent file ----------
+
+test('deleteGenerated removes a generated user or project file and refuses handmade, foreign-marker, missing and unsafe targets', async () => {
+  const project = makeTempDir('project-');
+  try {
+    await withRig(async (rig) => {
+      const projectAgents = path.join(project, '.claude', 'agents');
+      writeAgent(userAgents(rig), 'manager.md', generatedAgent('manager'));
+      writeAgent(userAgents(rig), 'handmade.md', '---\nname: handmade\ndescription: d\n---\nNo marker.\n');
+      writeAgent(userAgents(rig), 'copy.md', generatedAgent('copy', 'other-slug'));
+      writeAgent(projectAgents, 'worker.md', generatedAgent('worker'));
+
+      assert.deepEqual(await rig.claudeAgents.deleteGenerated('user', 'manager'), { deleted: true });
+      assert.equal(fs.existsSync(path.join(userAgents(rig), 'manager.md')), false);
+      assert.deepEqual(await rig.claudeAgents.deleteGenerated('project', 'worker', project), { deleted: true });
+      assert.equal(fs.existsSync(path.join(projectAgents, 'worker.md')), false);
+
+      for (const name of ['handmade', 'copy']) {
+        await assert.rejects(rig.claudeAgents.deleteGenerated('user', name), (error: { code?: string }) => error.code === 'AGENT_NOT_GENERATED');
+        assert.equal(fs.existsSync(path.join(userAgents(rig), `${name}.md`)), true, `${name} stays`);
+      }
+      await assert.rejects(rig.claudeAgents.deleteGenerated('user', 'missing'), (error: { code?: string }) => error.code === 'PROFILE_NOT_FOUND');
+      await assert.rejects(rig.claudeAgents.deleteGenerated('user', '../manager'), (error: { code?: string }) => error.code === 'INVALID_PROFILE_INPUT');
+      await assert.rejects(rig.claudeAgents.deleteGenerated('project', 'worker'), (error: { code?: string }) => error.code === 'INVALID_PROFILE_INPUT');
+      await assert.rejects(rig.claudeAgents.deleteGenerated('other', 'worker'), (error: { code?: string }) => error.code === 'INVALID_PROFILE_INPUT');
+    });
+  } finally { removeDir(project); }
+});

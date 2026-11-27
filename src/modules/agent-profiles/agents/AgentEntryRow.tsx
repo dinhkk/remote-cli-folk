@@ -1,9 +1,9 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ProfileSwitch } from '@/modules/agent-profiles/common/ProfileSwitch';
-import { Badge } from '@/shared/ui';
+import { Badge, Button } from '@/shared/ui';
 import type { ClaudeAgentEntry } from '@/shared/types';
 
 type AgentEntryRowProps = {
@@ -13,6 +13,8 @@ type AgentEntryRowProps = {
   onSetVisible: (visible: boolean) => void;
   /** The "Profile manager" switch of a file agent; absent = the row offers none. */
   manager?: { checked: boolean; onChange: (allowed: boolean) => void };
+  /** Deletes the generated agent file; only passed for a generated file agent, absent = no delete button. */
+  onDelete?: () => void;
 };
 
 /**
@@ -20,7 +22,7 @@ type AgentEntryRowProps = {
  * the visible/hidden switch, the optional "Profile manager" switch and a read-only details view (tools, file, prompt). An entry whose file could not be parsed
  * shows the file and the reason instead. Used by the Agents tab of the agent-profiles module.
  */
-export function AgentEntryRow({ entry, busy, onSetVisible, manager }: AgentEntryRowProps) {
+export function AgentEntryRow({ entry, busy, onSetVisible, manager, onDelete }: AgentEntryRowProps) {
   const { t } = useTranslation('agentProfiles');
   // Whether the read-only details are open; local because only this row cares.
   const [open, setOpen] = useState(false);
@@ -48,6 +50,7 @@ export function AgentEntryRow({ entry, busy, onSetVisible, manager }: AgentEntry
         {entry.hidden && <Badge variant="secondary">{t('agents.hiddenBadge')}</Badge>}
         <span className="flex-1" />
         <ProfileSwitch checked={!entry.hidden} onChange={onSetVisible} disabled={busy} ariaLabel={t('agents.visibleFor', { name: entry.name })} />
+        {onDelete && <Button size="sm" variant="ghost" aria-label={t('actions.deleteName', { name: entry.name })} disabled={busy} onClick={onDelete}><Trash2 /></Button>}
       </div>
       <p className="text-xs text-muted-foreground">{entry.description}</p>
       {manager && (

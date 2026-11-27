@@ -625,6 +625,9 @@ export const api = {
       get(`/api/agent-profiles/claude-agents${query({ directory })}`),
     setHiddenClaudeAgents: (body: { names: string[]; rev: number }) =>
       put('/api/agent-profiles/claude-agents/hidden', body),
+    // Deletes one generated agent file; `directory` is the project folder for scope `project`. The server refuses handmade files.
+    deleteGeneratedClaudeAgent: (scope: 'user' | 'project', name: string, directory?: string | null) =>
+      del(`/api/agent-profiles/claude-agents/file${query({ scope, name, directory })}`),
     // Main agents allowed to use the `profiles` tools; `rev` is the settings revision the hide list shares.
     setClaudeAgentManagers: (body: { names: string[]; rev: number }) =>
       put('/api/agent-profiles/claude-agents/managers', body),
