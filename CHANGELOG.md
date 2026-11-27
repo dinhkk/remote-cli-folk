@@ -3,6 +3,12 @@
 All notable changes to RemoteCLI will be documented in this file.
 
 
+## [1.3.1](https://github.com/tunghuynh/remote-cli/compare/v1.3.0...v1.3.1) (2026-11-27)
+
+### Bug Fixes
+
+* **chat:** keep the main-agent menu on screen and lock the agent picker for an open session ([f9f46d6](https://github.com/tunghuynh/remote-cli/commit/f9f46d62c31ca15c82d91b325b6cccd64e9a903e))
+
 ## [1.3.0](https://github.com/tunghuynh/remote-cli/compare/v1.2.0...v1.3.0) (2026-11-27)
 
 ### New Features
