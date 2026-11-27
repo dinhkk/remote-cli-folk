@@ -3,7 +3,10 @@ import express from 'express';
 import { AppError } from '@/shared/utils.js';
 
 import { parseExpectedBlockRev } from './agent-profiles.blocks.validation.js';
+import { parseConfirmRequest, parseExportRequest, parseImportRequest, parseRestoreRequest } from './agent-profiles.bundle.validation.js';
+import type { BundleService } from './agent-profiles.bundle.service.js';
 import type { BlocksService } from './agent-profiles.blocks.service.js';
+import type { PendingService } from './agent-profiles.pending.service.js';
 import type { AgentProfilesService } from './agent-profiles.service.js';
 import type { ClaudeAgentsService } from './claude-agents.service.js';
 
@@ -21,13 +24,40 @@ const parseOptionalRev = (value: unknown): number | undefined => {
 };
 
 /**
+ * Body handling of the bundle routes: JSON of at most 5 MB (bundles are text; the global parsers allow 50 MB). Mount it on
+ * `/api/agent-profiles/bundle` before the global parsers, which skip a body that is already parsed, so these routes never
+ * parse more than 5 MB. A body of another type (a form post would reach the 50 MB urlencoded parser) is refused with 415,
+ * and an oversize body is a 413 `BUNDLE_TOO_LARGE` (not the generic 500 the app answers for unknown errors).
+ * Consumed by: server/index.ts, agent-profiles.bundle.routes.test.ts.
+ */
+export const agentProfilesBundleBodyParser: express.RequestHandler[] = [
+  (req, _res, next) => {
+    const contentType = String(req.headers['content-type'] || '');
+    if (req.method !== 'GET' && req.method !== 'HEAD' && contentType && !contentType.includes('json')) {
+      next(new AppError('Send the bundle as a JSON body', { code: 'UNSUPPORTED_MEDIA_TYPE', statusCode: 415 }));
+      return;
+    }
+    next();
+  },
+  (req, res, next) => {
+    express.json({ limit: '5mb', type: (request) => String(request.headers['content-type'] || '').includes('json') })(req, res, (error?: unknown) => {
+      if ((error as { type?: string } | null | undefined)?.type === 'entity.too.large') {
+        next(new AppError('The bundle is larger than 5 MB', { code: 'BUNDLE_TOO_LARGE', statusCode: 413 }));
+        return;
+      }
+      next(error);
+    });
+  },
+];
+
+/**
  * REST routes of the agent profiles (templates, Generate, Claude agents, scope options). Routes
  * only parse transport input and call the services; every rule lives in the services. Errors go to
  * the app error middleware.
  * Mounted behind `authenticateToken`; Remote reaches only `GET /scope-options`.
  */
 export function createAgentProfilesRouter(
-  service: AgentProfilesService, claudeAgents: ClaudeAgentsService, blocks: BlocksService,
+  service: AgentProfilesService, claudeAgents: ClaudeAgentsService, blocks: BlocksService, bundle: BundleService, pending: PendingService,
 ): express.Router {
   const router = express.Router();
   const respond = (operation: (req: express.Request) => unknown | Promise<unknown>, status = 200) =>
@@ -41,6 +71,8 @@ export function createAgentProfilesRouter(
   // The single list of agents: built-in + user + the project folder's `.claude/agents` (`?directory=<absolute>`).
   router.get('/claude-agents', respond((req) => claudeAgents.list(queryValue(req.query.directory))));
   router.put('/claude-agents/hidden', respond((req) => claudeAgents.setHidden(req.body)));
+  // The main agents allowed to use the `profiles` tools (`{names, rev}`; the rev is the one the hide list shares).
+  router.put('/claude-agents/managers', respond((req) => claudeAgents.setManagers(req.body)));
 
   router.get('/templates', respond(() => service.listTemplates()));
   router.post('/templates', respond((req) => service.createTemplate(req.body), 201));
@@ -73,6 +105,28 @@ export function createAgentProfilesRouter(
     const expectedRev = parseOptionalRev(req.query.expectedRev);
     return req.query.remove === 'true' ? blocks.removeFolder(id, directory, expectedRev) : blocks.emptyContent(id, directory, expectedRev);
   }));
+
+  // Import / export of templates and memory blocks as a YAML or JSON text bundle (Host only, denied for Remote). The bundle is parsed
+  // on the server from `text` (mounted with a 5 MB body cap in server/index.ts). Apply answers 200 with `partial`: a mixed result must not look like plain success.
+  router.post('/bundle/export', respond((req) => bundle.exportText(parseExportRequest(req.body))));
+  router.post('/bundle/import/preview', respond((req) => {
+    const request = parseImportRequest(req.body);
+    return bundle.previewText(request.text, { projectMap: request.projectMap });
+  }));
+  router.post('/bundle/import', respond((req) => {
+    const { text, ...options } = parseImportRequest(req.body);
+    return bundle.applyText(text, options);
+  }));
+  // Snapshots the server wrote before an overwrite, newest first; restore names one by file name (never a path).
+  router.get('/bundle/snapshots', respond(() => bundle.listSnapshots()));
+  router.post('/bundle/restore', respond((req) => bundle.restoreSnapshot(parseRestoreRequest(req.body).snapshot)));
+
+  // Proposals an allowlisted agent staged through the `profiles` tools (Host only, denied for Remote). The list is a fresh review per proposal
+  // with the `basis` to send back; confirm re-checks everything and applies what was ticked (a tick on a delete confirms it), reject drops it.
+  router.get('/pending', respond(() => pending.list()));
+  router.get('/pending/count', respond(() => ({ count: pending.count() })));
+  router.post('/pending/:id/confirm', respond((req) => pending.confirm(param(req.params.id), parseConfirmRequest(req.body))));
+  router.post('/pending/:id/reject', respond((req) => pending.reject(param(req.params.id))));
 
   return router;
 }

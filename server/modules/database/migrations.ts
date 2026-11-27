@@ -445,6 +445,19 @@ const addSessionModelColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the nullable run-origin columns of scheduled and queued messages (`scheduled_messages.origin`,
+ * `session_drafts.queued_origin`). Existing rows stay NULL, which reads as a remote origin.
+ */
+const addRunOriginColumns = (db: Database): void => {
+  addColumnToTableIfNotExists(
+    db, 'scheduled_messages', getTableInfo(db, 'scheduled_messages').map((column) => column.name), 'origin', 'TEXT',
+  );
+  addColumnToTableIfNotExists(
+    db, 'session_drafts', getTableInfo(db, 'session_drafts').map((column) => column.name), 'queued_origin', 'TEXT',
+  );
+};
+
+/**
  * Adds the `effort` column that records a session's reasoning-effort choice.
  *
  * Existing rows stay NULL so clients can continue falling back to their
@@ -563,6 +576,7 @@ export const runMigrations = (db: Database) => {
     addRemotePairingAliasColumn(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
+    addRunOriginColumns(db);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

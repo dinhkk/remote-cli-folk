@@ -30,6 +30,7 @@ import type {
   ProviderModelsDefinition,
   ProviderSkillSource,
   QueuedChatMessage,
+  RunOrigin,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -124,6 +125,33 @@ export function readQueuedChatMessage(value: unknown): QueuedChatMessage | null 
     ? record.options as Record<string, unknown>
     : undefined;
   return { content, ...(options ? { options } : {}), attachments };
+}
+
+// ---------------------------
+//----------------- RUN ORIGIN UTILITIES ------------
+/**
+ * Reads a run origin from any stored or passed value, failing closed: only the
+ * exact string `local` is local; everything else (absent, null, unknown) is `remote`.
+ *
+ * Exported for: the websocket chat service (detached turns), the scheduled-messages
+ * dispatcher (rows and queued messages read from the database). Any provider code
+ * that gates behaviour on where a run came from reads `options.origin` through it.
+ */
+export function readRunOrigin(value: unknown): RunOrigin {
+  return value === 'local' ? 'local' : 'remote';
+}
+
+/**
+ * Maps how a request was authenticated on the Host (`authKind` set by the auth
+ * middleware or the WebSocket upgrade) to its run origin. Only the Host's own
+ * browser session and platform auth are `local`; the loopback bridge used for a
+ * Remote Controller, API-key access and an unset kind are all `remote`.
+ *
+ * Exported for: the websocket chat service (per connection) and the scheduled-messages
+ * and user routes (per request, stored on the row at creation).
+ */
+export function originFromAuthKind(authKind: unknown): RunOrigin {
+  return authKind === 'session' || authKind === 'platform' ? 'local' : 'remote';
 }
 
 // ---------------------------

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { getConnection } from '@/modules/database/connection.js';
+import type { RunOrigin } from '@/shared/types.js';
 
 export type ScheduledMessageStatus = 'pending' | 'sent' | 'failed' | 'cancelled';
 
@@ -13,12 +14,14 @@ export type ScheduledMessageRow = {
   scheduled_for: string;
   status: ScheduledMessageStatus;
   failure_reason: string | null;
+  /** Run origin stored at creation; null (older rows) is read as remote. */
+  origin: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  'id, user_id, session_id, content, options, scheduled_for, status, failure_reason, created_at, updated_at';
+  'id, user_id, session_id, content, options, scheduled_for, status, failure_reason, origin, created_at, updated_at';
 
 export const scheduledMessagesDb = {
   create(input: {
@@ -27,13 +30,15 @@ export const scheduledMessagesDb = {
     content: string;
     options: unknown;
     scheduledFor: Date;
+    /** Set by the route from the request's authentication, never from `options`; omitted is stored as null (remote). */
+    origin?: RunOrigin;
   }): ScheduledMessageRow {
     const db = getConnection();
     const id = randomUUID();
 
     db.prepare(
-      `INSERT INTO scheduled_messages (id, user_id, session_id, content, options, scheduled_for, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`
+      `INSERT INTO scheduled_messages (id, user_id, session_id, content, options, scheduled_for, status, origin)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`
     ).run(
       id,
       input.userId,
@@ -41,6 +46,7 @@ export const scheduledMessagesDb = {
       input.content,
       JSON.stringify(input.options ?? {}),
       input.scheduledFor.toISOString(),
+      input.origin ?? null,
     );
 
     return db.prepare(`SELECT ${COLUMNS} FROM scheduled_messages WHERE id = ?`).get(id) as ScheduledMessageRow;

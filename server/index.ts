@@ -49,7 +49,7 @@ import {
     startEnabledPluginServers,
     stopAllPlugins,
 } from './modules/plugins/index.js';
-import { agentProfilesRoutes } from './modules/agent-profiles/index.js';
+import { agentProfilesBundleBodyParser, agentProfilesRoutes, seedProfileManager } from './modules/agent-profiles/index.js';
 import { agentMonitorRoutes, stopAgentMonitor } from './modules/agent-monitor/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
@@ -164,6 +164,8 @@ app.use('/api', validateApiKey, createApiSessionGuard(authenticateToken));
 // Sandboxed Remote frames use scoped bearer tokens, never ambient cookies.
 app.use('/r', cors({ exposedHeaders: ['X-Auth-Error', 'Retry-After'] }));
 remote.mount(app);
+// Agent bundles are text: their import routes never parse more than 5 MB. Mounted before the global 50 MB parser, which skips a body that is already parsed.
+app.use('/api/agent-profiles/bundle', agentProfilesBundleBodyParser);
 app.use(express.json({
     limit: '50mb',
     type: (req) => {
@@ -459,6 +461,9 @@ async function startServer() {
             // Sends anything that came due while the server was not running,
             // then keeps polling.
             initializeScheduledMessageDispatcher(providerRuntimeService);
+
+            // Offered once per store; never throws.
+            seedProfileManager();
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {

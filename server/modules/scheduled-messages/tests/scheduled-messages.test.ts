@@ -538,3 +538,134 @@ test('a socket that cannot be written to does not stop a claimed message from be
     assert.equal(closedTab.frames.length, 0);
   });
 });
+
+// ---------------------------
+// Run origin: stored when the row is created, from the request, never from `options`.
+
+const PAST = () => new Date(Date.now() - 60_000).toISOString();
+
+test('a schedule keeps the origin it was created with, but an unattended run is remote whatever it stored', async () => {
+  await withIsolatedDatabase(async (userId) => {
+    const base = { userId, sessionId: SESSION_ID, scheduledFor: PAST() };
+    scheduledMessagesService.schedule({ ...base, content: 'local one', origin: 'local' });
+    scheduledMessagesService.schedule({ ...base, content: 'bridged one', origin: 'remote' });
+    scheduledMessagesService.schedule({ ...base, content: 'no origin' });
+
+    const runs: RunCall[] = [];
+    await dispatchDueScheduledMessages(createRuntime(runs));
+    const originOf = (command: string) => runs.find((run) => run.command === command)?.options.origin;
+    for (const command of ['local one', 'bridged one', 'no origin']) assert.equal(originOf(command), 'remote', command);
+  });
+});
+
+test('a row written before the origin column existed (null) runs as remote', async () => {
+  await withIsolatedDatabase(async (userId) => {
+    const row = scheduledMessagesDb.create({
+      userId, sessionId: SESSION_ID, content: 'legacy', options: {}, scheduledFor: new Date(Date.now() - 1000),
+    });
+    assert.equal(row.origin, null);
+    const runs: RunCall[] = [];
+    await dispatchDueScheduledMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'remote');
+  });
+});
+
+test('options saved with a schedule or a queued message cannot claim local', async () => {
+  await withIsolatedDatabase(async (userId) => {
+    scheduledMessagesService.schedule({
+      userId, sessionId: SESSION_ID, content: 'sneaky', options: { origin: 'local' }, scheduledFor: PAST(), origin: 'remote',
+    });
+    const runs: RunCall[] = [];
+    await dispatchDueScheduledMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'remote');
+
+    sessionDraftsDb.saveDraft(userId, SESSION_ID, {
+      text: '', queuedMessage: { content: 'sneaky queued', options: { origin: 'local' }, attachments: [] },
+    });
+    const queuedRuns: RunCall[] = [];
+    await dispatchQueuedMessages(createRuntime(queuedRuns));
+    assert.equal(queuedRuns[0].options.origin, 'remote');
+  });
+});
+
+test('a queued message keeps the origin it was queued with, and a merged one is local only if every part was', async () => {
+  await withIsolatedDatabase(async (userId) => {
+    const message = (content: string) => ({ content, attachments: [] });
+    sessionDraftsDb.saveDraft(userId, SESSION_ID, { text: '', queuedMessage: message('saved locally') }, 'local');
+    let runs: RunCall[] = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'local');
+
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('first'), 'local');
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('second'), 'local');
+    runs = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'local');
+
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('local part'), 'local');
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('bridged part'), 'remote');
+    runs = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'remote');
+
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('no origin given'));
+    runs = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'remote');
+  });
+});
+
+test('a queued message restored after a lost race keeps its origin', async () => {
+  await withIsolatedDatabase(async (userId) => {
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content: 'mine', attachments: [] }, 'local');
+    const [candidate] = sessionDraftsDb.listQueuedMessages();
+    assert.equal(candidate.origin, 'local');
+    assert.ok(sessionDraftsDb.claimQueuedMessage(candidate));
+    sessionDraftsDb.restoreQueuedMessage(candidate);
+    assert.equal(sessionDraftsDb.listQueuedMessages()[0].origin, 'local');
+
+    // Re-saving the same text from the bridge changes the origin, so a stale local claim no longer matches.
+    sessionDraftsDb.saveDraft(userId, SESSION_ID, { text: '', queuedMessage: { content: 'mine', attachments: [] } }, 'remote');
+    assert.equal(sessionDraftsDb.claimQueuedMessage(candidate), false);
+  });
+});
+
+test('POST /api/scheduled-messages stores the origin of the request authentication, not anything in the body', async () => {
+  const { default: express } = await import('express');
+  const { once } = await import('node:events');
+  const { scheduledMessagesRoutes } = await import('@/modules/scheduled-messages/index.js');
+
+  await withIsolatedDatabase(async (userId) => {
+    for (const [authKind, expected] of [['session', 'local'], ['loopback', 'remote'], [undefined, 'remote']] as const) {
+      const app = express();
+      app.use(express.json());
+      app.use((req, _res, next) => {
+        (req as unknown as { user: { id: number }; authKind?: string }).user = { id: userId };
+        (req as unknown as { authKind?: string }).authKind = authKind;
+        next();
+      });
+      app.use('/api/scheduled-messages', scheduledMessagesRoutes);
+      const server = app.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      try {
+        const { port } = server.address() as { port: number };
+        const response = await fetch(`http://127.0.0.1:${port}/api/scheduled-messages`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: SESSION_ID,
+            content: `from ${authKind}`,
+            scheduledFor: PAST(),
+            origin: 'local',
+            options: { origin: 'local' },
+          }),
+        });
+        assert.equal(response.status, 201);
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+      const row = scheduledMessagesDb.listForSession(userId, SESSION_ID).find((candidate) => candidate.content === `from ${authKind}`);
+      assert.equal(row?.origin, expected, String(authKind));
+    }
+  });
+});

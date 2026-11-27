@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePaletteOps } from '@/modules/command-palette';
+import { ExportBundleDialog } from '@/modules/agent-profiles/bundle/ExportBundleDialog';
+import { ImportBundleDialog } from '@/modules/agent-profiles/bundle/ImportBundleDialog';
+import { RestoreSnapshotDialog } from '@/modules/agent-profiles/bundle/RestoreSnapshotDialog';
 import { AgentsTab } from '@/modules/agent-profiles/agents/AgentsTab';
 import { GLOBAL_TARGET_ID, resolveGenerateTarget } from '@/modules/agent-profiles/agents/generate-target';
 import { CorruptFilesNotice } from '@/modules/agent-profiles/common/CorruptFilesNotice';
@@ -10,6 +13,8 @@ import { useAgentProfilesData } from '@/modules/agent-profiles/hooks/useAgentPro
 import { useClaudeAgents } from '@/modules/agent-profiles/hooks/useClaudeAgents';
 import { useProfileCatalogs } from '@/modules/agent-profiles/hooks/useProfileCatalogs';
 import { useSetupGuideDismissed } from '@/modules/agent-profiles/hooks/useSetupGuideDismissed';
+import { PendingTab } from '@/modules/agent-profiles/pending/PendingTab';
+import { usePendingCount } from '@/modules/agent-profiles/pending/usePendingCount';
 import { MemoryTab } from '@/modules/agent-profiles/memory/MemoryTab';
 import { TemplatesTab } from '@/modules/agent-profiles/templates/TemplatesTab';
 import { FirstRunWizard } from '@/modules/agent-profiles/wizard/FirstRunWizard';
@@ -17,9 +22,11 @@ import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { GenerateTargetProject } from '@/shared/types';
 
-type PanelTab = 'agents' | 'templates' | 'memory';
+type PanelTab = 'agents' | 'templates' | 'memory' | 'pending';
 
-const TABS: PanelTab[] = ['agents', 'templates', 'memory'];
+type BundleDialogName = 'export' | 'import' | 'restore';
+
+const TABS: PanelTab[] = ['agents', 'templates', 'memory', 'pending'];
 
 type AgentProfilesPanelProps = {
   /** Claude sign-in state for the wizard's first step (from the settings dialog's provider status). */
@@ -35,8 +42,9 @@ type AgentProfilesPanelProps = {
 const NO_PROJECTS: GenerateTargetProject[] = [];
 
 /**
- * The Agent Profiles management screen: three tabs, Agents (the agent files of a sidebar project or of `~/.claude/agents`,
- * with hide/show and the Generate form), Templates (list and editor) and Memory (app-owned memory blocks). Owns what crosses tabs: the chosen target
+ * The Agent Profiles management screen: four tabs, Agents (the agent files of a sidebar project or of `~/.claude/agents`,
+ * with hide/show, the Profile manager switch and the Generate form), Templates (list and editor), Memory (app-owned memory blocks)
+ * and Pending (changes manager agents proposed, waiting for the user; its tab carries the count). Owns what crosses tabs: the chosen target
  * (whose agent list is loaded here, so switching tabs does not reload it) and the shared load of the templates.
  * Also hosts the first-run guide: it opens by itself the first time the panel finds no agent files and the guide was not
  * dismissed, and from the "Setup guide" button afterwards. Used by the settings module's Agent Profiles tab (web only:
@@ -55,6 +63,16 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
     : (projects[0]?.projectId ?? GLOBAL_TARGET_ID);
   const { project, target } = resolveGenerateTarget(projects, targetId);
   const claude = useClaudeAgents(target.directory);
+  const pendingCount = usePendingCount();
+
+  // The bundle dialog on screen, if any.
+  const [bundleDialog, setBundleDialog] = useState<BundleDialogName | null>(null);
+  // Bumped after an import or restore: remounts the Memory tab, which loads its own list, so it shows the new blocks.
+  const [memoryRefresh, setMemoryRefresh] = useState(0);
+  const bundleApplied = () => {
+    void data.reload();
+    setMemoryRefresh((count) => count + 1);
+  };
 
   const { dismissed, dismiss } = useSetupGuideDismissed();
   // The guide: `auto` opens it by itself when the first agent list found no agent file and it was not dismissed before; `open` / `closed` are the user's explicit choices.
@@ -91,9 +109,15 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setBundleDialog('export')}>{t('bundle.open.export')}</Button>
+        <Button size="sm" variant="outline" onClick={() => setBundleDialog('import')}>{t('bundle.open.import')}</Button>
+        <Button size="sm" variant="outline" onClick={() => setBundleDialog('restore')}>{t('bundle.open.restore')}</Button>
         <Button size="sm" variant="outline" onClick={() => setGuide('open')}>{t('wizard.open')}</Button>
       </div>
+      {bundleDialog === 'export' && <ExportBundleDialog templates={data.templates} onClose={() => setBundleDialog(null)} />}
+      {bundleDialog === 'import' && <ImportBundleDialog projects={projects} onClose={() => setBundleDialog(null)} onApplied={bundleApplied} />}
+      {bundleDialog === 'restore' && <RestoreSnapshotDialog onClose={() => setBundleDialog(null)} onApplied={bundleApplied} />}
       <div role="tablist" aria-label={t('title')} className="flex flex-wrap gap-1 border-b border-border">
         {TABS.map((id) => (
           <button
@@ -108,6 +132,9 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
             )}
           >
             {t(`tabs.${id}`)}
+            {id === 'pending' && pendingCount > 0 && (
+              <span data-pending-tab-count className="ml-1.5 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">{pendingCount}</span>
+            )}
           </button>
         ))}
       </div>
@@ -132,6 +159,8 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
             loadError={claude.error}
             builtinSource={claude.builtinSource}
             onChangeHidden={claude.changeHidden}
+            managerNames={claude.managerNames}
+            onChangeManagers={claude.changeManagers}
             onReload={claude.reload}
           />
         )}
@@ -144,9 +173,11 @@ export function AgentProfilesPanel({ claudeAuth = { authenticated: false, email:
             onReload={() => void data.reload()}
           />
         )}
+        {tab === 'pending' && <PendingTab onApplied={bundleApplied} />}
         {/* Memory loads its own list; it borrows the Agents tab's agent list only for the read-only lock notice. */}
         {tab === 'memory' && (
           <MemoryTab
+            key={memoryRefresh}
             projects={projects}
             agents={claude.entries}
             agentsReady={claude.status === 'ready'}

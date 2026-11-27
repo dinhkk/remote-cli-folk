@@ -14,7 +14,10 @@ type DraftCall = [string, ...unknown[]];
 const USER_ID = 7;
 
 /** Serves the user routes over a service whose drafts store only records what it was asked to do. */
-async function withUserServer(run: (baseUrl: string, calls: DraftCall[]) => Promise<void>): Promise<void> {
+async function withUserServer(
+  run: (baseUrl: string, calls: DraftCall[]) => Promise<void>,
+  authKind?: string,
+): Promise<void> {
   const calls: DraftCall[] = [];
   const unexpected = () => {
     throw new Error('Unexpected user service call');
@@ -49,7 +52,8 @@ async function withUserServer(run: (baseUrl: string, calls: DraftCall[]) => Prom
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    (req as express.Request & { user?: { id: number } }).user = { id: USER_ID };
+    (req as express.Request & { user?: { id: number }; authKind?: string }).user = { id: USER_ID };
+    (req as express.Request & { authKind?: string }).authKind = authKind;
     next();
   });
   app.use('/api/user', createUserRouter(service));
@@ -89,9 +93,20 @@ test('POST /drafts/queued-message appends the message for the signed-in user', a
       appended: false,
     });
     assert.deepEqual(calls, [[
-      'appendQueuedMessage', USER_ID, 'session-a', { content: 'B', options: { model: 'opus' }, attachments: [] },
+      'appendQueuedMessage', USER_ID, 'session-a', { content: 'B', options: { model: 'opus' }, attachments: [] }, 'remote',
     ]]);
   });
+});
+
+test('the queued-message and draft routes take the origin from how the request was authenticated, never from the body', async () => {
+  for (const [authKind, expected] of [['session', 'local'], ['platform', 'local'], ['loopback', 'remote'], [undefined, 'remote']] as const) {
+    await withUserServer(async (baseUrl, calls) => {
+      const body = { scope: 's', origin: 'local', queuedMessage: { content: 'B', origin: 'local', options: { origin: 'local' }, attachments: [] } };
+      await send(`${baseUrl}/api/user/drafts/queued-message`, 'POST', body);
+      await send(`${baseUrl}/api/user/drafts`, 'PUT', { ...body, text: '' });
+      assert.deepEqual(calls.map((call) => call[call.length - 1]), [expected, expected], String(authKind));
+    }, authKind);
+  }
 });
 
 test('POST /drafts/queued-message refuses a message with nothing to send', async () => {

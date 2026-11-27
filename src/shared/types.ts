@@ -2190,6 +2190,8 @@ export type ClaudeAgentListing = {
   items: ClaudeAgentEntry[];
   hiddenNames: string[];
   hiddenRev: number;
+  /** Main agents allowed to use the `profiles` tools, as stored; shares `hiddenRev` (one settings revision), so send that rev with a change. */
+  managerNames: string[];
   builtinSource: 'sdk' | 'fallback';
 };
 
@@ -2242,6 +2244,133 @@ export type GenerateRememberedValues = { directory: string | null; values: Agent
 
 /** A sidebar project as the Generate form targets it: its id, display name and absolute folder. */
 export type GenerateTargetProject = { projectId: string; name: string; directory: string };
+
+//----------------- AGENT BUNDLE TYPES (import / export of templates and memory blocks) ------------
+
+/** Revision a preview saw of an import target (template `rev`, block definition `rev`, folder content `rev`), or `absent`. Apply sends it back so a target changed since the preview is refused. */
+export type ImportBasis = number | 'absent';
+
+/** One problem found in a bundle; `level: 'warning'` never blocks the item. `line`/`column` are set when the position in the source text is known. */
+export type ImportProblem = { level: 'error' | 'warning'; code: string; message: string; path?: string; line?: number; column?: number };
+
+/** How an item or folder entry compares with the store: `new`, `identical`, `conflict` (exists and differs), `invalid` (cannot be imported), `skipped` (no target folder). */
+export type ImportStatus = 'new' | 'identical' | 'conflict' | 'invalid' | 'skipped';
+
+/** One folder-text entry of a project block in a preview. `sourceKey` keys `projectMap`; `key` is what to tick in `overwrite` and to index `basis`. `overwritable` is false for a conflict that can never be overwritten. */
+export type ImportFolderRow = {
+  key: string;
+  sourceDirectory: string;
+  sourceKey: string;
+  status: ImportStatus;
+  code?: string;
+  reason?: string;
+  overwritable: boolean;
+  basis: ImportBasis;
+};
+
+/** One template or block of a bundle in an import preview. `key` is `template:<slug>` / `block:<name>`. `overwritable` is false for a conflict that can never be overwritten (other scope kind, ambiguous name, block not backed up). `sensitive` lists why the item needs its own tick (`mcpServers`, `no-tools`, `skills`, `tool:<name>`). */
+export type ImportPlanItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  status: ImportStatus;
+  code?: string;
+  overwritable: boolean;
+  problems: ImportProblem[];
+  sensitive: string[];
+  basis: ImportBasis;
+  /** Scope kind of a block the bundle describes (absent for templates and for blocks too broken to read). */
+  scope?: 'global' | 'project';
+  folders?: ImportFolderRow[];
+};
+
+/** Result of an import preview (dry run, nothing written). `hasFolderText`: the bundle carries folder text, so source folders must be mapped to sidebar projects. */
+export type ImportPlan = { items: ImportPlanItem[]; hasFolderText: boolean };
+
+/** Outcome of one folder entry when applying. */
+export type ImportFolderResult = { key: string; status: 'applied' | 'skipped' | 'failed'; code?: string; reason?: string };
+
+/** Outcome of one item when applying; `skipped` with code `IDENTICAL` means nothing to do. `partial`: the item applied but a folder entry did not. */
+export type ImportItemResult = {
+  key: string;
+  status: 'applied' | 'skipped' | 'failed';
+  code?: string;
+  reason?: string;
+  partial?: true;
+  folders?: ImportFolderResult[];
+};
+
+/** Result of applying an import or restore. `partial`: at least one item or folder entry was not applied. `snapshot`: file name of the backup taken before overwriting, or null. */
+export type ImportResult = { items: ImportItemResult[]; partial: boolean; snapshot: string | null };
+
+/** The user's choices sent with an import; keys are `template:<slug>`, `block:<name>`, `block:<name>#<sourceKey>`. `projectMap` maps a source folder key to a sidebar project id; `basis` is what the preview saw of each ticked key (required for every overwrite). */
+export type ImportOptions = {
+  overwrite?: string[];
+  acceptSensitive?: string[];
+  projectMap?: Record<string, string>;
+  basis?: Record<string, ImportBasis>;
+};
+
+/** What an export includes: the chosen templates and blocks (ids), whether block text travels, and the file format. */
+export type ExportBundleRequest = {
+  templateIds: string[];
+  blockIds: string[];
+  includeBlockContent: boolean;
+  format: 'yaml' | 'json';
+};
+
+/** A problem found while exporting (a block that cannot be exported completely); the export still succeeds. */
+export type ExportProblem = { key: string; code: string; message: string };
+
+/** The answer of an export: the file name to save under, the file text, and any problems. */
+export type ExportBundleResult = { filename: string; text: string; problems: ExportProblem[] };
+
+/** One server-written snapshot (backup) listed for restore. */
+export type AgentBundleSnapshot = { name: string; createdAt: string; templates: number; blocks: number; folders: number; bytes: number };
+
+//----------------- PENDING PROPOSALS (changes an agent staged for the Host user to confirm) ------------
+
+/** What a proposed item does to the store: `refused` when it can never be applied (see the item's `refusal`), `identical` when nothing would change. */
+export type ChangesetAction = 'create' | 'overwrite' | 'delete' | 'identical' | 'refused';
+
+/** One changed field of an overwrite as text (long text is cut by the server); `null` = absent. Shown as before and after. */
+export type ChangesetFieldChange = { field: string; before: string | null; after: string | null };
+
+/**
+ * One proposed item as the review shows it: what happens, why it is refused, which sensitive powers it grants and what
+ * changes. `needsTick`: an overwrite or delete applies only when its key is ticked at confirm. `basis` is the revision of the
+ * target now (`absent` for a create); confirm sends it back so a tick applies to what was shown.
+ */
+export type ChangesetReviewItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  action: ChangesetAction;
+  needsTick: boolean;
+  basis: ImportBasis;
+  sensitive: string[];
+  refusal?: { code: string; message: string };
+  /** Readable summary lines built by the server (what is created, which fields change, what a delete loses). */
+  lines: string[];
+  changes: ChangesetFieldChange[];
+};
+
+/** A waiting proposal as `GET /pending` returns it: a fresh review against the store now and the `basis` map to send back at confirm. Never the raw changeset. */
+export type PendingProposalView = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  agentName: string;
+  items: ChangesetReviewItem[];
+  basis: Record<string, ImportBasis>;
+};
+
+/** The choices sent to confirm a pending proposal: `overwrite` also carries the keys of ticked deletes. */
+export type PendingConfirmRequest = {
+  overwrite: string[];
+  acceptSensitive: string[];
+  basis: Record<string, ImportBasis>;
+};
 
 //----------------- MAIN AGENT OF A CHAT (new-chat picker, session badge) ------------
 

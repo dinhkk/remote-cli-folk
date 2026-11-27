@@ -2,7 +2,7 @@ import { requestMfaReauth,
   expireAuthSession,
   lockAuthSession,
   getStoredAuthToken } from '@/shared/authToken';
-import type { AgentMonitorKillRequest, AgentSessionScopePayload, GenerateAgentsRequest, MemoryBlockInput } from '@/shared/types';
+import type { AgentMonitorKillRequest, AgentSessionScopePayload, ExportBundleRequest, GenerateAgentsRequest, ImportOptions, MemoryBlockInput, PendingConfirmRequest } from '@/shared/types';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 import { isBlockedInTargetMode } from '@/shared/transport/target-route-policy';
 import { TargetUrlError, httpUrl, isTargetMode } from '@/shared/transport/target-context';
@@ -599,6 +599,22 @@ export const api = {
     generateValues: (directory?: string | null) =>
       get(`/api/agent-profiles/generate/values${query({ directory })}`),
 
+    // Import / export of templates and memory blocks as YAML or JSON text (Host only). `text` is the file content, parsed on the server.
+    exportBundle: (body: Partial<ExportBundleRequest>) => post('/api/agent-profiles/bundle/export', body),
+    previewBundleImport: (text: string, projectMap?: Record<string, string>) =>
+      post('/api/agent-profiles/bundle/import/preview', { text, ...(projectMap ? { projectMap } : {}) }),
+    importBundle: (text: string, options: ImportOptions) => post('/api/agent-profiles/bundle/import', { text, ...options }),
+    listBundleSnapshots: () => get('/api/agent-profiles/bundle/snapshots'),
+    restoreBundleSnapshot: (snapshot: string) => post('/api/agent-profiles/bundle/restore', { snapshot }),
+
+    // Changes a manager agent staged for the Host user (Host only). `listPending` returns fresh reviews with the `basis` to send back;
+    // `pendingCount` is the cheap number for the Settings badge. A confirm answers like an import apply.
+    listPending: () => get('/api/agent-profiles/pending'),
+    pendingCount: () => get('/api/agent-profiles/pending/count'),
+    confirmPending: (id: string, body: PendingConfirmRequest) =>
+      post(`/api/agent-profiles/pending/${encodeURIComponent(id)}/confirm`, body),
+    rejectPending: (id: string) => post(`/api/agent-profiles/pending/${encodeURIComponent(id)}/reject`, {}),
+
     // The only Agent Profiles route a Remote tab may call: the main agents a new chat in a sidebar project can start as
     // (`projectId` = `Project.projectId`, the id GET /api/projects returns); names only, no folders, prompts or values.
     scopeOptions: (projectId: string) =>
@@ -609,6 +625,9 @@ export const api = {
       get(`/api/agent-profiles/claude-agents${query({ directory })}`),
     setHiddenClaudeAgents: (body: { names: string[]; rev: number }) =>
       put('/api/agent-profiles/claude-agents/hidden', body),
+    // Main agents allowed to use the `profiles` tools; `rev` is the settings revision the hide list shares.
+    setClaudeAgentManagers: (body: { names: string[]; rev: number }) =>
+      put('/api/agent-profiles/claude-agents/managers', body),
   },
 
   // Agent Monitor (header icon → Activity drawer / full view). Read-only; a Remote tab may call both (the owner's decision).

@@ -1,6 +1,8 @@
 import { Settings, Sparkles, PanelLeftOpen, AlertTriangle } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { PendingSettingsBadge } from '@/modules/agent-profiles';
+
 type SidebarCollapsedProps = {
   onExpand: () => void;
   onShowSettings: () => void;
@@ -36,11 +38,12 @@ export default function SidebarCollapsed({
       {/* Settings */}
       <button
         onClick={onShowSettings}
-        className="group flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent/80"
+        className="group relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent/80"
         aria-label={t('actions.settings')}
         title={t('actions.settings')}
       >
         <Settings className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+        <PendingSettingsBadge />
       </button>
 
       {/* Restart-required indicator */}

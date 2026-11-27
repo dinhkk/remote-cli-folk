@@ -1,4 +1,4 @@
-import type { QueuedChatMessage } from '@/shared/types.js';
+import type { QueuedChatMessage, RunOrigin } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 type GitConfig = {
@@ -27,12 +27,13 @@ type UserDependencies = {
   };
   drafts: {
     getDrafts(userId: number): DraftRecord[];
-    saveDraft(userId: number, scope: string, draft: { text: string; queuedMessage: unknown | null }): void;
+    saveDraft(userId: number, scope: string, draft: { text: string; queuedMessage: unknown | null }, origin: RunOrigin): void;
     saveDraftText(userId: number, scope: string, text: string): void;
     appendQueuedMessage(
       userId: number,
       scope: string,
       message: QueuedChatMessage,
+      origin: RunOrigin,
     ): { queuedMessage: QueuedChatMessage; appended: boolean } | null;
     clearQueuedMessage(userId: number, scope: string): void;
     deleteDraft(userId: number, scope: string): void;
@@ -193,7 +194,8 @@ export function createUserService(dependencies: UserDependencies) {
       return { success: true, drafts: dependencies.drafts.getDrafts(userId) };
     },
 
-    saveDraft(userId: number, scopeInput: unknown, body: unknown) {
+    /** `origin` comes from the request's authentication (the route), never from the body; it defaults to remote. */
+    saveDraft(userId: number, scopeInput: unknown, body: unknown, origin: RunOrigin = 'remote') {
       const scope = readDraftScope(scopeInput);
       const payload = (body ?? {}) as { text?: unknown; queuedMessage?: unknown };
       const text = typeof payload.text === 'string' ? payload.text : '';
@@ -216,7 +218,7 @@ export function createUserService(dependencies: UserDependencies) {
       dependencies.drafts.saveDraft(userId, scope, {
         text,
         queuedMessage: payload.queuedMessage ?? null,
-      });
+      }, origin);
       return { success: true };
     },
 
@@ -228,10 +230,10 @@ export function createUserService(dependencies: UserDependencies) {
      * A slash command is the one exception: it only works as a turn of its
      * own, so it is refused rather than merged, and the composer keeps it.
      */
-    appendQueuedMessage(userId: number, scopeInput: unknown, queuedMessageInput: unknown) {
+    appendQueuedMessage(userId: number, scopeInput: unknown, queuedMessageInput: unknown, origin: RunOrigin = 'remote') {
       const scope = readDraftScope(scopeInput);
       const message = readQueuedMessageInput(queuedMessageInput);
-      const result = dependencies.drafts.appendQueuedMessage(userId, scope, message);
+      const result = dependencies.drafts.appendQueuedMessage(userId, scope, message, origin);
       if (!result) {
         throw new AppError(
           'A slash command runs as a turn of its own, so it cannot be combined with the queued message. '

@@ -14,7 +14,9 @@ import type {
   StoredShapeCheck,
 } from '@/shared/types.js';
 
-const DEFAULT_SETTINGS: AgentProfileSettings = { rev: 0, updatedAt: '', hiddenClaudeAgents: [] };
+const DEFAULT_SETTINGS: AgentProfileSettings = { rev: 0, updatedAt: '', hiddenClaudeAgents: [], profileManagerAgents: [] };
+
+const isStringList = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 /** Key of the global (no project) scope in `values-by-directory.json`; never equal to a normalized folder path. */
 const GLOBAL_VALUES_KEY = '@global';
@@ -129,11 +131,14 @@ export function createAgentProfileStore(options: {
     const value = readJson(settingsFile);
     if (value === null) return { ...DEFAULT_SETTINGS };
     const parsed = value as Partial<AgentProfileSettings>;
+    // `profileManagerAgents` is absent in files written before the key existed (= none); present, it must be a list of strings.
     if (
-      typeof value !== 'object' || !Number.isInteger(parsed.rev)
-      || !Array.isArray(parsed.hiddenClaudeAgents) || parsed.hiddenClaudeAgents.some((name) => typeof name !== 'string')
+      typeof value !== 'object' || Array.isArray(value) || !Number.isInteger(parsed.rev)
+      || !isStringList(parsed.hiddenClaudeAgents)
+      || (parsed.profileManagerAgents !== undefined && !isStringList(parsed.profileManagerAgents))
     ) throw corruptError('settings.json', 'unexpected shape');
-    return parsed as AgentProfileSettings;
+    // Keys this version does not know stay in the object, so a write keeps what a newer version saved.
+    return { ...parsed, profileManagerAgents: parsed.profileManagerAgents ?? [] } as AgentProfileSettings;
   }
 
   /** The whole values file ({} when absent); a file of the wrong shape throws PROFILE_CORRUPT and is left alone. */
@@ -394,9 +399,12 @@ export function createAgentProfileStore(options: {
     /** Module settings (defaults when no file yet); an unreadable file throws PROFILE_CORRUPT. */
     readSettings,
 
-    /** Applies `patch` to the settings; with `expectedRev` set, a stale rev is refused (409). */
+    /**
+     * Applies `patch` to the settings; with `expectedRev` set, a stale rev is refused (409). Any key in the patch bumps
+     * `rev` (the hide list and the manager list share it), and keys the patch does not name are kept as they are.
+     */
     updateSettings(
-      patch: Partial<Pick<AgentProfileSettings, 'hiddenClaudeAgents'>>, expectedRev?: number,
+      patch: Partial<Pick<AgentProfileSettings, 'hiddenClaudeAgents' | 'profileManagerAgents'>>, expectedRev?: number,
     ): AgentProfileSettings {
       const current = readSettings();
       if (expectedRev !== undefined && current.rev !== expectedRev) {
@@ -404,8 +412,9 @@ export function createAgentProfileStore(options: {
           code: 'PROFILE_STALE', statusCode: 409, details: { currentRev: current.rev },
         });
       }
-      const rev = patch.hiddenClaudeAgents ? current.rev + 1 : current.rev;
-      const next: AgentProfileSettings = { ...current, ...patch, rev, updatedAt: now().toISOString() };
+      const changes = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+      const rev = Object.keys(changes).length > 0 ? current.rev + 1 : current.rev;
+      const next: AgentProfileSettings = { ...current, ...changes, rev, updatedAt: now().toISOString() };
       writeAtomic(settingsFile, next);
       return next;
     },

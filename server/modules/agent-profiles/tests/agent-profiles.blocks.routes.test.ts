@@ -19,7 +19,7 @@ async function withApi(run: (call: Call, rig: ReturnType<typeof makeServiceRig>)
   const rig = makeServiceRig();
   const app = express();
   app.use(express.json());
-  app.use('/api/agent-profiles', createAgentProfilesRouter(rig.service, rig.claudeAgents, rig.blocks));
+  app.use('/api/agent-profiles', createAgentProfilesRouter(rig.service, rig.claudeAgents, rig.blocks, rig.bundle, rig.pending));
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (err instanceof AppError) {
       res.status(err.statusCode).json({ success: false, error: { code: err.code, message: err.message, details: err.details } });

@@ -44,6 +44,8 @@ async function sendClaimedQueuedMessage(
       userId: candidate.userId,
       content: message.content,
       options: { ...message.options, attachments: message.attachments },
+      // The origin stored when the message was queued; the options above can never carry one.
+      origin: candidate.origin,
     },
     { runtime },
   );
@@ -106,6 +108,9 @@ async function sendClaimedMessage(
         userId: row.user_id,
         content: row.content,
         options: readOptions(row.options),
+        // A scheduled message fires with nobody watching the chat: it is always remote, whatever origin its row stored, so it
+        // can never be given the tools that stage changes for the Host user to confirm. (The stored origin stays as a record.)
+        origin: 'remote',
         // The user picked this time on purpose; a run that happens to be going
         // is aborted so the scheduled message lands when it was due, instead
         // of being recorded as "not sent — session was busy".

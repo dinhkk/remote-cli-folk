@@ -114,7 +114,7 @@ test('get returns null and remove returns false for a missing record; a missing 
 
 test('settings default to empty, update with rev checks, and a corrupt file is not overwritten', () => {
   withStore((store, root) => {
-    assert.deepEqual(store.readSettings(), { rev: 0, updatedAt: '', hiddenClaudeAgents: [] });
+    assert.deepEqual(store.readSettings(), { rev: 0, updatedAt: '', hiddenClaudeAgents: [], profileManagerAgents: [] });
     const first = store.updateSettings({ hiddenClaudeAgents: ['Explore'] }, 0);
     assert.equal(first.rev, 1);
     assert.throws(() => store.updateSettings({ hiddenClaudeAgents: [] }, 0), (error: { statusCode?: number }) => error.statusCode === 409);
@@ -122,5 +122,44 @@ test('settings default to empty, update with rev checks, and a corrupt file is n
     fs.writeFileSync(path.join(root, 'settings.json'), 'garbage');
     assert.throws(() => store.updateSettings({ hiddenClaudeAgents: [] }), (error: { code?: string }) => error.code === 'PROFILE_CORRUPT');
     assert.equal(fs.readFileSync(path.join(root, 'settings.json'), 'utf8'), 'garbage');
+  });
+});
+
+test('a manager-only patch bumps rev, keeps the hide list, and a stale rev is refused', () => {
+  withStore((store) => {
+    store.updateSettings({ hiddenClaudeAgents: ['Explore'] }, 0);
+    const saved = store.updateSettings({ profileManagerAgents: ['alpha'] }, 1);
+    assert.equal(saved.rev, 2);
+    assert.deepEqual(saved.hiddenClaudeAgents, ['Explore']);
+    assert.deepEqual(store.readSettings().profileManagerAgents, ['alpha']);
+    assert.throws(() => store.updateSettings({ profileManagerAgents: [] }, 1), (error: { statusCode?: number }) => error.statusCode === 409);
+    assert.equal(store.updateSettings({}, 2).rev, 2, 'an empty patch changes nothing');
+    assert.equal(store.updateSettings({ profileManagerAgents: undefined }, 2).rev, 2, 'an undefined key is not a change');
+  });
+});
+
+test('a settings file from before the manager list reads as no managers and stays valid', () => {
+  withStore((store, root) => {
+    fs.writeFileSync(path.join(root, 'settings.json'), JSON.stringify({ rev: 3, updatedAt: 'x', hiddenClaudeAgents: ['Plan'] }));
+    assert.deepEqual(store.readSettings().profileManagerAgents, []);
+    assert.equal(store.updateSettings({ hiddenClaudeAgents: [] }, 3).rev, 4);
+  });
+});
+
+test('a malformed manager list is reported as a corrupt settings file and never overwritten', () => {
+  withStore((store, root) => {
+    for (const bad of ['alpha', [1], { a: 1 }, null]) {
+      fs.writeFileSync(path.join(root, 'settings.json'), JSON.stringify({ rev: 1, updatedAt: 'x', hiddenClaudeAgents: [], profileManagerAgents: bad }));
+      assert.throws(() => store.readSettings(), (error: { code?: string }) => error.code === 'PROFILE_CORRUPT', JSON.stringify(bad));
+      assert.throws(() => store.updateSettings({ hiddenClaudeAgents: ['x'] }), (error: { code?: string }) => error.code === 'PROFILE_CORRUPT');
+    }
+  });
+});
+
+test('a key this version does not know survives a settings write', () => {
+  withStore((store, root) => {
+    fs.writeFileSync(path.join(root, 'settings.json'), JSON.stringify({ rev: 1, updatedAt: 'x', hiddenClaudeAgents: [], futureKey: { keep: true } }));
+    store.updateSettings({ profileManagerAgents: ['alpha'] });
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'settings.json'), 'utf8')).futureKey, { keep: true });
   });
 });

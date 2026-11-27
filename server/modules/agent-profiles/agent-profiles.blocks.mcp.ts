@@ -8,16 +8,17 @@ import type { MemoryBlock } from '@/shared/types.js';
 import type { BlocksRunContext, BlocksService } from './agent-profiles.blocks.service.js';
 import { escapeValue } from './agent-profiles.resolve.js';
 
-/** What the tools of one run return: MCP text content, `isError` set for a refusal the model should read. */
-type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
+/** What the tools of one run return: MCP text content, `isError` set for a refusal the model should read. Consumed by: agent-profiles.profiles.mcp.ts (same result shape). */
+export type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
-const reply = (text: string, isError = false): ToolResult => ({
+/** One text result. Consumed by: agent-profiles.profiles.mcp.ts. */
+export const reply = (text: string, isError = false): ToolResult => ({
   content: [{ type: 'text', text }],
   ...(isError ? { isError: true } : {}),
 });
 
-/** Escaped text for an XML attribute value: `escapeValue` handles `& < >`, quotes are added here. */
-const attribute = (value: string): string => escapeValue(value, 200).replace(/"/g, '&quot;').replace(/\n/g, ' ');
+/** Escaped text for an XML attribute value: `escapeValue` handles `& < >`, quotes are added here. Consumed by: agent-profiles.profiles.mcp.ts. */
+export const attribute = (value: string): string => escapeValue(value, 200).replace(/"/g, '&quot;').replace(/\n/g, ' ');
 
 const writerOf = (block: MemoryBlock): string => block.lastWriter ?? 'none';
 

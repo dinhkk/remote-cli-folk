@@ -995,6 +995,24 @@ export type QueuedChatMessage = {
 };
 
 // ---------------------------
+//----------------- RUN ORIGIN ------------
+/**
+ * Where the request that started a provider run came from, carried on the run
+ * options as `origin`.
+ *
+ * `local` is set only by the Host's own authenticated non-bridge path (a browser
+ * session or the platform auth of the Host itself). `remote` is a connection the
+ * Host bridged from a Remote Controller (loopback token), and also every path
+ * that cannot prove otherwise: a missing or unknown value is read as `remote`
+ * (fail closed). The value never comes from a client message, header, query or
+ * `options`; it is derived on the Host from how the request was authenticated.
+ * It is containment against accidents and prompt injection that arrives through a
+ * Controller chat, not a boundary against a hostile paired Controller (a paired
+ * Controller is a full-trust grant). Read it with `readRunOrigin`.
+ */
+export type RunOrigin = 'local' | 'remote';
+
+// ---------------------------
 //----------------- PROJECT PERSISTENCE TYPES ------------
 /**
  * Canonical project row shape returned by the projects repository.
@@ -2680,14 +2698,138 @@ export type AgentProfileList<T> = { items: T[]; corrupt: AgentProfileCorruptEntr
 
 /**
  * Module settings stored in `settings.json`: the Claude agents the user hid (by
- * name, same for every scope). `rev`/`updatedAt` follow the same stale-write rule as
- * profile records.
+ * name, same for every scope) and the main agents allowed to use the `profiles` MCP tools
+ * (`profileManagerAgents`, set from the Host UI; absent in older files = none). `rev`/`updatedAt` follow the same
+ * stale-write rule as profile records; both lists share the one `rev`, which any change of the settings bumps.
  */
 export type AgentProfileSettings = {
   rev: number;
   updatedAt: string;
   hiddenClaudeAgents: string[];
+  profileManagerAgents: string[];
 };
+
+// ---------------------------
+// ---------------------------
+//----------------- AGENT BUNDLE TYPES (import / export of templates and memory blocks) ------------
+/**
+ * One memory block inside a bundle. `scope` never carries a folder. A global block carries `content`; a project block
+ * carries `contents` (one entry per folder it has text for). Both are present only when the export included block text.
+ * `directory` of a `contents` entry is the folder the text belonged to on the source host: it is only a mapping key on
+ * import (the target folder is always the sidebar project the user maps it to). `lastWriter` is provenance and is never
+ * trusted as a user claim: text an agent wrote stays labelled as agent text.
+ */
+export type MemoryBlockBundleEntry = {
+  name: string;
+  description: string;
+  mode: MemoryBlockMode;
+  scope: MemoryBlockScope;
+  maxChars: number;
+  content?: string;
+  contents?: { directory: string; content: string; lastWriter?: MemoryBlockWriter }[];
+  lastWriter?: MemoryBlockWriter;
+};
+
+/**
+ * The portable bundle: templates and memory blocks as editable text (YAML or JSON). Hand-written and AI-written bundles
+ * are accepted as input and treated as untrusted. No ids, revisions or timestamps travel in a bundle.
+ */
+export type AgentBundle = {
+  format: 'remotecli.agent-bundle';
+  version: 1;
+  exportedAt: string;
+  templates: AgentProfileTemplateInput[];
+  memoryBlocks: MemoryBlockBundleEntry[];
+};
+
+/**
+ * A bundle after its envelope was checked (format, version, array shapes, nesting depth) but before any item was
+ * validated: what a person or an AI wrote. Items are validated one by one by the import plan, so one bad item never
+ * rejects the others. An {@link AgentBundle} is assignable to it.
+ */
+export type RawAgentBundle = {
+  format: AgentBundle['format'];
+  version: AgentBundle['version'];
+  exportedAt: string;
+  templates: unknown[];
+  memoryBlocks: unknown[];
+};
+
+/** Who triggers an import: the Host user (default) or an agent proposing changes; an agent cannot write `read-only` blocks and is recorded as the writer. */
+export type ImportActor = { kind: 'user' } | { kind: 'agent'; name: string };
+
+/** Revision a preview saw of an import target (template `rev`, block definition `rev`, folder content `rev`), or `absent`. Apply compares it with the live value. */
+export type ImportBasis = number | 'absent';
+
+/** One problem found in a bundle; `level: 'warning'` never blocks the item. `line`/`column` are set when the position in the source text is known. */
+export type ImportProblem = { level: 'error' | 'warning'; code: string; message: string; path?: string; line?: number; column?: number };
+
+/** How an item or folder entry compares with the store: `new`, `identical`, `conflict` (exists and differs), `invalid` (cannot be imported), `skipped` (no target folder). */
+export type ImportStatus = 'new' | 'identical' | 'conflict' | 'invalid' | 'skipped';
+
+/** One folder-text entry of a project block in a plan. `sourceKey` (= the store's folder key of `sourceDirectory`) keys `projectMap`. */
+export type ImportFolderRow = {
+  /** `block:<name>#<sourceKey>`: the key to tick in `overwrite` and to index `basis`. */
+  key: string;
+  sourceDirectory: string;
+  sourceKey: string;
+  status: ImportStatus;
+  code?: string;
+  reason?: string;
+  /** False for a conflict that can never be overwritten (the block cannot be backed up). */
+  overwritable: boolean;
+  basis: ImportBasis;
+};
+
+/** One template or block of a bundle in an import preview. `key` is `template:<slug>` / `block:<name>`. `overwritable` is false for a conflict that can never be overwritten (other scope kind, ambiguous name, not backed-up block). */
+export type ImportPlanItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  status: ImportStatus;
+  code?: string;
+  overwritable: boolean;
+  problems: ImportProblem[];
+  sensitive: string[];
+  basis: ImportBasis;
+  /** Scope kind of a block the bundle describes (absent for templates and for blocks too broken to read). */
+  scope?: 'global' | 'project';
+  folders?: ImportFolderRow[];
+};
+
+/** Result of a dry run: nothing is written. */
+export type ImportPlan = { items: ImportPlanItem[]; hasFolderText: boolean };
+
+/** Outcome of one folder entry when applying. */
+export type ImportFolderResult = { key: string; status: 'applied' | 'skipped' | 'failed'; code?: string; reason?: string };
+
+/** Outcome of one item when applying; `skipped` with code `IDENTICAL` means nothing to do. `partial`: the item applied but a folder entry did not. */
+export type ImportItemResult = {
+  key: string;
+  status: 'applied' | 'skipped' | 'failed';
+  code?: string;
+  reason?: string;
+  partial?: true;
+  folders?: ImportFolderResult[];
+};
+
+/** Result of applying an import or restore. `partial`: at least one item (or folder entry) was not applied (identical items do not count). `snapshot`: file name of the backup taken before overwriting, or null. */
+export type ImportResult = { items: ImportItemResult[]; partial: boolean; snapshot: string | null };
+
+/** What an import changes: the user's choices, all optional. Keys are `template:<slug>`, `block:<name>`, `block:<name>#<sourceKey>`. `projectMap` maps a source folder key to a sidebar project id (the only way a folder entry gets a target); `basis` is what the preview saw of each ticked key (required for every overwrite). */
+export type ImportOptions = {
+  overwrite?: string[];
+  acceptSensitive?: string[];
+  projectMap?: Record<string, string>;
+  basis?: Record<string, ImportBasis>;
+  actor?: ImportActor;
+};
+
+/** A problem found while exporting (a block that cannot be exported completely); the export still succeeds. */
+export type ExportProblem = { key: string; code: string; message: string };
+
+/** One server-written snapshot (backup) listed for restore. */
+export type AgentBundleSnapshot = { name: string; createdAt: string; templates: number; blocks: number; folders: number; bytes: number };
 
 // ---------------------------
 //----------------- CLAUDE-PROVIDED AGENT TYPES ------------
@@ -3074,4 +3216,89 @@ export type AgentMonitorMachineUsage = {
   cpuPercent: number | null;
   memoryUsedBytes: number;
   memoryTotalBytes: number;
+};
+
+// ---------------------------
+//----------------- AGENT CHANGESET AND PENDING PROPOSAL TYPES (profiles MCP server) ------------
+/** One thing an agent asks to delete: a template (key = slug) or a memory block (key = name). */
+export type ChangesetDelete = { kind: 'template' | 'block'; key: string };
+
+/**
+ * What an agent proposes: bundle items to create or overwrite (`upsert`, the same shape as an import bundle, never a folder
+ * text or folder) and items to delete. At most 5 items and 20 KB in total; one key is never both upserted and deleted.
+ * Deletes run before upserts. Parsed (and normalised) by `parseChangeset`; stored as is in a pending proposal.
+ */
+export type AgentChangeset = { upsert?: RawAgentBundle; delete?: ChangesetDelete[] };
+
+/** What a changeset item does to the store: `refused` when it cannot be applied at all (see the item's `refusal`). */
+export type ChangesetAction = 'create' | 'overwrite' | 'delete' | 'identical' | 'refused';
+
+/** One changed field of an overwrite, as text for the person who confirms (long text is cut). `null` = absent. */
+export type ChangesetFieldChange = { field: string; before: string | null; after: string | null };
+
+/**
+ * One item of a changeset as the Host user sees it: what happens, why it is refused, which sensitive powers it grants and
+ * what changes. `needsTick`: an overwrite or delete is applied only when its key is ticked at confirm. `basis` is the
+ * revision of the target now (`absent` for a create): confirm sends it back so the tick applies to what was shown.
+ */
+export type ChangesetReviewItem = {
+  key: string;
+  kind: 'template' | 'block';
+  label: string;
+  action: ChangesetAction;
+  needsTick: boolean;
+  basis: ImportBasis;
+  sensitive: string[];
+  refusal?: { code: string; message: string };
+  /** Readable summary lines (what is created, which fields change, what a delete loses). */
+  lines: string[];
+  changes: ChangesetFieldChange[];
+};
+
+/** Review of a whole changeset against the live store. `refused`: at least one item can never be applied. */
+export type ChangesetReview = { items: ChangesetReviewItem[]; refused: boolean };
+
+/** `<root>/pending/<id>.json`: a changeset an agent proposed and nobody confirmed yet. `summary` is the review taken when it was staged. */
+export type PendingProposal = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  agentName: string;
+  changeset: AgentChangeset;
+  summary: ChangesetReviewItem[];
+};
+
+/** A pending proposal as `GET /pending` returns it: a fresh review against the store now, and the `basis` map to send back at confirm. No raw changeset. */
+export type PendingProposalView = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  agentName: string;
+  items: ChangesetReviewItem[];
+  basis: Record<string, ImportBasis>;
+};
+
+/**
+ * A memory block as the changeset checks and the `profiles` tools describe it: the stored definition plus what the block
+ * holds. `problem` is set when the block cannot be backed up (so never overwritten or deleted by an agent), `ambiguous`
+ * when another block uses the same name. Folder facts are counts and sizes only (paths and folder text never leave the Host).
+ */
+export type ProfilesLiveBlock = {
+  definition: MemoryBlockDefinition;
+  ambiguous: boolean;
+  problem: { code: string; message: string } | null;
+  /** Content files of a project block (0 for a global block). */
+  folders: number;
+  /** Content files whose text is not empty. */
+  foldersWithText: number;
+  /** Total characters of all folder texts. */
+  folderChars: number;
+  /** Sum of the folder content revisions: moves whenever any folder text changes. */
+  folderRevSum: number;
+};
+
+/** The templates (by slug) and blocks (by name, first of a name) the store holds now, as {@link ProfilesLiveBlock}. */
+export type ProfilesLiveView = {
+  templates: Map<string, AgentProfileTemplate>;
+  blocks: Map<string, ProfilesLiveBlock>;
 };

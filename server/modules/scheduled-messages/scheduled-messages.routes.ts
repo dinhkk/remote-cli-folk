@@ -2,9 +2,9 @@ import express from 'express';
 import type { Request, Response } from 'express';
 
 import { scheduledMessagesService } from '@/modules/scheduled-messages/services/scheduled-messages.service.js';
-import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
+import { AppError, asyncHandler, createApiSuccessResponse, originFromAuthKind } from '@/shared/utils.js';
 
-type AuthenticatedRequest = Request & { user?: { id?: number | string } };
+type AuthenticatedRequest = Request & { user?: { id?: number | string }; authKind?: string };
 
 function readUserId(request: Request): number {
   const userId = Number((request as AuthenticatedRequest).user?.id);
@@ -52,6 +52,8 @@ router.post(
       content: readString(body.content, 'content'),
       options: body.options,
       scheduledFor: readString(body.scheduledFor, 'scheduledFor'),
+      // From how this request was authenticated (a bridged Controller request is remote), never from the body.
+      origin: originFromAuthKind((req as AuthenticatedRequest).authKind),
     });
     res.status(201).json(createApiSuccessResponse(result));
   }),

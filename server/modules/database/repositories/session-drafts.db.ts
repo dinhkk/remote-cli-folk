@@ -1,6 +1,6 @@
 import { getConnection } from '@/modules/database/connection.js';
-import type { QueuedChatMessage } from '@/shared/types.js';
-import { readQueuedChatMessage } from '@/shared/utils.js';
+import type { QueuedChatMessage, RunOrigin } from '@/shared/types.js';
+import { readQueuedChatMessage, readRunOrigin } from '@/shared/utils.js';
 
 /**
  * One chat scope's unsent state: the text still in the composer, plus the
@@ -26,6 +26,8 @@ export type QueuedSessionMessageRecord = {
   userId: number;
   sessionId: string;
   queuedMessage: unknown;
+  /** Origin the message was queued with (fail closed: null in the row reads as remote). */
+  origin: RunOrigin;
   claimToken: string;
 };
 
@@ -33,6 +35,7 @@ type QueuedMessageRow = {
   user_id: number;
   draft_scope: string;
   queued_message: string;
+  queued_origin: string | null;
 };
 
 /** A queued message that no longer parses is treated as absent, not fatal. */
@@ -74,25 +77,43 @@ function isSlashCommand(message: QueuedChatMessage): boolean {
   return message.content.trimStart().startsWith('/');
 }
 
-/** The message waiting in a scope's queue, or null when nothing sendable is stored there. */
-function readStoredQueuedMessage(userId: number, scope: string): QueuedChatMessage | null {
-  const row = getConnection()
-    .prepare('SELECT queued_message FROM session_drafts WHERE user_id = ? AND draft_scope = ?')
-    .get(userId, scope) as { queued_message: string | null } | undefined;
-  return readQueuedChatMessage(parseQueuedMessage(row?.queued_message ?? null));
+/**
+ * A merged queued turn is local only when every part of it was queued locally:
+ * one remote or unmarked part makes the whole turn remote (fail closed).
+ */
+function mergeOrigins(earlier: RunOrigin, later: RunOrigin): RunOrigin {
+  return earlier === 'local' && later === 'local' ? 'local' : 'remote';
 }
 
-/** Stores a scope's queued message without touching its draft text. */
-function writeStoredQueuedMessage(userId: number, scope: string, rawQueuedMessage: string): void {
+/** The message waiting in a scope's queue and its origin, or null when nothing sendable is stored there. */
+function readStoredQueuedMessage(
+  userId: number,
+  scope: string,
+): { message: QueuedChatMessage; origin: RunOrigin } | null {
+  const row = getConnection()
+    .prepare('SELECT queued_message, queued_origin FROM session_drafts WHERE user_id = ? AND draft_scope = ?')
+    .get(userId, scope) as { queued_message: string | null; queued_origin: string | null } | undefined;
+  const message = readQueuedChatMessage(parseQueuedMessage(row?.queued_message ?? null));
+  return message ? { message, origin: readRunOrigin(row?.queued_origin) } : null;
+}
+
+/** Stores a scope's queued message and its origin without touching its draft text. */
+function writeStoredQueuedMessage(
+  userId: number,
+  scope: string,
+  rawQueuedMessage: string,
+  origin: RunOrigin,
+): void {
   getConnection()
     .prepare(
-      `INSERT INTO session_drafts (user_id, draft_scope, draft_text, queued_message, updated_at)
-       VALUES (?, ?, '', ?, CURRENT_TIMESTAMP)
+      `INSERT INTO session_drafts (user_id, draft_scope, draft_text, queued_message, queued_origin, updated_at)
+       VALUES (?, ?, '', ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(user_id, draft_scope) DO UPDATE SET
          queued_message = excluded.queued_message,
+         queued_origin = excluded.queued_origin,
          updated_at = CURRENT_TIMESTAMP`
     )
-    .run(userId, scope, rawQueuedMessage);
+    .run(userId, scope, rawQueuedMessage, origin);
 }
 
 function toRecord(row: DraftRow): SessionDraftRecord {
@@ -130,7 +151,7 @@ export const sessionDraftsDb = {
   listQueuedMessages(): QueuedSessionMessageRecord[] {
     const rows = getConnection()
       .prepare(
-        `SELECT drafts.user_id, drafts.draft_scope, drafts.queued_message
+        `SELECT drafts.user_id, drafts.draft_scope, drafts.queued_message, drafts.queued_origin
          FROM session_drafts AS drafts
          INNER JOIN sessions ON sessions.session_id = drafts.draft_scope
          WHERE drafts.queued_message IS NOT NULL`
@@ -141,6 +162,7 @@ export const sessionDraftsDb = {
       userId: row.user_id,
       sessionId: row.draft_scope,
       queuedMessage: parseQueuedMessage(row.queued_message),
+      origin: readRunOrigin(row.queued_origin),
       claimToken: row.queued_message,
     }));
   },
@@ -150,10 +172,11 @@ export const sessionDraftsDb = {
     const result = getConnection()
       .prepare(
         `UPDATE session_drafts
-         SET queued_message = NULL, updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = ? AND draft_scope = ? AND queued_message = ?`
+         SET queued_message = NULL, queued_origin = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = ? AND draft_scope = ? AND queued_message = ?
+           AND (CASE queued_origin WHEN 'local' THEN 'local' ELSE 'remote' END) = ?`
       )
-      .run(candidate.userId, candidate.sessionId, candidate.claimToken);
+      .run(candidate.userId, candidate.sessionId, candidate.claimToken, candidate.origin);
     return result.changes > 0;
   },
 
@@ -177,8 +200,9 @@ export const sessionDraftsDb = {
         candidate.userId,
         candidate.sessionId,
         queuedSinceClaim
-          ? JSON.stringify(mergeQueuedMessages(restored, queuedSinceClaim))
+          ? JSON.stringify(mergeQueuedMessages(restored, queuedSinceClaim.message))
           : candidate.claimToken,
+        queuedSinceClaim ? mergeOrigins(candidate.origin, queuedSinceClaim.origin) : candidate.origin,
       );
     })();
   },
@@ -199,16 +223,23 @@ export const sessionDraftsDb = {
   appendQueuedMessage(
     userId: number,
     scope: string,
-    message: QueuedChatMessage
+    message: QueuedChatMessage,
+    /** Origin of the request queueing it (from its authentication, never from the body); a merged turn is local only if all parts are. */
+    origin: RunOrigin = 'remote',
   ): { queuedMessage: QueuedChatMessage; appended: boolean } | null {
     const db = getConnection();
     return db.transaction(() => {
       const waiting = readStoredQueuedMessage(userId, scope);
-      if (waiting && (isSlashCommand(waiting) || isSlashCommand(message))) {
+      if (waiting && (isSlashCommand(waiting.message) || isSlashCommand(message))) {
         return null;
       }
-      const queuedMessage = waiting ? mergeQueuedMessages(waiting, message) : message;
-      writeStoredQueuedMessage(userId, scope, JSON.stringify(queuedMessage));
+      const queuedMessage = waiting ? mergeQueuedMessages(waiting.message, message) : message;
+      writeStoredQueuedMessage(
+        userId,
+        scope,
+        JSON.stringify(queuedMessage),
+        waiting ? mergeOrigins(waiting.origin, origin) : origin,
+      );
       return { queuedMessage, appended: waiting !== null };
     })();
   },
@@ -219,7 +250,7 @@ export const sessionDraftsDb = {
     db.transaction(() => {
       db.prepare(
         `UPDATE session_drafts
-         SET queued_message = NULL, updated_at = CURRENT_TIMESTAMP
+         SET queued_message = NULL, queued_origin = NULL, updated_at = CURRENT_TIMESTAMP
          WHERE user_id = ? AND draft_scope = ?`
       ).run(userId, scope);
       sessionDraftsDb.deleteEmptyDraft(userId, scope);
@@ -271,7 +302,9 @@ export const sessionDraftsDb = {
   saveDraft(
     userId: number,
     scope: string,
-    draft: { text: string; queuedMessage: unknown | null }
+    draft: { text: string; queuedMessage: unknown | null },
+    /** Origin of the request saving the queued message (from its authentication, never from the body); default remote. */
+    origin: RunOrigin = 'remote',
   ): void {
     const db = getConnection();
 
@@ -282,17 +315,19 @@ export const sessionDraftsDb = {
     }
 
     db.prepare(
-      `INSERT INTO session_drafts (user_id, draft_scope, draft_text, queued_message, updated_at)
-       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `INSERT INTO session_drafts (user_id, draft_scope, draft_text, queued_message, queued_origin, updated_at)
+       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(user_id, draft_scope) DO UPDATE SET
          draft_text = excluded.draft_text,
          queued_message = excluded.queued_message,
+         queued_origin = excluded.queued_origin,
          updated_at = CURRENT_TIMESTAMP`
     ).run(
       userId,
       scope,
       draft.text,
-      draft.queuedMessage === null ? null : JSON.stringify(draft.queuedMessage)
+      draft.queuedMessage === null ? null : JSON.stringify(draft.queuedMessage),
+      draft.queuedMessage === null ? null : origin,
     );
   },
 

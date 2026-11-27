@@ -40,6 +40,7 @@ import {
   notifyUserIfEnabled
 } from '@/modules/notifications/index.js';
 import { resolveBlocksAgentName, withBlocksMcpServer, withBlocksToolsAllowed } from '@/modules/providers/list/claude/claude-blocks-mcp.js';
+import { resolveProfilesAgentName, withProfilesMcpServer, withProfilesToolsAllowed } from '@/modules/providers/list/claude/claude-profiles-mcp.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import {
   getReportedClaudeContextWindow,
@@ -1124,17 +1125,30 @@ async function queryClaudeSDK(
       options.agentProfile as SessionAgentSnapshot | undefined,
       options.cwd,
     );
-    const mcpServers = await withBlocksMcpServer(
-      await loadMcpConfig(options.cwd),
-      blocksAgentName,
+    // The profiles server (proposals the Host user confirms) only for a local run of an allowlisted main agent; an absent or
+    // unknown origin reads as remote, so it never attaches for Remote, scheduled, queued or API-key runs.
+    const profilesAgentName = await resolveProfilesAgentName(
+      options.agentProfile as SessionAgentSnapshot | undefined,
+      options.origin,
       options.cwd,
+    );
+    const mcpServers = await withProfilesMcpServer(
+      await withBlocksMcpServer(
+        await loadMcpConfig(options.cwd),
+        blocksAgentName,
+        options.cwd,
+      ),
+      profilesAgentName,
     );
     if (mcpServers) {
       sdkOptions.mcpServers = mcpServers;
     }
-    sdkOptions.allowedTools = withBlocksToolsAllowed(
-      sdkOptions.allowedTools || [],
-      blocksAgentName,
+    sdkOptions.allowedTools = withProfilesToolsAllowed(
+      withBlocksToolsAllowed(
+        sdkOptions.allowedTools || [],
+        blocksAgentName,
+      ),
+      profilesAgentName,
     );
 
     // Every turn uses streaming input so stdin stays open past the turn's

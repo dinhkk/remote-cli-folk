@@ -42,7 +42,10 @@ describe('Agent Profiles translations', () => {
 
   it('has a string for every key family built at run time', () => {
     const dynamic = [
-      ...['agents', 'templates', 'memory'].map((id) => `tabs.${id}`),
+      ...['agents', 'templates', 'memory', 'pending'].map((id) => `tabs.${id}`),
+      ...['create', 'overwrite', 'delete', 'identical', 'refused'].map((action) => `pending.action.${action}`),
+      ...['one', 'other'].map((plural) => `pending.time.hours_${plural}`),
+      ...['one', 'other'].map((plural) => `pending.time.minutes_${plural}`),
       ...['writable', 'read-only'].map((mode) => `memory.mode.${mode}`),
       ...['writable', 'read-only'].map((mode) => `memory.form.modeHint.${mode}`),
       ...['writerNone', 'writerUser', 'writerAgent'].map((key) => `memory.${key}`),

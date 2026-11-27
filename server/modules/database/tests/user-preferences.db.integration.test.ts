@@ -147,6 +147,7 @@ const claimCandidate = (scope: string) => {
     userId: USER_ID,
     sessionId: scope,
     queuedMessage: JSON.parse(row.queued_message) as unknown,
+    origin: 'remote' as const,
     claimToken: row.queued_message,
   };
 };

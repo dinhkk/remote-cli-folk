@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import {
-  AppError, assertValidProfileId, extractPlaceholderKeys, RESERVED_PARAM_KEYS,
+  AppError, assertValidProfileId, extractPlaceholderKeys, isValidAgentProfileName, RESERVED_PARAM_KEYS,
 } from '@/shared/utils.js';
 import type {
   AgentProfileKind,
@@ -242,6 +242,18 @@ export function parseHiddenNames(body: unknown): string[] {
   const names = stringList(asObject(body, 'request body'), 'names', { items: 200, length: 100 }) ?? [];
   // Each name becomes the `Task(<name>)` deny rule of every scoped session: parentheses and `*` would change what the rule matches.
   if (names.some((name) => UNSAFE_RULE_NAME_PATTERN.test(name))) throw invalid('names must not contain parentheses, "*" or control characters');
+  return names;
+}
+
+/**
+ * Reads the name list of a set-profile-managers request (trimmed, de-duplicated, at most 50 names). Each name must be one
+ * a chat can start with as a main agent (`isValidAgentProfileName`), because it is compared with the session's agent name
+ * and used to find `~/.claude/agents/<name>.md`.
+ * Consumed by: claude-agents.service.ts.
+ */
+export function parseManagerNames(body: unknown): string[] {
+  const names = stringList(asObject(body, 'request body'), 'names', { items: 50, length: 64 }) ?? [];
+  if (!names.every((name) => isValidAgentProfileName(name))) throw invalid('names must be valid agent names (letters, digits, - and _, at most 64 characters)');
   return names;
 }
 

@@ -6,6 +6,7 @@ import { BRAND_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 import { IS_PLATFORM } from '@/shared/utils';
 import type { SidebarSearchMode } from '@/shared/types';
 import RemoteCliLogo from '@/shared/ui/RemoteCliLogo';
+import { PendingSettingsBadge } from '@/modules/agent-profiles';
 import SidebarModeTabs from '@/modules/sidebar/SidebarModeTabs';
 
 const MOD_KEY =
@@ -120,12 +121,13 @@ export default function SidebarHeader({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+              className="relative h-7 w-7 rounded-lg p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
               onClick={onShowSettings}
               title={t('actions.settings')}
               aria-label={t('actions.settings')}
             >
               <Settings className="h-3.5 w-3.5" />
+              <PendingSettingsBadge />
             </Button>
             <Button
               variant="ghost"
@@ -222,12 +224,13 @@ export default function SidebarHeader({
               <RefreshCw className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 transition-all active:scale-95"
+              className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 transition-all active:scale-95"
               onClick={onShowSettings}
               title={t('actions.settings')}
               aria-label={t('actions.settings')}
             >
               <Settings className="h-4 w-4 text-muted-foreground" />
+              <PendingSettingsBadge />
             </button>
             <button
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/90 text-primary-foreground transition-all active:scale-95"

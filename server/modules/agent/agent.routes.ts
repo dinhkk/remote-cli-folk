@@ -1056,6 +1056,8 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
           sessionId: appSessionId,
           model: model || providerModels?.DEFAULT,
           effort,
+          // API-key / platform access is never the Host's own browser session: always remote.
+          origin: 'remote',
           // Agent-profile touchpoint: continuing a scoped session passes its main agent name and hide
           // rules again, as the chat gateway does (every run carries them, resume included). Plain sessions: undefined.
           ...(agentSnapshot ? { agentProfile: agentSnapshot } : {}),
