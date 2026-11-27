@@ -169,7 +169,8 @@ function Sidebar({
     setSidebarVisible: (visible) => setPreference('sidebarVisible', visible),
     sidebarVisible,
     keepProjectsExpanded: preferences.keepProjectsExpanded,
-    initialSearchMode: runningActive ? 'running' : 'projects',
+    // A fresh page load opens on Conversations; a tab chosen afterwards lives in the controller's state and is not stored.
+    initialSearchMode: runningActive ? 'running' : 'conversations',
   });
 
   // The Running tab is the monitoring centre: while it is on show the main area follows its focus (overview, graph) and the

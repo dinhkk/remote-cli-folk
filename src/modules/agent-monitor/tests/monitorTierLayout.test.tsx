@@ -45,30 +45,30 @@ const before = (first: HTMLElement, second: HTMLElement) => Boolean(first.compar
 
 describe('the overview by pane width', () => {
   it.each([
-    [1200, 'wide', 'side-by-side'],
-    [800, 'medium', 'rail-below'],
-    [360, 'narrow', 'rail-above'],
-  ])('at %ipx the pane is %s and lays the rail out %s', async (width, tier, layout) => {
+    [1200, 'wide', 'grid-cols-4'],
+    [800, 'medium', 'grid-cols-4'],
+    [500, 'narrow', 'grid-cols-3'],
+    [360, 'narrow', 'grid-cols-3'],
+    [320, 'narrow', 'grid-cols-1'],
+  ])('at %ipx the pane is %s and the strip has %s', async (width, tier, columns) => {
     await mount(width);
     expect(screen.getByTestId('running-pane').dataset.tier).toBe(tier);
-    expect(screen.getByTestId('monitor-columns').dataset.layout).toBe(layout);
+    expect(screen.getByTestId('monitor-kpi-strip').className).toContain(columns);
   });
 
-  it('wide and medium: the graph comes first, the machine card after it', async () => {
+  it('every tier: the strip holds the machine card and sits above the full-width graph', async () => {
     await mount(800);
-    expect(before(screen.getByTestId('monitor-graph-card'), screen.getByTestId('machine-card'))).toBe(true);
+    const strip = screen.getByTestId('monitor-kpi-strip');
+    expect(strip.contains(screen.getByTestId('machine-card'))).toBe(true);
+    expect(before(strip, screen.getByTestId('monitor-graph-card'))).toBe(true);
+    expect(screen.queryByTestId('monitor-columns')).toBeNull();
   });
 
-  it('narrow: the machine card is above the graph, the KPI strip on top of both and its cards smaller', async () => {
-    await mount(360);
-    expect(before(screen.getByTestId('machine-card'), screen.getByTestId('monitor-graph-card'))).toBe(true);
-    expect(before(screen.getByTestId('monitor-kpi-strip'), screen.getByTestId('machine-card'))).toBe(true);
+  it('narrow: the strip, then the graph (never above it), and the machine card spans a row of its own', async () => {
+    await mount(500);
+    expect(before(screen.getByTestId('monitor-kpi-strip'), screen.getByTestId('monitor-graph-card'))).toBe(true);
     expect(screen.getByTestId('kpi-agents').className).toContain('p-2');
-  });
-
-  it('the KPI strip keeps three cards in every tier', async () => {
-    await mount(360);
-    expect(screen.getByTestId('monitor-kpi-strip').className).toContain('grid-cols-3');
+    expect(screen.getByTestId('machine-card').parentElement?.className).toContain('col-span-3');
   });
 });
 
@@ -78,11 +78,11 @@ describe('the single-session view by pane width', () => {
     await waitFor(() => expect(screen.getByTestId('selection-detail')).toBeTruthy());
   };
 
-  it('narrow: the detail of the tapped box appears ABOVE the graph, so it is seen without scrolling past it', async () => {
+  it('narrow: the detail of the tapped box appears UNDER the graph', async () => {
     await mount(360);
     await focusAgent();
-    expect(before(screen.getByTestId('selection-detail'), screen.getByTestId('monitor-graph-card'))).toBe(true);
-    expect(screen.getByTestId('monitor-columns').dataset.layout).toBe('rail-above');
+    expect(before(screen.getByTestId('monitor-graph-card'), screen.getByTestId('selection-detail'))).toBe(true);
+    expect(screen.getByTestId('monitor-columns').dataset.layout).toBe('rail-below');
   });
 
   it('medium: the graph, then the detail under it (the machine card is gone: one session shows its own numbers)', async () => {

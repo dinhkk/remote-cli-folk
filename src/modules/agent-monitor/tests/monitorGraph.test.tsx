@@ -99,7 +99,7 @@ describe('the graph\'s boxes and connectors', () => {
     expect(document.querySelectorAll('.react-flow__edge').length).toBeGreaterThan(0);
   });
 
-  it('offers zoom in, zoom out, fit and reset controls, keeps the attribution, and has no minimap', async () => {
+  it('still renders the zoom, fit and reset controls (the stylesheet hides them), keeps the attribution, and has no minimap', async () => {
     await draw([SESSION]);
     const controls = document.querySelector('.react-flow__controls')!;
     expect(controls.getAttribute('aria-label')).toBe('Graph view controls');

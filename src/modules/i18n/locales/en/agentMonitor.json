@@ -41,6 +41,7 @@
     "runningAgents": "Agents working",
     "tokensPerMinute": "Agent tokens / min",
     "tokensToday": "Agent tokens today",
+    "active": "Active",
     "sparkline": "{{label}}, last 60 seconds"
   },
   "graph": {

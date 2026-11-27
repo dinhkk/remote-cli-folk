@@ -23,8 +23,8 @@ export async function resolveBlocksAgentName(
   if (agentProfile?.agentName) return agentProfile.agentName;
   if (!cwd) return undefined;
   try {
-    const { directoryHasProjectBlocks } = await import('@/modules/agent-profiles/index.js');
-    return directoryHasProjectBlocks(cwd) ? PLAIN_CHAT_BLOCKS_WRITER : undefined;
+    const { directoryHasProjectContent } = await import('@/modules/agent-profiles/index.js');
+    return directoryHasProjectContent(cwd) ? PLAIN_CHAT_BLOCKS_WRITER : undefined;
   } catch (error) {
     console.warn('[Claude SDK] Unable to read memory blocks; running without the blocks server:', error);
     return undefined;

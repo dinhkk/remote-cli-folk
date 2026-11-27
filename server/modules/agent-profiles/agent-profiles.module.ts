@@ -49,12 +49,21 @@ export function createBlocksMcpServerForRun(context: BlocksRunContext) {
 }
 
 /**
- * Whether the folder a run works in has at least one project-scoped memory block (global blocks alone do not count).
+ * Whether the folder a run works in has at least one project memory block with a content file (an empty one counts;
+ * global blocks alone do not).
  * Decides if a chat without a main agent still gets the `blocks` server.
  * Consumed by: the providers module's Claude runtime (via claude-blocks-mcp.ts).
  */
-export function directoryHasProjectBlocks(directory: string | null | undefined): boolean {
-  return blocksService.hasProjectBlocks(directory);
+export function directoryHasProjectContent(directory: string | null | undefined): boolean {
+  return blocksService.hasProjectContent(directory);
+}
+
+/**
+ * Moves memory blocks saved by an older version to per-folder content (idempotent, never throws). The service also runs it
+ * once on first use, so nothing needs to call this at start-up.
+ */
+export function migrateLegacyBlocks(): void {
+  blocksService.migrateLegacyBlocks();
 }
 
 /**

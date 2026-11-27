@@ -13,7 +13,7 @@ import { Button } from '@/shared/ui';
 import type { ClaudeAgentEntry, GenerateTargetProject, MemoryBlock } from '@/shared/types';
 
 type MemoryTabProps = {
-  /** The sidebar projects a block can be scoped to. */
+  /** The sidebar projects a folder can be added from to a project block. */
   projects: GenerateTargetProject[];
   /** The agent list the Agents tab loaded (for its current target); the source of the "read-only is not a hard lock" notice. */
   agents: ClaudeAgentEntry[];
@@ -25,8 +25,9 @@ type MemoryTabProps = {
 
 /**
  * The Memory tab of Settings → Agent Profiles: the app-owned memory blocks (name, mode, scope, size, last writer, update
- * time) with create / edit / delete (with confirmation) and the form. Says in plain words what a block is: visible to agents
- * by global or project scope only, never per agent, and only inside this app's chats. Blocks load when the tab opens.
+ * time) with create / edit / delete (with confirmation) and the form; a project block expands to its folders. Says in plain
+ * words what a block is: global or project scope only, never per agent, and only inside this app's chats. Blocks load when
+ * the tab opens.
  * Rendered by the agent-profiles panel (Host only, like Templates: the server denies the routes to Remote).
  */
 export function MemoryTab({ projects, agents, agentsReady, agentsTarget }: MemoryTabProps) {
@@ -62,7 +63,6 @@ export function MemoryTab({ projects, agents, agentsReady, agentsTarget }: Memor
       <MemoryBlockForm
         key={editing.block?.id ?? 'new'}
         block={editing.block}
-        projects={projects}
         onSaved={finish}
         onCancel={close}
       />
@@ -94,6 +94,7 @@ export function MemoryTab({ projects, agents, agentsReady, agentsTarget }: Memor
             <MemoryBlockRow
               key={block.id}
               block={block}
+              projects={projects}
               risky={risky}
               agentsTarget={agentsTarget}
               busy={busy}

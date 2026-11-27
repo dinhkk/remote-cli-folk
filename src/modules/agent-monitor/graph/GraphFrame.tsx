@@ -5,6 +5,11 @@ import type { HTMLAttributes, ReactNode } from 'react';
  * It follows the window's height (a bit over half), never under 320 px and never over 600 px.
  */
 export const OVERVIEW_GRAPH_HEIGHT = 'clamp(320px, 55vh, 600px)';
+/**
+ * The overview graph's height can be overridden by a parent through this CSS variable (a narrow pane shortens it so the whole
+ * overview fits the screen); without it the height above applies.
+ */
+export const OVERVIEW_GRAPH_HEIGHT_VAR = '--monitor-graph-height';
 /** The least height the single-session graph keeps when the pane is short (a phone in landscape). */
 const FILL_MIN_HEIGHT = 320;
 
@@ -24,7 +29,7 @@ export function GraphFrame({ fill, children, className = '', ...rest }: GraphFra
     <div
       {...rest}
       className={`relative w-full min-w-0 overflow-hidden rounded-md border border-border ${fill ? 'flex-1' : ''} ${className}`}
-      style={fill ? { minHeight: FILL_MIN_HEIGHT } : { height: OVERVIEW_GRAPH_HEIGHT }}
+      style={fill ? { minHeight: FILL_MIN_HEIGHT } : { height: `var(${OVERVIEW_GRAPH_HEIGHT_VAR}, ${OVERVIEW_GRAPH_HEIGHT})` }}
     >
       <div className="absolute inset-0">{children}</div>
     </div>

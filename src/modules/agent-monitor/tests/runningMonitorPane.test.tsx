@@ -88,11 +88,11 @@ describe('the overview pane', () => {
     expect(screen.getByTestId('running-pane-summary').textContent).toBe('1 running · 2 agents');
   });
 
-  it('is a tidy column: summary, KPI strip, graph card, machine card; and no explanatory notes, legend or how-to text', async () => {
+  it('is a tidy column: summary, KPI strip (machine card included), graph card; and no explanatory notes, legend or how-to text', async () => {
     stubReducedMotion(true);
     await mount(makeSnapshot({ ...WORKING, sessions: [...WORKING.sessions, makeSession({ id: 't1', source: 'terminal', detail: 'transcript', openSessionId: null })] }));
 
-    const order = ['running-pane-summary', 'monitor-kpi-strip', 'monitor-graph-card', 'machine-card'].map((id) => screen.getByTestId(id));
+    const order = ['running-pane-summary', 'monitor-kpi-strip', 'monitor-graph-card'].map((id) => screen.getByTestId(id));
     order.slice(1).forEach((element, index) => expect(order[index].compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
     for (const gone of [/Click a box/i, /Colours/i, /may lag/i, /never per agent/i, /No cost is shown/i, /billed totals/i, /prices behind/i, /logical cores/i]) {
       expect(screen.queryByText(gone), String(gone)).toBeNull();

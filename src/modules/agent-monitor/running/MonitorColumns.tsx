@@ -14,8 +14,8 @@ type MonitorColumnsProps = {
 
 /**
  * Where the graph and the rail go, by the width of the PANE (not the window: the sidebar takes a variable share of it):
- * wide = side by side, the rail scrolling by itself; medium = the graph, then the rail under it; narrow = one column with
- * the rail ABOVE the graph, so what a tap on a box selects shows without scrolling past the graph.
+ * wide = side by side, the rail scrolling by itself; medium = the graph, then the rail under it; narrow = the same one
+ * column as medium: the graph first, the rail (the detail of what is selected) under it.
  * Only classes and DOM order change with the tier; there is no scrolling logic here.
  */
 export function MonitorColumns({ tier, fill, main, rail }: MonitorColumnsProps) {
@@ -31,14 +31,12 @@ export function MonitorColumns({ tier, fill, main, rail }: MonitorColumnsProps) 
       </div>
     );
   }
-  const railFirst = tier === 'narrow';
   return (
     // No `min-h-0` here: the graph has a least height of its own, and a column that could shrink below it would let the rail
     // draw over the graph. The pane scrolls when the two do not fit.
-    <div className={`flex flex-col gap-3 ${fill ? 'flex-1' : ''}`} data-testid="monitor-columns" data-layout={railFirst ? 'rail-above' : 'rail-below'}>
-      {railFirst && <div className="min-w-0 shrink-0">{rail}</div>}
+    <div className={`flex flex-col gap-3 ${fill ? 'flex-1' : ''}`} data-testid="monitor-columns" data-layout="rail-below">
       <div className={`flex min-w-0 flex-col ${fill ? 'flex-1' : ''}`}>{main}</div>
-      {!railFirst && <div className="min-w-0 shrink-0">{rail}</div>}
+      <div className="min-w-0 shrink-0">{rail}</div>
     </div>
   );
 }

@@ -51,7 +51,9 @@ describe('Agent Profiles translations', () => {
       ...['invalid', 'reserved', 'duplicate'].map((problem) => `params.keyProblem.${problem}`),
       ...['new', 'duplicate', 'missing-values', 'invalid-name', 'handmade-exists', 'write-failed'].map((status) => `generate.status.${status}`),
       ...['project', 'user', 'local'].map((scope) => `template.memoryScope.${scope}`),
-      ...['PROFILE_STALE', 'SLUG_TAKEN', 'DIRECTORY_NOT_FOUND', 'DIRECTORY_NOT_A_DIRECTORY', 'PROFILE_CORRUPT', 'BLOCK_NAME_TAKEN', 'BLOCK_LIMIT_REACHED'].map((code) => `errors.${code}`),
+      ...['PROFILE_STALE', 'SLUG_TAKEN', 'DIRECTORY_NOT_FOUND', 'DIRECTORY_NOT_A_DIRECTORY', 'PROFILE_CORRUPT', 'BLOCK_NAME_TAKEN', 'BLOCK_LIMIT_REACHED', 'BLOCK_CONTENT_LIMIT_REACHED', 'BLOCK_CONTENT_EXISTS'].map((code) => `errors.${code}`),
+      ...['global', 'project'].map((kind) => `memory.form.scopeHint.${kind}`),
+      ...['one', 'other'].map((plural) => `memory.folders.corrupt_${plural}`),
     ];
     expect(dynamic.filter((key) => !resolves(key))).toEqual([]);
   });

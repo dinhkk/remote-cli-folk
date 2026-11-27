@@ -2623,18 +2623,24 @@ export type AgentProfileKind = 'templates' | 'memory-blocks';
 /** `read-only`: agents cannot write the block (only the user can); `writable`: agents may replace or append to it. */
 export type MemoryBlockMode = 'read-only' | 'writable';
 
-/** Where a block is visible to agents: every agent run (`global`) or only runs in that project folder (`project`). */
-export type MemoryBlockScope = { kind: 'global' } | { kind: 'project'; directory: string };
+/**
+ * Where a block applies: every agent run (`global`, content in the block record) or per project folder (`project`: one
+ * definition, each folder has its own content file and an agent sees the block only in a folder that has one).
+ */
+export type MemoryBlockScope = { kind: 'global' } | { kind: 'project' };
 
 /** Who wrote the content last: the user (UI/API), an agent (`agent:<main agent name>`), or nobody yet. */
 export type MemoryBlockWriter = 'user' | `agent:${string}` | null;
 
 /**
- * A named piece of persistent text shared by agents. `name` is a slug, unique inside its scope. Content an agent
- * wrote is untrusted data: it is only ever returned inside tool results (escaped), never put in a system prompt.
- * `maxChars` (default 2000, hard cap 20000) bounds `content`.
+ * Stored definition of a block (`memory-blocks/<id>.json`). `name` is a slug, unique across all scopes. A project block holds
+ * no content here (`content` is '' and `rev` is the definition's own revision); its text lives per folder, see
+ * {@link MemoryBlockProjectContent}. A global block keeps its `content` here. Content an agent wrote is untrusted data: it
+ * is only ever returned inside tool results (escaped), never put in a system prompt. `maxChars` (default 2000, hard cap
+ * 20000) bounds the content. `needsAttention` is set on listing for a block saved by an older version that could not be
+ * moved to per-folder content (the reason, for the user); it is never stored.
  */
-export type MemoryBlock = AgentProfileMeta & {
+export type MemoryBlockDefinition = AgentProfileMeta & {
   name: string;
   description: string;
   mode: MemoryBlockMode;
@@ -2642,10 +2648,26 @@ export type MemoryBlock = AgentProfileMeta & {
   content: string;
   maxChars: number;
   lastWriter: MemoryBlockWriter;
+  needsAttention?: string;
 };
 
-/** Editable part of a block: what a create request carries (a PUT adds `expectedRev`). */
-export type MemoryBlockInput = Omit<MemoryBlock, keyof AgentProfileMeta | 'lastWriter'>;
+/** Content of a project block in one folder (`memory-block-contents/<blockId>/<hash>.json`); `rev` counts this file's writes. */
+export type MemoryBlockProjectContent = {
+  directory: string;
+  content: string;
+  rev: number;
+  lastWriter: MemoryBlockWriter;
+  updatedAt: string;
+};
+
+/**
+ * What an agent run sees: the definition with `content`, `rev`, `lastWriter` and `updatedAt` taken from the folder's content
+ * file for a project block (for a global block they are the record's own). `definitionRev` is the definition's revision.
+ */
+export type MemoryBlock = MemoryBlockDefinition & { definitionRev: number };
+
+/** Editable part of a block: what a create request carries (a PUT adds `expectedRev`). Project blocks ignore `content`. */
+export type MemoryBlockInput = Omit<MemoryBlockDefinition, keyof AgentProfileMeta | 'lastWriter' | 'needsAttention'>;
 
 /**
  * A stored file that could not be read as a profile (invalid JSON or wrong shape).

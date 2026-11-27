@@ -34,7 +34,7 @@ const stubLayout = (rowWidth: number) => {
   });
 };
 
-const renderTabs = (rowWidth: number, searchMode: SidebarSearchMode) => {
+const renderTabs = (rowWidth: number, searchMode: SidebarSearchMode, conversationsCount?: number, projectsCount?: number) => {
   stubLayout(rowWidth);
   const changes: SidebarSearchMode[] = [];
   render(
@@ -42,6 +42,8 @@ const renderTabs = (rowWidth: number, searchMode: SidebarSearchMode) => {
       searchMode={searchMode}
       onSearchModeChange={(mode) => changes.push(mode)}
       runningSessionsCount={0}
+      conversationsCount={conversationsCount}
+      projectsCount={projectsCount}
       t={t}
     />,
   );
@@ -81,4 +83,37 @@ test('the section on screen keeps its place in the row', () => {
   assert.equal(archive.getAttribute('aria-pressed'), 'true');
   assert.equal(screen.queryByRole('button', { name: 'Conversations' }), null);
   assert.ok(screen.getByRole('button', { name: 'More' }));
+});
+
+test('the conversation count sits on the Conversations tab and nowhere else', () => {
+  renderTabs(400, 'conversations', 42);
+
+  const conversations = screen.getByRole('button', { name: /Conversations/ });
+  assert.equal(conversations.textContent, 'Conversations42');
+  assert.equal(screen.getByRole('button', { name: 'Projects' }).textContent, 'Projects');
+});
+
+test('without a count the Conversations tab shows its label alone', () => {
+  renderTabs(400, 'projects');
+
+  assert.equal(screen.getByRole('button', { name: 'Conversations' }).textContent, 'Conversations');
+});
+
+test('a zero count is still shown while the Conversations tab is open', () => {
+  renderTabs(400, 'conversations', 0);
+
+  assert.equal(screen.getByRole('button', { name: /Conversations/ }).textContent, 'Conversations0');
+});
+
+test('the project count sits on the Projects tab, independent of the open section', () => {
+  renderTabs(400, 'conversations', 7, 12);
+
+  assert.equal(screen.getByRole('button', { name: /Projects/ }).textContent, 'Projects12');
+  assert.equal(screen.getByRole('button', { name: /Conversations/ }).textContent, 'Conversations7');
+  assert.equal(screen.getByRole('button', { name: 'Archive only' }).textContent, '');
+});
+
+test('a project count of zero is shown and an absent one is not', () => {
+  renderTabs(400, 'projects', undefined, 0);
+  assert.equal(screen.getByRole('button', { name: /Projects/ }).textContent, 'Projects0');
 });

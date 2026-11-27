@@ -6,6 +6,8 @@ export type WidthTier = 'narrow' | 'medium' | 'wide';
 /** Below this the pane is one column; from `WIDE_FROM` the graph and the rail sit side by side. Tuned in the live check. */
 export const MEDIUM_FROM = 640;
 export const WIDE_FROM = 1000;
+/** Below this the pane is too narrow for three cards on a row: the cards of the overview then stack one per row. */
+export const STACK_BELOW = 340;
 /** A resize is acted on this long after the last one, so dragging the sidebar edge does not re-flow on every pixel. */
 export const WIDTH_DEBOUNCE_MS = 150;
 
@@ -14,6 +16,11 @@ export function widthTier(width: number): WidthTier {
   if (!(width > 0)) return 'wide';
   if (width < MEDIUM_FROM) return 'narrow';
   return width < WIDE_FROM ? 'medium' : 'wide';
+}
+
+/** True for a measured pane too narrow for a row of three cards (an unknown width, 0, is not). */
+export function isStackedWidth(width: number): boolean {
+  return width > 0 && width < STACK_BELOW;
 }
 
 /**

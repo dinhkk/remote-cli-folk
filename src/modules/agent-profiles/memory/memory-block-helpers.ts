@@ -1,13 +1,12 @@
 import { isSameFolder } from '@/shared/utils';
-import type { ClaudeAgentEntry, GenerateTargetProject, MemoryBlock, MemoryBlockScope } from '@/shared/types';
+import type { ClaudeAgentEntry, GenerateTargetProject, MemoryBlock } from '@/shared/types';
 
 /**
- * The sidebar project a block's scope points at (folders compared however they were typed); null for a global scope or a
- * folder that is not in the sidebar (any more). Used by the Memory form to preselect the scope.
+ * The sidebar project whose folder is `directory` (folders compared however they were typed); null when it is not in the
+ * sidebar (any more). Used by the folder list of a project block to show the project's name next to the folder.
  */
-export function projectOfScope(projects: readonly GenerateTargetProject[], scope: MemoryBlockScope): GenerateTargetProject | null {
-  if (scope.kind !== 'project') return null;
-  return projects.find((project) => isSameFolder(project.directory, scope.directory)) ?? null;
+export function projectOfDirectory(projects: readonly GenerateTargetProject[], directory: string): GenerateTargetProject | null {
+  return projects.find((project) => isSameFolder(project.directory, directory)) ?? null;
 }
 
 /**

@@ -61,7 +61,6 @@ const renderList = (
 ) => render(
   <SidebarRecentConversations
     conversations={conversations}
-    total={conversations.length}
     hasMore={false}
     isLoading={false}
     isLoadingMore={false}
