@@ -19,7 +19,7 @@ type MonitorOverviewProps = {
 };
 
 /** The overview graph on a narrow pane: short enough that the strip above it and the graph fit one screen without scrolling. */
-const NARROW_GRAPH_HEIGHT = 'clamp(200px, 36vh, 340px)';
+const NARROW_GRAPH_HEIGHT = 'clamp(272px, calc(36vh + 72px), 412px)';
 
 /**
  * The overview of everything running: one strip of cards (the three counts and the server's numbers), then the graph of ALL
