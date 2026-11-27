@@ -755,9 +755,8 @@ export async function runDetachedChatTurn(
   return dispatchRun(
     null,
     input.userId,
-    // A detached turn (scheduled or queued message) runs with nobody watching the chat: it is never `local`, whatever origin
-    // its row stored, so it can never be given the tools that stage changes for the Host user to confirm.
-    'remote',
+    // The origin the caller stored when the message was queued or scheduled (absent or unknown reads as remote).
+    readRunOrigin(input.origin),
     input.sessionId,
     session,
     { sessionId: input.sessionId, content: input.content, options: input.options ?? {} },

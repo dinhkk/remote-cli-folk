@@ -588,32 +588,30 @@ test('options saved with a schedule or a queued message cannot claim local', asy
   });
 });
 
-test('a queued message keeps the origin it was queued with (a merge is local only if every part was), and its run is remote', async () => {
+test('a queued message keeps the origin it was queued with, and a merged one is local only if every part was', async () => {
   await withIsolatedDatabase(async (userId) => {
     const message = (content: string) => ({ content, attachments: [] });
-    const stored = () => sessionDraftsDb.listQueuedMessages()[0]?.origin;
-    const dispatched = async (): Promise<unknown> => {
-      const runs: RunCall[] = [];
-      await dispatchQueuedMessages(createRuntime(runs));
-      return runs[0].options.origin;
-    };
     sessionDraftsDb.saveDraft(userId, SESSION_ID, { text: '', queuedMessage: message('saved locally') }, 'local');
-    assert.equal(stored(), 'local');
-    assert.equal(await dispatched(), 'remote', 'an unattended run never gets the local origin');
+    let runs: RunCall[] = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'local');
 
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('first'), 'local');
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('second'), 'local');
-    assert.equal(stored(), 'local');
-    await dispatched();
+    runs = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'local');
 
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('local part'), 'local');
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('bridged part'), 'remote');
-    assert.equal(stored(), 'remote');
-    await dispatched();
+    runs = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'remote');
 
     sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, message('no origin given'));
-    assert.equal(stored() ?? 'remote', 'remote');
-    assert.equal(await dispatched(), 'remote');
+    runs = [];
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs[0].options.origin, 'remote');
   });
 });
 

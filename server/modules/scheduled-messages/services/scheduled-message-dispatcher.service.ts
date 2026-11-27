@@ -3,7 +3,7 @@ import type { QueuedSessionMessageRecord, ScheduledMessageRow } from '@/modules/
 import { announceScheduledMessagesChanged } from '@/modules/scheduled-messages/services/scheduled-messages.service.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-import { readQueuedChatMessage, readRunOrigin } from '@/shared/utils.js';
+import { readQueuedChatMessage } from '@/shared/utils.js';
 
 /**
  * How often due messages are looked for.
@@ -108,8 +108,9 @@ async function sendClaimedMessage(
         userId: row.user_id,
         content: row.content,
         options: readOptions(row.options),
-        // The origin stored at creation (null in older rows runs as remote), not anything in the options.
-        origin: readRunOrigin(row.origin),
+        // A scheduled message fires with nobody watching the chat: it is always remote, whatever origin its row stored, so it
+        // can never be given the tools that stage changes for the Host user to confirm. (The stored origin stays as a record.)
+        origin: 'remote',
         // The user picked this time on purpose; a run that happens to be going
         // is aborted so the scheduled message lands when it was due, instead
         // of being recorded as "not sent — session was busy".

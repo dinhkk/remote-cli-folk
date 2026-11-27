@@ -35,8 +35,8 @@ reading, editing or importing on a host that was set up before. Hosts are indepe
 
 ## Good to know
 
-- The `profiles` tools exist only in a chat started on the Host itself. A Controller (phone) tab, a scheduled or queued
-  message, and an agent that is not switched on as a profile manager have no such tools.
+- The `profiles` tools exist only in a chat started on the Host itself. A Controller (phone) tab, a scheduled
+  message, and an agent that is not switched on as a profile manager have no such tools. A message you type in the Host browser while the agent is busy is queued and keeps the tools.
 - Proposals wait 24 hours, at most 10 at a time, at most 5 items each.
 - The manager refuses what the app refuses: templates without a `tools` list, `mcpServers`, folder text for project
   blocks (you add folders in the Memory tab), read-only blocks, its own template.

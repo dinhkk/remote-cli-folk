@@ -299,7 +299,7 @@ All four are pre-approved (`allowedTools`) because none of them changes the stor
 
 **Attach rule.** `resolveProfilesAgentName` (`claude-profiles-mcp.ts`), next to `blocks` in `claude-runtime.provider.ts`. The server and the
 four tool names are added on every run (resumed ones too) only when ALL hold: the provider is Claude; `readRunOrigin(options.origin) === 'local'`
-(absent or unknown reads as remote: never for a Controller, scheduled, queued or `/api/agent` run); the session's main agent is in
+(absent or unknown reads as remote: never for a Controller, a scheduled message or an `/api/agent` run; a message queued while the agent was busy keeps the origin of the connection that queued it); the session's main agent is in
 `profileManagerAgents`; that name resolves to the **user-level** generated file `~/.claude/agents/<name>.md` (marker naming the same slug;
 a project file of the same name shadows it in Claude Code and disqualifies it, readable or not); the settings read cleanly. Any error or
 malformed value means no tools, never an exception in the run path. The allowlist is set with `PUT /claude-agents/managers {names, rev}`
