@@ -131,6 +131,7 @@
     "attachImages": "צירוף תמונות",
     "send": "שליחה",
     "stop": "עצירה",
+    "stopUnavailable": "לא ניתן לעצור את ההפעלה הזו כאן",
     "hintText": {
       "ctrlEnter": "Ctrl+Enter לשליחה • Shift+Enter לשורה חדשה • Tab להחלפת מצב • / לפקודות סלאש",
       "enter": "Enter לשליחה • Shift+Enter לשורה חדשה • Tab להחלפת מצב • / לפקודות סלאש",

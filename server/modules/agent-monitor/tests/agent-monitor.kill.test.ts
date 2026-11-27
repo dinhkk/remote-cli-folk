@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { KillOutcome } from '@/modules/process-control/index.js';
+
 import { createAgentActivityAggregator } from '../agent-monitor.aggregator.js';
 import { createAgentMonitorKiller, STOP_TASK_TIMEOUT_MS, type KillSessionInfo } from '../agent-monitor.kill.js';
-import type { KillOutcome } from '../agent-monitor.process-kill.js';
 
 const SID = 'app-1';
 const LIVE_ROOT = { providerSessionId: 'prov-1', pid: 100, startedAt: 5_000 };

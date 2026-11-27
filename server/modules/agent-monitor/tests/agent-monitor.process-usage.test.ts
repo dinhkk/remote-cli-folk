@@ -11,7 +11,7 @@ import {
   toSample,
   treePids,
   type RawProcess,
-} from '../agent-monitor.process-usage.js';
+} from '@/modules/process-control/index.js';
 
 const proc = (pid: number, ppid: number, cpuSeconds: number, rssMb: number, name = `p${pid}`): RawProcess =>
   ({ pid, ppid, name, cpuSeconds, rssBytes: rssMb * 1024 * 1024 });

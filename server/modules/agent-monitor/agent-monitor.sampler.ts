@@ -1,6 +1,5 @@
 import type { AgentMonitorProcessGroup, AgentMonitorResourceRow, AgentMonitorSessionUsage } from '@/shared/types.js';
-
-import { describeChildGroups, measureTree, toSample, type ProcessReading, type ProcessSample, type RawProcess } from './agent-monitor.process-usage.js';
+import { describeChildGroups, measureTree, toSample, type ProcessReading, type ProcessSample, type RawProcess } from '@/modules/process-control/index.js';
 
 /** A process tree the monitor measures: this server, a session the app runs, or a Claude process it does not run. */
 export type SamplerTarget = {
