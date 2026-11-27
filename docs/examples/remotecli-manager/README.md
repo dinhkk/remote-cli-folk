@@ -3,8 +3,9 @@
 An example agent that helps you create, edit and delete **agent templates** and **memory blocks** from a chat. It never
 changes anything itself: it **proposes**, and you confirm in the app (Settings → Agent Profiles → Pending).
 
-Nothing here is installed by default. Set it up on each host that should have it (hosts are independent; repeat the steps
-per host).
+A new install already contains this template and copies the three skills to `~/.claude/skills/` once (a template you delete
+is not brought back). On such a host skip steps 1 and 2 below and start at step 3. The files here are the same content for
+reading, editing or importing on a host that was set up before. Hosts are independent; repeat the steps per host.
 
 ## Files
 

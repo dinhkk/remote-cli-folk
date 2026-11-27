@@ -12,6 +12,7 @@ import { createPendingService } from './agent-profiles.pending.service.js';
 import { createProfilesMcpServer, type ProfilesRunContext } from './agent-profiles.profiles.mcp.js';
 import { createAgentProfilesRouter } from './agent-profiles.routes.js';
 import { createSessionScopeResolver } from './agent-profiles.session-scope.js';
+import { seedProfileManagerOnce } from './agent-profiles.manager-seed.js';
 import { createAgentProfilesService } from './agent-profiles.service.js';
 import { createAgentProfileStore } from './agent-profiles.store.js';
 import { storedShapeProblem } from './agent-profiles.validation.js';
@@ -53,6 +54,9 @@ const pendingService = createPendingService({
   bundle: bundleService,
   getManagers: () => claudeAgents.managerNames(),
 });
+
+// Offered once per store (marker file): the `remotecli-manager` template and its three skills in `~/.claude/skills`. Never throws.
+seedProfileManagerOnce({ rootDir, skillsDirectory: path.join(claudeHomeDirectory, 'skills'), profiles: agentProfilesService });
 
 /** Agent profile router assembled with the file store and the Claude SDK adapter. */
 export const agentProfilesRoutes = createAgentProfilesRouter(agentProfilesService, claudeAgents, blocksService, bundleService, pendingService);

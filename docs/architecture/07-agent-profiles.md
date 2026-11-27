@@ -63,9 +63,13 @@ Root = `AGENT_PROFILES_DIR`, else `<os.homedir()>/.claude-code-ui/agent-profiles
 
 - **Folder key**: normalized path, `/` separators; lower-cased for Windows paths (drive letter or UNC),
   so `C:\Work\Alpha` and `c:/work/alpha/` share values.
-- **No bundled templates.** A new store starts empty: nothing is seeded on first use and no template ships in the
-  package. Templates are created in Settings → Agent Profiles (or through the REST API); anything specific to a
-  project or an organisation stays in the user's own store, never in the repository.
+- **One bundled template.** A new store starts with no template except the generic profile manager `remotecli-manager`,
+  offered **once** (`agent-profiles.manager-seed.ts`, marker file `seeded-manager.json` in the store root): the template is
+  created unless a template with that slug exists, and its three skills are copied to `~/.claude/skills/` unless a folder of
+  that name exists. A template the user deletes or edits is never brought back or overwritten. It does nothing until the user
+  Generates it globally and switches on *Profile manager*. It is sensitive (it lists the `profiles` tools) and, being seeded,
+  skips the import tick. Every other template is created in Settings → Agent Profiles (or through the REST API); anything
+  specific to a project or an organisation stays in the user's own store, never in the repository.
 - **The old folders (`agents/`, `memory/`, `projects/`) are not migrated.** They stay on disk untouched and are never
   read or written.
 
@@ -240,7 +244,7 @@ folder's file only and cannot reach another folder's content.
 ## Import / export
 
 Templates and memory blocks move between independent hosts as one text **bundle** (YAML by default, JSON accepted). The
-file format, field tables, examples and a paste-ready prompt for an AI are in [agent-bundle-format.md](../agent-bundle-format.md). An example agent that proposes templates and blocks from a chat (`remotecli-manager`, with skills and a setup README) is under [docs/examples/remotecli-manager](../examples/remotecli-manager/README.md); it is never seeded into the store.
+file format, field tables, examples and a paste-ready prompt for an AI are in [agent-bundle-format.md](../agent-bundle-format.md). An example agent that proposes templates and blocks from a chat (`remotecli-manager`, with skills and a setup README) is under [docs/examples/remotecli-manager](../examples/remotecli-manager/README.md); it is seeded once per store (see the "One bundled template" note under Data on disk), and the seed is kept equal to the example by a test.
 There is no sync: each host imports and recreates its own copy. Import, export, snapshots and restore are Host-only.
 
 - **Code.** `agent-profiles.bundle.service.ts` (export, plan, apply, restore), `.bundle.validation.ts` (per-item checks, request
