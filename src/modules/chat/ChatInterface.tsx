@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
 import { useTasksSettings } from '@/modules/task-master';
-import { SessionScopeBadge, useNewChatScope } from '@/modules/agent-profiles';
+import { useNewChatScope, useSessionAgentScope } from '@/modules/agent-profiles';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
@@ -200,6 +200,11 @@ function ChatInterface({
     projectId: selectedProject?.projectId ?? null,
     enabled: isNewChat && provider === 'claude',
   });
+  // An open session keeps the agent it started with; the composer shows it as a disabled picker.
+  const sessionAgentName = useSessionAgentScope(
+    isNewChat ? null : currentSessionId || selectedSession?.id || null,
+    provider === 'claude',
+  );
 
   const {
     input,
@@ -548,10 +553,6 @@ function ChatInterface({
             </div>
           )}
 
-          {!isNewChat && (
-            <SessionScopeBadge sessionId={currentSessionId || selectedSession?.id || null} enabled={provider === 'claude'} />
-          )}
-
           <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
@@ -578,6 +579,7 @@ function ChatInterface({
           onScheduleMessage={handleScheduleMessage}
           onCancelScheduledMessage={cancelScheduledMessage}
           agentScope={isNewChat ? newChatScope : null}
+          sessionAgentName={sessionAgentName}
           hasInput={Boolean(input.trim())}
           onClearInput={handleClearInput}
           onSubmit={handleSubmit}

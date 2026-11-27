@@ -8,8 +8,8 @@ type SessionDetailsAnswer = { data?: { agentScope?: SessionAgentScopeInfo | null
 /**
  * Looks up the main agent an open session was started with: the session details carry `agentScope`, null for a chat
  * without a scope. Returns the agent's name, or null while unknown, for a chat without a main agent, or when the lookup
- * failed: the badge is information, never a reason to break the chat.
- * Used by chat's ChatInterface through the SessionScopeBadge of this module.
+ * failed: the label is information, never a reason to break the chat.
+ * Used by chat's ChatInterface for the locked agent button of an open session's composer.
  */
 export function useSessionAgentScope(sessionId: string | null, enabled: boolean): string | null {
   // The name found for `forSession`; keeping the id lets a stale answer for the previous session be ignored on a switch.

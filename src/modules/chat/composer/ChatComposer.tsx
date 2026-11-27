@@ -38,7 +38,7 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
-import ComposerAgentMenu from '@/modules/chat/composer/ComposerAgentMenu';
+import ComposerAgentMenu, { ComposerAgentLocked } from '@/modules/chat/composer/ComposerAgentMenu';
 import type { NewChatScopeState } from '@/modules/agent-profiles';
 
 type MentionableFile = {
@@ -71,6 +71,8 @@ type ChatComposerProps = {
   onShowTokenUsage: () => void;
   /** Main-agent choice of a brand-new Claude chat; null/absent once the chat has a session (it is fixed then). */
   agentScope?: NewChatScopeState | null;
+  /** Main agent an open session was started with; shown as a disabled picker because it is fixed with the session. */
+  sessionAgentName?: string | null;
   hasInput: boolean;
   onClearInput: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
@@ -147,6 +149,7 @@ export default function ChatComposer({
   tokenBudget,
   onShowTokenUsage,
   agentScope = null,
+  sessionAgentName = null,
   hasInput,
   onClearInput,
   onSubmit,
@@ -505,7 +508,7 @@ export default function ChatComposer({
 
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
-            {agentScope && <ComposerAgentMenu state={agentScope} />}
+            {agentScope ? <ComposerAgentMenu state={agentScope} /> : sessionAgentName ? <ComposerAgentLocked agentName={sessionAgentName} /> : null}
 
             {hasInput && (
               <PromptInputButton

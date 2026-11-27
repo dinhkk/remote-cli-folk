@@ -479,7 +479,7 @@ A session with `agentName: null` only carries the hide list: it runs as a plain 
 project folder (`SESSION_PROJECT_MISSING` when that row is gone) and ignores client `systemPrompt` / `agents` /
 `agent` / `cwd`.
 
-**Open chat** (`SessionScopeBadge`): "Main agent: x" from session details (`agentScope.agentName`).
+**Open chat** (`ComposerAgentLocked`): the composer shows the same agent button, disabled, with the name from session details (`agentScope.agentName`); a chat without a main agent shows nothing.
 
 ## Environment
 
