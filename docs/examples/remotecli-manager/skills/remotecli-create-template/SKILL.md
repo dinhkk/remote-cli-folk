@@ -7,6 +7,8 @@ description: Draft a new agent template and propose it for the user to confirm. 
 
 You propose; the user confirms in the app. Never write anything yourself.
 
+First read the guides with the Skill tool: `remotecli-templates-guide` (fields and how Generate and the runtime use them) and `remotecli-proposal-flow` (what the tools and the user's confirmation do). Draft from what they say, not from guesses.
+
 ## 1. Interview (one question at a time)
 - What should the agent do, and when should another agent pick it? (becomes `description`)
 - `family`: `worker` (a sub-agent others call) or `orchestrator` (the main chat agent that delegates).

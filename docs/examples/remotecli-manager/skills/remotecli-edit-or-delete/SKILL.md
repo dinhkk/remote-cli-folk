@@ -7,6 +7,8 @@ description: Edit or delete an existing template or memory block by proposing th
 
 You propose; the user confirms in the app. Never write anything yourself.
 
+First read the guides with the Skill tool: `remotecli-templates-guide` and/or `remotecli-memory-guide` for the kind of item, and `remotecli-proposal-flow`. An edit has consequences beyond the store (generated files, folder text): know them before you propose.
+
 ## Edit
 1. `profiles_list` to find it, then `profiles_get` to read the **current** version. Edit from that, never from memory.
 2. Change only what the user asked for. Keep everything else as it is.

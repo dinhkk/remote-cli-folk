@@ -65,7 +65,7 @@ Root = `AGENT_PROFILES_DIR`, else `<os.homedir()>/.claude-code-ui/agent-profiles
   so `C:\Work\Alpha` and `c:/work/alpha/` share values.
 - **One bundled template.** A new store starts with no template except the generic profile manager `remotecli-manager`,
   offered **once** (`agent-profiles.manager-seed.ts`, marker file `seeded-manager.json` in the store root): the template is
-  created unless a template with that slug exists, and its three skills are copied to `~/.claude/skills/` unless a folder of
+  created unless a template with that slug exists, and its six skills (three guides to how the system works, three workflows) are copied to `~/.claude/skills/` unless a folder of
   that name exists. A template the user deletes or edits is never brought back or overwritten. It does nothing until the user
   Generates it globally and switches on *Profile manager*. It is sensitive (it lists the `profiles` tools) and, being seeded,
   skips the import tick. Every other template is created in Settings → Agent Profiles (or through the REST API); anything

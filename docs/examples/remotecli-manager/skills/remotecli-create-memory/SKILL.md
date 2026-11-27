@@ -7,6 +7,8 @@ description: Draft a new memory block and propose it for the user to confirm. Us
 
 You propose; the user confirms in the app. Never write anything yourself.
 
+First read the guides with the Skill tool: `remotecli-memory-guide` (scopes, folders, who sees what, the block tools) and `remotecli-proposal-flow`. Decide where the knowledge belongs before you draft: block, template instructions or CLAUDE.md.
+
 ## 1. Interview (one question at a time)
 - What is it for, and who reads it? (becomes `description`)
 - Scope: `global` (every chat) or `project` (a separate text per folder).

@@ -3,7 +3,7 @@
 An example agent that helps you create, edit and delete **agent templates** and **memory blocks** from a chat. It never
 changes anything itself: it **proposes**, and you confirm in the app (Settings → Agent Profiles → Pending).
 
-A new install already contains this template and copies the three skills to `~/.claude/skills/` once (a template you delete
+A new install already contains this template and copies the six skills to `~/.claude/skills/` once (a template you delete
 is not brought back). On such a host skip steps 1 and 2 below and start at step 3. The files here are the same content for
 reading, editing or importing on a host that was set up before. Hosts are independent; repeat the steps per host.
 
@@ -11,7 +11,10 @@ reading, editing or importing on a host that was set up before. Hosts are indepe
 
 | File | What |
 | --- | --- |
-| `remotecli-manager.bundle.json` | One template (`orchestrator`) with explicit tools, including the four `profiles` tools, and the three skills |
+| `remotecli-manager.bundle.json` | One template (`orchestrator`) with explicit tools, including the four `profiles` tools, and the six skills |
+| `skills/remotecli-templates-guide/SKILL.md` | How templates work: Generate, fields, tools, params, what an edit changes |
+| `skills/remotecli-memory-guide/SKILL.md` | How memory blocks work: scopes, per-folder text, block tools, limits |
+| `skills/remotecli-proposal-flow/SKILL.md` | How the profiles tools, guardrails and the Pending confirmation work |
 | `skills/remotecli-create-template/SKILL.md` | Interview, draft, preview, propose for a template |
 | `skills/remotecli-create-memory/SKILL.md` | Same for a memory block |
 | `skills/remotecli-edit-or-delete/SKILL.md` | Edit or delete something that exists |
@@ -21,7 +24,7 @@ reading, editing or importing on a host that was set up before. Hosts are indepe
 1. **Import the template.** Settings → Agent Profiles → *Import*, choose `remotecli-manager.bundle.json`. It is a
    *sensitive* template (it lists `mcp__*` tools and skills), so tick it in the preview before *Apply*. See
    [agent-bundle-format.md](../../agent-bundle-format.md).
-2. **Copy the skills** to the Host user's skills folder: copy the three folders under `skills/` to `~/.claude/skills/`.
+2. **Copy the skills** to the Host user's skills folder: copy the six folders under `skills/` to `~/.claude/skills/`.
 3. **Generate the agent globally.** Agents tab → *Generate agents* → target **Global** (`~/.claude/agents`) → tick
    *RemoteCLI manager*. It must be the **user-level** file: a project-level agent with the same name does not get the tools.
 4. **Switch it on.** In the Agents tab turn on *Profile manager* for `remotecli-manager`.

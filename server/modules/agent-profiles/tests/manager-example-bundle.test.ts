@@ -9,7 +9,10 @@ import { PROFILES_TOOL_NAMES } from '../agent-profiles.profiles.tool-names.js';
 import { makeServiceRig } from './service-rig.js';
 
 const EXAMPLE_DIR = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'docs', 'examples', 'remotecli-manager');
-const SKILLS = ['remotecli-create-template', 'remotecli-create-memory', 'remotecli-edit-or-delete'];
+const SKILLS = [
+  'remotecli-templates-guide', 'remotecli-memory-guide', 'remotecli-proposal-flow',
+  'remotecli-create-template', 'remotecli-create-memory', 'remotecli-edit-or-delete',
+];
 
 const rigs: ReturnType<typeof makeServiceRig>[] = [];
 afterEach(() => { while (rigs.length) rigs.pop()?.cleanup(); });
@@ -46,6 +49,8 @@ describe('remotecli-manager example', () => {
       const body = fs.readFileSync(path.join(EXAMPLE_DIR, 'skills', skill, 'SKILL.md'), 'utf8');
       assert.match(body, new RegExp(`^---\\nname: ${skill}\\n`));
       assert.ok(body.split('\n').length < 100, `${skill} is under 100 lines`);
+      // The three workflow skills walk the whole preview -> propose -> confirm path; the guides explain the mechanism.
+      if (skill.endsWith('-guide') || skill === 'remotecli-proposal-flow') continue;
       assert.match(body, /profiles_preview/);
       assert.match(body, /profiles_propose/);
       assert.match(body, /Settings -> Agent Profiles -> Pending/);
