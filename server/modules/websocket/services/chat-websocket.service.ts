@@ -15,6 +15,7 @@ import {
 } from '@/shared/image-attachments.js';
 import type {
   AnyRecord,
+  ChatTurnResult,
   AuthenticatedWebSocketRequest,
   LLMProvider,
   ProviderPermissionDecision,
@@ -249,7 +250,7 @@ async function dispatchRun(
   dependencies: ChatWebSocketDependencies,
   extraRuntimeOptions: AnyRecord = {},
   beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>,
-): Promise<{ started: boolean; error: string | null }> {
+): Promise<ChatTurnResult> {
   const provider = session.provider as LLMProvider;
 
   // Agent-profile touchpoint: the agent record of a scoped session (`{ agentName, hiddenClaudeAgents }`; null
@@ -263,7 +264,7 @@ async function dispatchRun(
     if (ws) {
       sendProtocolError(ws, 'AGENT_SNAPSHOT_INVALID', message, sessionId);
     }
-    return { started: false, error: message };
+    return { started: false, error: message, reason: 'agent-invalid' };
   }
 
   // A session with a main agent must run in its project directory. The row loses `project_path` if
@@ -275,7 +276,7 @@ async function dispatchRun(
     if (ws) {
       sendProtocolError(ws, 'SESSION_PROJECT_MISSING', message, sessionId);
     }
-    return { started: false, error: message };
+    return { started: false, error: message, reason: 'project-missing' };
   }
 
   const run = chatRunRegistry.startRun({
@@ -295,7 +296,7 @@ async function dispatchRun(
         sessionId
       );
     }
-    return { started: false, error: 'A run is already in progress for this session.' };
+    return { started: false, error: 'A run is already in progress for this session.', reason: 'session-busy' };
   }
 
   // Only a session with a main agent locks the agent keys and `cwd`; `agentName: null` is a plain
@@ -726,21 +727,21 @@ export async function runDetachedChatTurn(
     requireIdle?: boolean;
   },
   dependencies: ChatWebSocketDependencies,
-): Promise<{ started: boolean; error: string | null }> {
+): Promise<ChatTurnResult> {
   const session = sessionsDb.getSessionById(input.sessionId);
   if (!session) {
-    return { started: false, error: 'The session no longer exists.' };
+    return { started: false, error: 'The session no longer exists.', reason: 'session-missing' };
   }
 
   const provider = session.provider as LLMProvider;
   if (!dependencies.runtime.hasRuntime(provider)) {
-    return { started: false, error: `Provider "${provider}" is not available.` };
+    return { started: false, error: `Provider "${provider}" is not available.`, reason: 'provider-unavailable' };
   }
 
   const activeRun = chatRunRegistry.getRun(input.sessionId);
   if (activeRun && activeRun.status === 'running') {
     if (!input.interruptActiveRun) {
-      return { started: false, error: 'A run was already in progress for this session.' };
+      return { started: false, error: 'A run was already in progress for this session.', reason: 'session-busy' };
     }
     // Same shape as `chat.abort`: cancel the provider run and emit the
     // terminal `complete` on its behalf, so every watching client sees the
@@ -756,7 +757,7 @@ export async function runDetachedChatTurn(
 
   if (input.requireIdle && (dependencies.runtime.hasBackgroundWork(input.sessionId)
     || (await sessionsService.listRunningSessions()).some((entry) => entry.sessionId === input.sessionId))) {
-    return { started: false, error: 'The session is still busy; the queued turn will retry.' };
+    return { started: false, error: 'The session is still busy; the queued turn will retry.', reason: 'session-busy' };
   }
 
   return dispatchRun(

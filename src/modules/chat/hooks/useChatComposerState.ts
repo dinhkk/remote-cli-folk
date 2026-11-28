@@ -140,12 +140,16 @@ const uploadAttachmentFiles = async (files: File[]): Promise<unknown[]> => {
 };
 
 
+const QUEUED_RECOVERY_FAST_WINDOW_MS = 30_000;
+const QUEUED_RECOVERY_SLOW_INTERVAL_MS = 30_000;
+
 const restoreQueuedDraft = (sessionKey: string): QueuedDraft | null => {
   const saved = readQueuedMessage(sessionKey);
   return saved
     ? {
         content: saved.content,
         failure: saved.failure,
+        retry: saved.retry,
         attachments: [],
         uploadedAttachments: saved.attachments ?? saved.images,
         options: saved.options,
@@ -158,6 +162,7 @@ const restoreQueuedDraft = (sessionKey: string): QueuedDraft | null => {
 const showsQueuedMessage = (card: QueuedDraft, stored: QueuedDraft): boolean => (
   card.content === stored.content
   && card.failure === stored.failure
+  && card.retry?.stopped === stored.retry?.stopped
   && JSON.stringify(card.uploadedAttachments ?? []) === JSON.stringify(stored.uploadedAttachments ?? [])
 );
 
@@ -804,6 +809,7 @@ export function useChatComposerState({
           queuedCard = {
             content: queuedMessage.content,
             failure: queuedMessage.failure,
+            retry: queuedMessage.retry,
             attachments: durableDraft.attachments,
             uploadedAttachments: queuedMessage.attachments,
             options: queuedMessage.options,
@@ -1195,12 +1201,19 @@ export function useChatComposerState({
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
 
-  // The dispatcher owns sending. Reconcile the active session even after a
-  // claim removes its card: a failed startup can restore the message later.
+  // Never poll a session that has not held a queue. Keep a slow recovery watch
+  // after a claim because a late startup refusal can restore the card.
+  const queuedReconcileHistory = useRef(new Map<string, { seen: boolean; hadCard: boolean; claimedAt: number | null }>());
   useEffect(() => {
-    if (!sessionKey) {
-      return;
-    }
+    if (!sessionKey) return;
+    const hasCard = queuedDraftSessionRef.current === sessionKey && Boolean(queuedDraft);
+    if (!hasCard && !queuedReconcileHistory.current.has(sessionKey)) return;
+    const history = queuedReconcileHistory.current.get(sessionKey) ?? { seen: false, hadCard: false, claimedAt: null };
+    queuedReconcileHistory.current.set(sessionKey, history);
+    if (hasCard) history.seen = true;
+    if (history.hadCard && !hasCard) history.claimedAt = Date.now();
+    history.hadCard = hasCard;
+    if (!history.seen) return;
     let cancelled = false;
     const reconcile = async () => {
       await hydrateChatDrafts();
@@ -1221,29 +1234,39 @@ export function useChatComposerState({
         });
       }
     };
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void reconcile();
-      }
-    }, QUEUED_DRAFT_RECONCILE_INTERVAL_MS);
-    // A hidden tab's timers are throttled (to about once a minute after a few
-    // minutes), so its card can be far behind; catch up as soon as it is shown.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let reading = false;
+    const nextDelay = () => (hasCard && !queuedDraft?.retry?.stopped)
+      || (history.claimedAt !== null && Date.now() - history.claimedAt < QUEUED_RECOVERY_FAST_WINDOW_MS)
+      ? QUEUED_DRAFT_RECONCILE_INTERVAL_MS : QUEUED_RECOVERY_SLOW_INTERVAL_MS;
+    const schedule = () => {
+      if (!cancelled) timer = setTimeout(() => { void tick(); }, nextDelay());
+    };
+    const tick = async () => {
+      if (cancelled || reading) return;
+      reading = true;
+      try { if (document.visibilityState === 'visible') await reconcile(); }
+      finally { reading = false; schedule(); }
+    };
     const reconcileWhenShown = () => {
-      if (document.visibilityState === 'visible') {
-        void reconcile();
+      if (document.visibilityState === 'visible' && !reading) {
+        if (timer) clearTimeout(timer);
+        void tick();
       }
     };
+    schedule();
     document.addEventListener('visibilitychange', reconcileWhenShown);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
       document.removeEventListener('visibilitychange', reconcileWhenShown);
     };
-  }, [sessionKey]);
+  }, [sessionKey, queuedDraft]);
 
   // Editing or deleting the card takes the message off the server's queue at
   // once, before the dispatcher's next poll can send it.
   const editQueuedDraft = useCallback(() => {
+    if (sessionKeyRef.current) queuedReconcileHistory.current.delete(sessionKeyRef.current);
     if (!queuedDraft) {
       return;
     }
@@ -1258,6 +1281,7 @@ export function useChatComposerState({
   }, [queuedDraft]);
 
   const deleteQueuedDraft = useCallback(() => {
+    if (sessionKeyRef.current) queuedReconcileHistory.current.delete(sessionKeyRef.current);
     if (queuedDraftSessionRef.current) {
       clearQueuedMessage(queuedDraftSessionRef.current);
     }

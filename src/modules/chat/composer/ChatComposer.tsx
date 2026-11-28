@@ -334,6 +334,7 @@ export default function ChatComposer({
         <QueuedMessageCard
           content={queuedDraft.content}
           failure={queuedDraft.failure}
+          retryStopped={queuedDraft.retry?.stopped}
           attachmentCount={
             queuedDraft.uploadedAttachments?.length ?? queuedDraft.attachments.length
           }

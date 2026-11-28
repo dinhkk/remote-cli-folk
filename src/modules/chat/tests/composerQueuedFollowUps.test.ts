@@ -9,9 +9,11 @@ import type * as SharedConstants from '@/shared/constants';
 import { readDraftText, resetChatDrafts, writeDraftText } from '@/shared/chatDrafts';
 import type { BackgroundSendChoice, ChatMessage, PermissionMode, Project, ProjectSession, SessionActivityMap } from '@/shared/types';
 
+const pollTiming = vi.hoisted(() => ({ interval: 300 }));
+
 vi.mock('@/shared/constants', async (importOriginal) => ({
   ...(await importOriginal<typeof SharedConstants>()),
-  QUEUED_DRAFT_RECONCILE_INTERVAL_MS: 300,
+  get QUEUED_DRAFT_RECONCILE_INTERVAL_MS() { return pollTiming.interval; },
 }));
 
 /**
@@ -212,6 +214,7 @@ const startSubmit = (view: View) => {
 };
 
 beforeEach(() => {
+  pollTiming.interval = 300;
   server = new Map();
   refuseQueueing = false;
   uploadGate = null;
@@ -719,4 +722,71 @@ test('a startup failure restores the card even after a poll saw the claim remove
   assert.equal(view.result.current.queuedDraft?.content, 'retained after startup failure');
   server.get('session-1')!.queuedMessage!.failure = 'Still waiting to start.';
   await waitFor(() => assert.equal(view.result.current.queuedDraft?.failure, 'Still waiting to start.'));
+});
+
+
+test('an idle session makes no periodic drafts requests in sixty seconds', async () => {
+  pollTiming.interval = 10_000;
+  vi.useFakeTimers();
+  const { view } = render();
+  await act(async () => {});
+  const fetchMock = vi.mocked(fetch);
+  fetchMock.mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  const requests = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
+  console.log('QUEUE_POLL_IDLE_60_SECONDS', requests.length);
+  assert.equal(requests.length, 0);
+  view.unmount();
+});
+
+
+test('the fast claim-recovery window ends and a late failure is recovered by the slow watch', async () => {
+  const { view } = render();
+  await submit(view, 'late startup failure');
+  pollTiming.interval = 10_000;
+  vi.useFakeTimers();
+  // Recreate the current card effect on the fake clock.
+  view.rerender({ session: SESSION_2, isLoading: true, model: 'model-1' });
+  view.rerender({ session: SESSION_1, isLoading: true, model: 'model-1' });
+  dispatcherClaims('session-1');
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  assert.equal(view.result.current.queuedDraft, null);
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+  vi.mocked(fetch).mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  const requests = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
+  console.log('QUEUE_POLL_RECOVERY_SLOW_60_SECONDS', requests.length);
+  assert.equal(requests.length, 2);
+  server.set('session-1', { text: '', queuedMessage: { content: 'late startup failure', attachments: [], failure: 'Late refusal.' } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+  assert.equal((view.result.current.queuedDraft as { failure?: string } | null)?.failure, 'Late refusal.');
+  view.unmount();
+});
+
+test('deleting the queued card stops its recovery watch', async () => {
+  const { view } = render();
+  await submit(view, 'cancel queue');
+  await act(async () => { view.result.current.deleteQueuedDraft(); });
+  vi.useFakeTimers();
+  vi.mocked(fetch).mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  const requests = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
+  assert.equal(requests.length, 0);
+  view.unmount();
+});
+
+
+test('a queued busy card polls six times per minute at the production interval', async () => {
+  const { view } = render();
+  await submit(view, 'still queued');
+  pollTiming.interval = 10_000;
+  vi.useFakeTimers();
+  view.rerender({ session: SESSION_2, isLoading: true, model: 'model-1' });
+  view.rerender({ session: SESSION_1, isLoading: true, model: 'model-1' });
+  vi.mocked(fetch).mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  const requests = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
+  console.log('QUEUE_POLL_BUSY_60_SECONDS', requests.length);
+  assert.equal(requests.length, 6);
+  view.unmount();
 });

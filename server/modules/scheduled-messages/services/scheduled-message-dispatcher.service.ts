@@ -4,6 +4,7 @@ import { announceScheduledMessagesChanged } from '@/modules/scheduled-messages/s
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
+import type { ChatTurnStartReason } from '@/shared/types.js';
 import { readQueuedChatMessage } from '@/shared/utils.js';
 
 /**
@@ -14,6 +15,7 @@ import { readQueuedChatMessage } from '@/shared/utils.js';
  * would buy precision nobody asked for.
  */
 const POLL_INTERVAL_MS = 30_000;
+const MAX_STARTUP_ATTEMPTS = 3;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 const queuedInFlight = new Set<string>();
@@ -40,11 +42,21 @@ async function sendClaimedQueuedMessage(
     return;
   }
 
-  const restore = (reason: string) => {
-    const queuedMessage = { ...message, failure: reason };
+  const restore = (kind: 'waiting' | 'temporary' | 'permanent', reason: string) => {
+    const retained = { ...message };
+    delete retained.failure;
+    const prior = message.retry;
+    const attempts = (prior?.attempts ?? 0) + (kind === 'waiting' ? 0 : 1);
+    const stopped = kind === 'permanent' || attempts >= MAX_STARTUP_ATTEMPTS;
+    const retry = { attempts, stopped, lastFailure: kind === 'waiting' ? prior?.lastFailure : reason };
+    const queuedMessage = { ...retained, retry, ...(kind === 'waiting' ? {} : { failure: reason }) };
     sessionDraftsDb.restoreQueuedMessage({ ...candidate, queuedMessage, claimToken: JSON.stringify(queuedMessage) });
-    console.error('[ScheduledMessages] Queued turn was not started; retained for retry', { sessionId: candidate.sessionId, error: reason });
+    if (kind !== 'waiting' && (prior?.lastFailure !== reason || stopped)) {
+      console.error('[ScheduledMessages] Queued startup failed', { sessionId: candidate.sessionId, error: reason, attempts, stopped });
+    }
   };
+  const classify = (reason: ChatTurnStartReason): 'waiting' | 'permanent' =>
+    reason === 'session-busy' ? 'waiting' : 'permanent';
   try {
     const result = await runDetachedChatTurn(
       {
@@ -59,12 +71,12 @@ async function sendClaimedQueuedMessage(
     );
     // Every refusal is retained, independent of human-readable error wording.
     if (!result.started) {
-      restore(result.error ?? 'The queued turn could not start.');
+      restore(classify(result.reason), result.error);
       return;
     }
     sessionDraftsDb.deleteEmptyDraft(candidate.userId, candidate.sessionId);
   } catch (error) {
-    restore(error instanceof Error ? error.message : String(error));
+    restore('temporary', error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -89,6 +101,7 @@ export async function dispatchQueuedMessages(runtime: ProviderRuntimeGateway): P
   let claimed = 0;
 
   await Promise.all(candidates.map(async (candidate) => {
+    if (readQueuedChatMessage(candidate.queuedMessage)?.retry?.stopped) return;
     if (queuedInFlight.has(candidate.sessionId)) return;
     queuedInFlight.add(candidate.sessionId);
     try {

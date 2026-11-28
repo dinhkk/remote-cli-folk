@@ -771,6 +771,8 @@ export type CommandModalPayload = {
 
 /** A composer message queued while its session is still busy, holding the text, the in-memory and already-uploaded attachments and the send options snapshotted at queue time so it can be auto-sent unchanged once the session goes idle. */
 export type QueuedDraft = {
+  /** Persisted retry policy returned with the queued message. */
+  retry?: { attempts: number; stopped: boolean };
   /** Last startup failure retained by the server while this message waits for retry. */
   failure?: string;
   content: string;

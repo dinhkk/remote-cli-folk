@@ -7,6 +7,7 @@ import { cn } from '@/shared/utils';
 type QueuedMessageCardProps = {
   content: string;
   failure?: string;
+  retryStopped?: boolean;
   attachmentCount?: number;
   onEdit: () => void;
   onDelete: () => void;
@@ -20,6 +21,7 @@ type QueuedMessageCardProps = {
 export default function QueuedMessageCard({
   content,
   failure,
+  retryStopped,
   attachmentCount = 0,
   onEdit,
   onDelete,
@@ -36,7 +38,7 @@ export default function QueuedMessageCard({
           <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-primary/70">
             <span>{t('input.queue.label', { defaultValue: 'Queued' })}</span>
             <span className="normal-case text-muted-foreground/60">
-              · {t('input.queue.willSend', { defaultValue: 'Will send when this finishes' })}
+              · {retryStopped ? t('input.queue.retryPausedLabel', { defaultValue: 'Retry paused' }) : t('input.queue.willSend', { defaultValue: 'Will send when this finishes' })}
             </span>
           </div>
           {/* Follow-ups queued while one waits are joined into this message.
@@ -61,7 +63,9 @@ export default function QueuedMessageCard({
           >
             {content}
           </p>
-          {failure && <p role="status" className="mt-1 break-words text-xs text-destructive">{failure}</p>}
+          {failure && <p role="status" className="mt-1 break-words text-xs text-destructive">{failure}
+            {retryStopped && <span className="block">{t('input.queue.retryPaused', { defaultValue: 'Automatic retry paused. Edit and send this message to try again.' })}</span>}
+          </p>}
           {attachmentCount > 0 && (
             <p className="mt-0.5 text-xs text-muted-foreground">
               {attachmentCount} {attachmentCount === 1 ? 'file' : 'files'} attached

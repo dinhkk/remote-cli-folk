@@ -171,6 +171,7 @@ unrelated to the change that caused them.
 | A tool renders wrong, or a group collapses oddly | [6](./06-tool-view.md) |
 | An orchestrated chat delegates to the wrong agent, an edit to an agent file does not show up, a resumed chat lost its main agent, or an agent cannot see or update a memory block | [7](./07-agent-profiles.md) |
 | The agent monitor shows a wrong tree, state, token count or CPU/RAM, or its sampler runs with the screen closed, a terminal session is missing or wrong, the Running tab's tree, focus or graph pane misbehaves | [8](./08-agent-monitor.md) |
+| A queued turn keeps retrying or its card does not return after a refused start | [1](./01-websocket-transport.md#queued-turns-and-external-cli-activity), then `server/modules/scheduled-messages/README.md` |
 | Nothing arrives at all after a network blip | [1](./01-websocket-transport.md) — reconnect and `lastSeq` |
 
 ---

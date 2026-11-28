@@ -705,7 +705,7 @@ test('a lost run-reservation race retains the message regardless of the is/was e
     await dispatchQueuedMessages(createRuntime([]));
     const queued = sessionDraftsDb.getDrafts(userId)[0]?.queuedMessage as { content: string; failure?: string };
     assert.equal(queued?.content, 'keep after race');
-    assert.match(queued.failure ?? '', /already in progress/);
+    assert.equal(queued.failure, undefined, 'a busy session is waiting, not failed');
     assert.equal(sessionDraftsDb.listQueuedMessages()[0].origin, 'local');
   });
 });
@@ -831,5 +831,83 @@ test('the real CLI registry keeps a queued turn until its busy record becomes id
       assert.equal(await dispatchQueuedMessages(createRuntime(runs)), 0);
       assert.equal(runs.length, 1);
     } finally { await rm(home, { recursive: true, force: true }); }
+  });
+});
+
+
+test('a permanent startup refusal stops automatic attempts and duplicate writes/logs', async (t) => {
+  await withIsolatedDatabase(async (userId) => {
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content: 'keep paused', attachments: [] }, 'remote');
+    const claim = t.mock.method(sessionDraftsDb, 'claimQueuedMessage');
+    const restore = t.mock.method(sessionDraftsDb, 'restoreQueuedMessage');
+    const log = t.mock.method(console, 'error', () => {});
+    let calls = 0;
+    const runtime = { hasBackgroundWork: () => false, hasRuntime: () => { calls++; return false; } } as never;
+    for (let pass = 0; pass < 20; pass++) await dispatchQueuedMessages(runtime);
+    console.log('QUEUE_PERMANENT_20_SCANS', { attempts: calls, claims: claim.mock.callCount(), restores: restore.mock.callCount(), logs: log.mock.callCount() });
+    assert.equal(calls, 1);
+    assert.equal(claim.mock.callCount(), 1);
+    assert.equal(restore.mock.callCount(), 1);
+    assert.equal(log.mock.callCount(), 1);
+    const queued = sessionDraftsDb.getDrafts(userId)[0]?.queuedMessage as { content: string; failure?: string; retry?: { stopped: boolean } };
+    assert.equal(queued.content, 'keep paused');
+    assert.match(queued.failure ?? '', /not available/);
+    assert.equal(queued.retry?.stopped, true);
+    closeConnection();
+    await initializeDatabase();
+    await dispatchQueuedMessages(runtime);
+    assert.equal(calls, 1, 'pause survives reopening the database');
+    // Editing/re-sending a fresh card clears the stored retry metadata.
+    sessionDraftsDb.clearQueuedMessage(userId, SESSION_ID);
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content: 'edited retry', attachments: [] }, 'remote');
+    await dispatchQueuedMessages(runtime);
+    assert.equal(calls, 2);
+  });
+});
+
+test('temporary startup exceptions stop after three attempts and log only change/stop', async (t) => {
+  await withIsolatedDatabase(async (userId) => {
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content: 'temporary retry', attachments: [] }, 'remote');
+    const log = t.mock.method(console, 'error', () => {});
+    let calls = 0;
+    const runtime = { hasBackgroundWork: () => false, hasRuntime: () => { calls++; throw new Error('temporary startup'); } } as never;
+    for (let pass = 0; pass < 20; pass++) await dispatchQueuedMessages(runtime);
+    assert.equal(calls, 3);
+    assert.equal(log.mock.callCount(), 2);
+    assert.equal(sessionDraftsDb.listQueuedMessages().length, 1);
+  });
+});
+
+
+test('waiting for many scans does not consume attempts or delay the first idle scan', async (t) => {
+  await withIsolatedDatabase(async (userId) => {
+    let busy = true;
+    t.mock.method(sessionsService, 'listRunningSessions', async () => busy ? [{ sessionId: SESSION_ID }] : []);
+    const claim = t.mock.method(sessionDraftsDb, 'claimQueuedMessage');
+    const log = t.mock.method(console, 'error', () => {});
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content: 'wait without penalty', attachments: [] }, 'remote');
+    const runs: RunCall[] = [];
+    for (let pass = 0; pass < 20; pass++) await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(claim.mock.callCount(), 0);
+    assert.equal(log.mock.callCount(), 0);
+    busy = false;
+    await dispatchQueuedMessages(createRuntime(runs));
+    await dispatchQueuedMessages(createRuntime(runs));
+    assert.equal(runs.length, 1);
+    assert.equal(claim.mock.callCount(), 1);
+  });
+});
+
+test('retry logging records a changed reason and the final stop', async (t) => {
+  await withIsolatedDatabase(async (userId) => {
+    const log = t.mock.method(console, 'error', () => {});
+    let count = 0;
+    const runtime = { hasBackgroundWork: () => false, hasRuntime: () => {
+      throw new Error(++count === 1 ? 'first temporary failure' : 'changed temporary failure');
+    } } as never;
+    sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content: 'log changes', attachments: [] }, 'remote');
+    for (let pass = 0; pass < 10; pass++) await dispatchQueuedMessages(runtime);
+    assert.equal(count, 3);
+    assert.equal(log.mock.callCount(), 3);
   });
 });

@@ -124,7 +124,12 @@ export function readQueuedChatMessage(value: unknown): QueuedChatMessage | null 
   const options = record.options && typeof record.options === 'object' && !Array.isArray(record.options)
     ? record.options as Record<string, unknown>
     : undefined;
-  return { content, ...(options ? { options } : {}), attachments, ...(typeof record.failure === 'string' ? { failure: record.failure } : {}) };
+  const state = record.retry && typeof record.retry === 'object' ? record.retry as Record<string, unknown> : null;
+  const retry = state && Number.isInteger(state.attempts) && Number(state.attempts) >= 0
+    ? { attempts: Math.min(Number(state.attempts), 3), stopped: state.stopped === true,
+      ...(typeof state.lastFailure === 'string' ? { lastFailure: state.lastFailure } : {}) } : undefined;
+  return { content, ...(options ? { options } : {}), attachments,
+    ...(typeof record.failure === 'string' ? { failure: record.failure } : {}), ...(retry ? { retry } : {}) };
 }
 
 // ---------------------------

@@ -670,18 +670,32 @@ running-session definition as the chat UI. It rechecks that definition immediate
 before reserving a detached queued turn. This also covers a CLI still reporting busy
 after an app run has completed; it does not change how the app marks that run complete.
 
-If startup is refused or throws before the detached turn is admitted, the dispatcher
-restores the message with its last failure reason and logs the refusal. A newer queued
-follow-up is appended after the restored message, preserving attachment order and the
-more restrictive origin. The QUEUED card shows the reason; the next 30-second scan can
-retry, and editing or deleting the card still works. A turn that was admitted and then
-failed in the provider is not automatically replayed, since replay could duplicate work.
+If startup is refused, the gateway returns a typed reason. `session-busy` is waiting:
+it does not consume an attempt, set `failure`, or write an error log. The next scan
+can send the turn as soon as the session is idle. Missing sessions, unavailable
+providers, invalid agent snapshots and missing projects stop automatic retry immediately.
+Unknown startup exceptions are temporary: `MAX_STARTUP_ATTEMPTS` allows 3 attempts.
+
+The dispatcher stores `retry.attempts`, `retry.stopped` and `retry.lastFailure` in the
+existing queued-message JSON. A Host restart does not reset the limit. Paused messages
+stay in the database with `failure`; their QUEUED card says to edit and send again.
+Editing/re-sending or appending a new follow-up creates a fresh retry budget. If a new
+follow-up arrives during a failed claim, restore merges both messages and lets that
+new user action retry. Logs record a changed failure reason or the final stop, not
+every repeated failure. A turn already admitted to the provider is not automatically
+replayed, since replay could duplicate work.
 
 The scan does not wait for other sessions' turns to finish. Per-session guards and
 atomic claims prevent duplicate queued dispatch; scheduled turns serialize within each
 session across scans. Schedules retain their explicit interruptActiveRun behavior.
-Active chat draft reconciliation continues after a card disappears, so a later startup
-failure can restore its card. The Stop button and Send anyway dialog are unchanged.
+Draft reconciliation makes no timer requests for a session that has never held a
+queued card. A pending card polls every 10 seconds. After a claim removes it, that
+interval continues for `QUEUED_RECOVERY_FAST_WINDOW_MS` (30 seconds), then changes to
+`QUEUED_RECOVERY_SLOW_INTERVAL_MS` (30 seconds). Paused cards also use the slow interval.
+A late restore is therefore seen within 30 seconds in a visible tab, plus request time.
+The hook remembers recovery scopes across session switches. Editing/deleting clears
+the scope's watch; unmounting stops all timers. Hidden documents make no timer requests
+and reconcile when shown. This uses REST, not the browser-local drafts change event. The Stop button and Send anyway dialog are unchanged.
 
 The CLI registry is an observation, not a lock shared with external terminals. The
 last check prevents dispatch while the registry reports busy, but cannot stop a separate

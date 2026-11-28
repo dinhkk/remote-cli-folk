@@ -976,6 +976,17 @@ export type CreateCredentialResult = {
 
 // ---------------------------
 //----------------- CHAT DRAFT QUEUE TYPES ------------
+/** Startup reasons shared by the websocket gateway and queued-message dispatcher. */
+export type ChatTurnStartReason = 'session-busy' | 'session-missing' | 'provider-unavailable' | 'agent-invalid' | 'project-missing';
+
+/** An admitted provider failure must not be replayed as a startup refusal. */
+export type ChatTurnResult =
+  | { started: true; error: string | null }
+  | { started: false; error: string; reason: ChatTurnStartReason };
+
+/** Persisted queue retry state, used by the database and dispatcher across Host restarts. */
+export type QueuedRetryState = { attempts: number; stopped: boolean; lastFailure?: string };
+
 /**
  * A chat message queued to be sent when its session is next idle, in the shape
  * the composer submits it and `session_drafts.queued_message` stores it.
@@ -989,6 +1000,7 @@ export type CreateCredentialResult = {
  * through `readQueuedChatMessage`).
  */
 export type QueuedChatMessage = {
+  retry?: QueuedRetryState;
   content: string;
   /** Last startup failure, retained with the queued message until retry or edit. */
   failure?: string;

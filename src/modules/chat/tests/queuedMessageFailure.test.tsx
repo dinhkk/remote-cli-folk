@@ -15,3 +15,11 @@ test('a retained queue failure is readable and preserves edit/delete actions', (
   fireEvent.click(view.getByRole('button', { name: /delete queued/i }));
   assert.equal(onEdit.mock.calls.length, 1); assert.equal(onDelete.mock.calls.length, 1);
 });
+
+
+test('a paused queue explains how editing resumes it instead of promising an automatic send', () => {
+  const view = render(<QueuedMessageCard content="unsent message" failure="Provider is not available." retryStopped onEdit={() => {}} onDelete={() => {}} />);
+  assert.match(view.getByRole('status').textContent ?? '', /Edit and send/);
+  assert.ok(view.getByText(/Retry paused/));
+  assert.equal(view.queryByText(/Will send when this finishes/), null);
+});
