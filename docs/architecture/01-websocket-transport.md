@@ -692,7 +692,13 @@ Draft reconciliation makes no timer requests for a session that has never held a
 queued card. A pending card polls every 10 seconds. After a claim removes it, that
 interval continues for `QUEUED_RECOVERY_FAST_WINDOW_MS` (30 seconds), then changes to
 `QUEUED_RECOVERY_SLOW_INTERVAL_MS` (30 seconds). Paused cards also use the slow interval.
-A late restore is therefore seen within 30 seconds in a visible tab, plus request time.
+Within the recovery window, a late restore is seen within 30 seconds in a visible tab, plus request time.
+Claim recovery stops after `QUEUED_RECOVERY_MAX_WINDOW_MS` (120 seconds) if the
+card does not return. The hook clears the timer and deletes the session history.
+This leaves time for startup refusal recovery without polling successful claims
+indefinitely. If the card returns before the deadline, normal card polling resumes.
+After the deadline, a later restore needs another hydration, such as reopening the
+chat. Paused cards remain visible and keep their 30-second reconciliation interval.
 The hook remembers recovery scopes across session switches. Editing/deleting clears
 the scope's watch; unmounting stops all timers. Hidden documents make no timer requests
 and reconcile when shown. This uses REST, not the browser-local drafts change event. The Stop button and Send anyway dialog are unchanged.

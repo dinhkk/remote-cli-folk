@@ -753,10 +753,10 @@ test('the fast claim-recovery window ends and a late failure is recovered by the
   assert.equal(view.result.current.queuedDraft, null);
   await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
   vi.mocked(fetch).mockClear();
-  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
   const requests = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
-  console.log('QUEUE_POLL_RECOVERY_SLOW_60_SECONDS', requests.length);
-  assert.equal(requests.length, 2);
+  console.log('QUEUE_POLL_RECOVERY_SLOW_30_SECONDS', requests.length);
+  assert.equal(requests.length, 1);
   server.set('session-1', { text: '', queuedMessage: { content: 'late startup failure', attachments: [], failure: 'Late refusal.' } });
   await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
   assert.equal((view.result.current.queuedDraft as { failure?: string } | null)?.failure, 'Late refusal.');
@@ -788,5 +788,31 @@ test('a queued busy card polls six times per minute at the production interval',
   const requests = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
   console.log('QUEUE_POLL_BUSY_60_SECONDS', requests.length);
   assert.equal(requests.length, 6);
+  view.unmount();
+});
+
+
+test('claim recovery expires after two minutes and does not restart on visibility or session changes', async () => {
+  const { view } = render();
+  await submit(view, 'successful claim');
+  pollTiming.interval = 10_000;
+  vi.useFakeTimers();
+  view.rerender({ session: SESSION_2, isLoading: true, model: 'model-1' });
+  view.rerender({ session: SESSION_1, isLoading: true, model: 'model-1' });
+  dispatcherClaims('session-1');
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  assert.equal(view.result.current.queuedDraft, null);
+  await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+  vi.mocked(fetch).mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  const requests = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET'));
+  console.log('QUEUE_POLL_AFTER_EXPIRY_60_SECONDS', requests.length);
+  assert.equal(requests.length, 0);
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+  view.rerender({ session: SESSION_2, isLoading: true, model: 'model-1' });
+  view.rerender({ session: SESSION_1, isLoading: true, model: 'model-1' });
+  vi.mocked(fetch).mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  assert.equal(vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/user/drafts') && (!init?.method || init.method === 'GET')).length, 0);
   view.unmount();
 });

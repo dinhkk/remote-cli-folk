@@ -141,6 +141,7 @@ const uploadAttachmentFiles = async (files: File[]): Promise<unknown[]> => {
 
 
 const QUEUED_RECOVERY_FAST_WINDOW_MS = 30_000;
+const QUEUED_RECOVERY_MAX_WINDOW_MS = 120_000;
 const QUEUED_RECOVERY_SLOW_INTERVAL_MS = 30_000;
 
 const restoreQueuedDraft = (sessionKey: string): QueuedDraft | null => {
@@ -1210,7 +1211,7 @@ export function useChatComposerState({
     if (!hasCard && !queuedReconcileHistory.current.has(sessionKey)) return;
     const history = queuedReconcileHistory.current.get(sessionKey) ?? { seen: false, hadCard: false, claimedAt: null };
     queuedReconcileHistory.current.set(sessionKey, history);
-    if (hasCard) history.seen = true;
+    if (hasCard) { history.seen = true; history.claimedAt = null; }
     if (history.hadCard && !hasCard) history.claimedAt = Date.now();
     history.hadCard = hasCard;
     if (!history.seen) return;
@@ -1239,11 +1240,23 @@ export function useChatComposerState({
     const nextDelay = () => (hasCard && !queuedDraft?.retry?.stopped)
       || (history.claimedAt !== null && Date.now() - history.claimedAt < QUEUED_RECOVERY_FAST_WINDOW_MS)
       ? QUEUED_DRAFT_RECONCILE_INTERVAL_MS : QUEUED_RECOVERY_SLOW_INTERVAL_MS;
+    // Successful claims must not leave an idle session polling indefinitely.
+    const expireRecovery = () => {
+      if (hasCard || history.claimedAt === null || Date.now() - history.claimedAt < QUEUED_RECOVERY_MAX_WINDOW_MS) return false;
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      queuedReconcileHistory.current.delete(sessionKey);
+      document.removeEventListener('visibilitychange', reconcileWhenShown);
+      return true;
+    };
     const schedule = () => {
-      if (!cancelled) timer = setTimeout(() => { void tick(); }, nextDelay());
+      if (cancelled || expireRecovery()) return;
+      const remaining = !hasCard && history.claimedAt !== null
+        ? Math.max(0, QUEUED_RECOVERY_MAX_WINDOW_MS - (Date.now() - history.claimedAt)) : Infinity;
+      timer = setTimeout(() => { void tick(); }, Math.min(nextDelay(), remaining));
     };
     const tick = async () => {
-      if (cancelled || reading) return;
+      if (cancelled || reading || expireRecovery()) return;
       reading = true;
       try { if (document.visibilityState === 'visible') await reconcile(); }
       finally { reading = false; schedule(); }
@@ -1255,7 +1268,7 @@ export function useChatComposerState({
       }
     };
     schedule();
-    document.addEventListener('visibilitychange', reconcileWhenShown);
+    if (!cancelled) document.addEventListener('visibilitychange', reconcileWhenShown);
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);

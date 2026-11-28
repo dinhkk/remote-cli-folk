@@ -62,6 +62,13 @@ The frontend polls only pending/recovery scopes. A never-queued idle chat has no
 requests. Recovery becomes a 30-second poll after the 30-second fast window; a mounted
 Controller frame can keep that slow watch even when another Host tab is selected.
 
+Claim recovery stops after `QUEUED_RECOVERY_MAX_WINDOW_MS` (120 seconds) if the
+card does not return. The hook clears the timer and deletes the session history.
+This leaves time for startup refusal recovery without polling successful claims
+indefinitely. If the card returns before the deadline, normal card polling resumes.
+After the deadline, a later restore needs another hydration, such as reopening the
+chat. Paused cards remain visible and keep their 30-second reconciliation interval.
+
 ## Tests
 
 Run `node_modules/.bin/tsx --tsconfig server/tsconfig.json --test server/modules/scheduled-messages/tests/scheduled-messages.test.ts`.
